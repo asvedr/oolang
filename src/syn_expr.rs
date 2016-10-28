@@ -15,7 +15,8 @@ pub enum EVal {
 	Item(Box<Expr>,Box<Expr>),
 	Id(Option<Vec<String>>, String), // namespace, name
 	Arr(Vec<Expr>),
-	Asc(Vec<Pair<Expr,Expr>>)
+	Asc(Vec<Pair<Expr,Expr>>),
+	Prop(Box<Expr>,String)
 }
 
 #[derive(Clone)]
@@ -113,6 +114,13 @@ impl Show for Expr {
 					for line in arg.show(layer + 1) {
 						res.push(line)
 					}
+				}
+				res
+			},
+			EVal::Prop(ref obj, ref fld) => {
+				let mut res = vec![format!("{}PROP {}{}", tab, fld, tp)];
+				for line in obj.show(layer + 1) {
+					res.push(line)
 				}
 				res
 			}
@@ -279,7 +287,7 @@ fn build(seq : &mut Vec<Result<Box<Expr>,usize>>, addr : &Vec<Cursor>) -> Expr {
 								min_p = Some(PRIORS[*p]);
 							}
 							Some(p1) =>
-								if p1 <= PRIORS[*p] {
+								if p1 >= PRIORS[*p] {
 									min_p_ind = i;
 									min_p = Some(PRIORS[*p]);
 								}
@@ -302,6 +310,21 @@ fn build(seq : &mut Vec<Result<Box<Expr>,usize>>, addr : &Vec<Cursor>) -> Expr {
 	build_local(seq, addr, 0, len)
 }
 
+fn parse_prop(lexer : &Lexer, curs : Cursor, obj : Box<Expr>) -> SynRes<Box<Expr>> {
+	match lexer.lex(&curs) {
+		Err(_) => syn_ok!(obj, curs),
+		Ok(ans) =>
+			if ans.val == "." {
+				let ans = lex_type!(lexer, &ans.cursor, LexTP::Id);
+				let obj = Box::new(expr!(EVal::Prop(obj,ans.val), curs));
+				let curs = ans.cursor;
+				parse_prop(lexer, curs, obj)
+			} else {
+				syn_ok!(obj, curs);
+			}
+	}
+}
+
 pub fn parse_expr(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 	let mut curs : Cursor = curs.clone();
 	let mut acc = vec![];
@@ -312,18 +335,24 @@ pub fn parse_expr(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 	}};}
 	loop {
 		let ans = lex!(lexer, &curs);
+		let mut obj;
 		if ans.val == "(" {
 			curs = ans.cursor;
 			let ans = try!(parse_expr(lexer, &curs));
 			addr.push(curs);
 			curs = lex!(lexer, &ans.cursor, ")");
-			acc.push(Ok(Box::new(ans.val)));
+			obj = Box::new(ans.val);
+			//acc.push(Ok(Box::new(ans.val)));
 		} else {
 			let ans = try!(parse_operand(lexer, &curs));
-			acc.push(Ok(Box::new(ans.val)));
+			//acc.push(Ok(Box::new(ans.val)));
+			obj = Box::new(ans.val);
 			addr.push(curs);
 			curs = ans.cursor;
 		}
+		let ans = try!(parse_prop(lexer, curs, obj));
+		acc.push(Ok(ans.val));
+		curs = ans.cursor;
 		match parse_operator(lexer, &curs) {
 			Err(_) => finalize!(),
 			Ok(ans) => {

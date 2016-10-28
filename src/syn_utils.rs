@@ -35,10 +35,10 @@ pub struct Pair<A,B> {
 macro_rules! pair_parser {
 	($key_p:expr, $val_p:expr, $pair_sig:expr) => {
 		move|lexer : &Lexer, curs : &Cursor| {
-			let ansA = syn_try!($key_p(lexer,curs));
-			let curs = lex!(lexer, &ansA.cursor, $pair_sig);
-			let ansB = syn_try!($val_p(lexer, &curs));
-			syn_ok!(Pair{a : ansA.val, b : ansB.val}, ansB.cursor);
+			let ans_a = syn_try!($key_p(lexer,curs));
+			let curs  = lex!(lexer, &ans_a.cursor, $pair_sig);
+			let ans_b = syn_try!($val_p(lexer, &curs));
+			syn_ok!(Pair{a : ans_a.val, b : ans_b.val}, ans_a.cursor);
 		};
 	};
 }
