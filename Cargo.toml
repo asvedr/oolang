@@ -1,0 +1,6 @@
+[package]
+name = "oolang"
+version = "0.1.0"
+authors = ["Arseny <asvedr@gmail.com>"]
+
+[dependencies]

@@ -1,0 +1,26 @@
+mod lexer;
+#[macro_use]
+mod syn_reserr;
+mod type_sys;
+mod syn_utils;
+mod syn_expr;
+use lexer::*;
+use std::io;
+use std::fs::File;
+//use std::result::Result;
+
+fn main() {
+	let mut source = String::new();
+	match File::open("source.code") {
+		Ok(hnd) => hnd.read_to_string(&mut source),
+		Err(_)  => panic!("can't open file")
+	};
+	let lxr = Lexer::new(&*source);
+	let curs = Cursor::new();
+	match syn_expr::parse_expr(&lxr, &curs) {
+		Ok(ans) => {
+			println!("ans: {:?}", ans.val);
+		},
+		Err(e) => println!("ERR {:?}", e)
+	}
+}
