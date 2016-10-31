@@ -30,3 +30,34 @@ pub fn parse_lambda(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 	let curs = lex!(lexer, curs, "fn");
 	parse_list(lexer, &curs, &parse_arg, "(", ")");
 }
+
+fn parse_arg(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
+	let sym = lex!(lexer, curs);
+	let mut curs = curs.clone();
+	let named = if sym.val == "~" {
+		curs = sym.cursor;
+		true;
+	} else {
+		false
+	};
+	let name = lex_type!(lexer, &curs, LexTP::Id);
+	curs = name.cursor;
+	let sym = lex!(lexer, &curs);
+	let val = if sym.val == "=" {
+		let val = try!(parse_expr(lexer, &sym.cursor));
+		curs = val.cursor;
+		Some(val.val)
+	} else {
+		None
+	};
+	curs = lex!(lexer, &curs, ":");
+	let tp = try!(parse_type(lexer, &curs));
+	curs = tp.cursor;
+	let res = Arg {
+		named : named,
+		name  : name,
+		val   : val,
+		tp    : tp
+	};
+	syn_ok!(res, curs);
+}
