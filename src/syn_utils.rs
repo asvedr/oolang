@@ -43,11 +43,6 @@ macro_rules! pair_parser {
 	};
 }
 
-pub fn parse_id(lexer : &Lexer, curs : &Cursor) -> SynRes<String> {
-	let ans = lex_type!(lexer, curs, LexTP::Id);
-	syn_ok!(ans.val, ans.cursor)
-}
-
 pub trait Show {
 	fn show(&self, usize) -> Vec<String>;
 }

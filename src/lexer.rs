@@ -29,17 +29,20 @@ pub enum LexTP {
 	Char,		// ok q
 	Br,			// ok q
 	Dot,		// ok q
-	Comma,		// ok q
+	//Comma,		// ok q
+	//DCM,        // ok
 	Opr,		// ok q
 	DecType,	// ok q
 	NSpace,		// ok q
 }
 
+/*
 impl LexTP {
 	pub fn to_string(&self) -> String {
 		format!("{:?}", self)
 	}
 }
+*/
 
 /*
 // this struct don't used in this module but using in others
@@ -147,7 +150,7 @@ impl Lexer {
 		let machines : Vec<Machine> = vec![
 			mach!(id, Id), mach!(numi, Int), mach!(numr, Real), mach!(stra, Str, read_str), mach!(chara, Char, read_char),
 			mach!(br, Br), mach!(opr, Opr), mach!(dectp, DecType), mach!(namesp, NSpace),
-			mach!(dot, Dot), mach!(comma, Comma)
+			mach!(dot, Dot)//, mach!(comma, Comma)
 		];
 		let mut any_on = false; // flag for any machine is activated
 		let mut last_true = None; // last machine which was in final state
@@ -310,13 +313,19 @@ fn br(c : char, lexer : &Lexer, s : &mut State) {
 
 #[allow(unused_parens)]
 fn dot(c : char, _ : &Lexer, s : &mut State) {
-	cond!(s, s.num == 0 && c == '.', sstate!(s,true,1))
+	cond!(s, s.num == 0 && (c == '.' || c == ',' || c == ';'), sstate!(s,true,1))
 }
-
+/*
 #[allow(unused_parens)]
 fn comma(c : char, _ : &Lexer, s : &mut State) {
 	cond!(s, s.num == 0 && c == ',', sstate!(s,true,1))
 }
+
+#[allow(unused_parens)]
+fn dcm(c : char, _ : &Lexer, s : &mut State) {
+	cond!(s, s.num == 0 && c == )
+}
+*/
 
 #[allow(unused_parens)]
 fn dectp(c : char, _ : &Lexer, s : &mut State) {

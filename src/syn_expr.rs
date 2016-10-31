@@ -13,23 +13,24 @@ pub enum EVal {
 	Call(Option<Vec<Type>>,Box<Expr>,Vec<Expr>),
 	NewClass(Option<Vec<Type>>,Option<Vec<String>>,String,Vec<Expr>),
 	Item(Box<Expr>,Box<Expr>),
-	Id(Option<Vec<String>>, String), // namespace, name
+	Var(Option<Vec<String>>, String), // namespace, name
 	Arr(Vec<Expr>),
 	Asc(Vec<Pair<Expr,Expr>>),
 	Prop(Box<Expr>,String)
+	//Lambda( ... )
 }
 
 #[derive(Clone)]
 pub struct Expr {
-	val    : EVal,
-	kind   : Option<Type>,
-	addres : Cursor
+	pub val    : EVal,
+	pub kind   : Option<Type>,
+	pub addres : Cursor
 }
 
 impl Show for Expr {
 	fn show(&self, layer : usize) -> Vec<String> {
 		let mut tab = String::new();
-		for i in 0 .. layer {
+		for _ in 0 .. layer {
 			tab.push(' ')
 		}
 		let tp = match self.kind {
@@ -41,7 +42,7 @@ impl Show for Expr {
 			EVal::Real(ref a) => vec![format!("{}{}{}",tab,a,tp)],
 			EVal::Str(ref a)  => vec![format!("{}\"{}\"{}",tab,a,tp)],
 			EVal::Char(ref a) => vec![format!("{}\'{}\'{}",tab,a,tp)],
-			EVal::Call(ref tmpl,ref fun,ref args) => {
+			EVal::Call(_,ref fun,ref args) => {
 				let mut res = vec![format!("{}CALL{}", tab, tp)/*, format!("{}FUN", tab)*/];
 				for line in fun.show(layer + 1) {
 					res.push(line);
@@ -64,7 +65,7 @@ impl Show for Expr {
 				}
 				res
 			},
-			EVal::Id(ref p, ref a) => {
+			EVal::Var(ref p, ref a) => {
 				let mut pref = String::new();
 				match *p {
 					Some(ref v) => {
@@ -146,7 +147,7 @@ fn parse_prefix(lexer : &Lexer, curs : &Cursor) -> Option<SynAns<Vec<String>>> {
 	loop {
 		match lexer.lex(&curs) {
 			Ok(ans) => {
-				let mut pack;
+				let pack;
 				if ans.kind == LexTP::Id {
 					pack = ans.val;
 				} else {
@@ -172,13 +173,13 @@ fn parse_prefix(lexer : &Lexer, curs : &Cursor) -> Option<SynAns<Vec<String>>> {
 fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 	let mut curs : Cursor = curs.clone();
 	let ans = lex!(lexer, &curs);
-	let obj;
+	let mut obj;
 	match parse_prefix(&lexer, &curs) {
 		Some(pans) => {
 			let prefix = pans.val;
 			curs = pans.cursor;
 			let id = lex_type!(lexer, &curs, LexTP::Id);
-			obj = expr!(EVal::Id(Some(prefix), id.val), curs);
+			obj = expr!(EVal::Var(Some(prefix), id.val), curs);
 			curs = id.cursor;
 		},
 		None =>
@@ -219,7 +220,7 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 					obj = expr!(EVal::NewClass(None,pref,name,args), orig_c);
 				},
 				LexTP::Id   => {
-					obj  = expr!(EVal::Id(None, ans.val), curs);
+					obj  = expr!(EVal::Var(None, ans.val), curs);
 					curs = ans.cursor;
 				},
 				LexTP::Br if ans.val == "[" => {
@@ -236,22 +237,31 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 				_ => syn_throw!("can't read expr", curs)
 			}
 	}
-	match lexer.lex(&curs) {
-		Ok(ans) =>
-			if ans.val == "(" {
-				let args = try!(parse_list(lexer, &curs, &parse_expr, "(", ")"));
-				let opos = obj.addres.clone();
-				syn_ok!(expr!(EVal::Call(None,Box::new(obj), args.val), opos), args.cursor);
-			} else if ans.val == "[" {
-				let index_ans = try!(parse_expr(lexer, &ans.cursor));
-				let opos = obj.addres.clone();
-				let expr = expr!(EVal::Item(Box::new(obj), Box::new(index_ans.val)), opos);
-				let curs = lex!(lexer,&index_ans.cursor,"]");
-				syn_ok!(expr, curs);
-			} else {
-				syn_ok!(obj, curs);
-			},
-		_ => syn_ok!(obj, curs)
+	// adding modifs (props, items, calls)
+	// cur object in 'obj'
+	// cur cursor in 'curs'
+	loop {
+		match lexer.lex(&curs) {
+			Ok(ans) => 
+				if ans.val == "(" {
+					let args = try!(parse_list(lexer, &curs, &parse_expr, "(", ")"));
+					//let opos = obj.addres.clone();
+					obj = expr!(EVal::Call(None,Box::new(obj), args.val), curs);
+					curs = args.cursor;
+				} else if ans.val == "[" {	
+					let index_ans = try!(parse_expr(lexer, &ans.cursor));
+					//let opos = obj.addres.clone();
+					obj = expr!(EVal::Item(Box::new(obj), Box::new(index_ans.val)), curs);
+					curs = lex!(lexer,&index_ans.cursor,"]");
+				} else if ans.val == "." {
+					let fld = lex_type!(lexer, &ans.cursor, LexTP::Id);
+					obj = expr!(EVal::Prop(Box::new(obj), fld.val), curs);
+					curs = fld.cursor;
+				} else {
+					syn_ok!(obj, curs)
+				},
+			_ => syn_ok!(obj, curs)
+		}
 	}
 }
 
@@ -302,7 +312,7 @@ fn build(seq : &mut Vec<Result<Box<Expr>,usize>>, addr : &Vec<Cursor>) -> Expr {
 			let fun_id = match seq[min_p_ind] {Err(ref i) => OPERS[*i], _ => panic!()};
 			let left  = build_local(seq, addr, left, min_p_ind);
 			let right = build_local(seq, addr, min_p_ind + 1, right);
-			let fun = expr!(EVal::Id(Some(vec!["#opr".to_string()]), fun_id.to_string()), addr[min_p_ind].clone());
+			let fun = expr!(EVal::Var(Some(vec!["#opr".to_string()]), fun_id.to_string()), addr[min_p_ind].clone());
 			return expr!(EVal::Call(None, Box::new(fun), vec![left,right]), addr[min_p_ind].clone());
 		}
 	}
@@ -310,32 +320,17 @@ fn build(seq : &mut Vec<Result<Box<Expr>,usize>>, addr : &Vec<Cursor>) -> Expr {
 	build_local(seq, addr, 0, len)
 }
 
-fn parse_prop(lexer : &Lexer, curs : Cursor, obj : Box<Expr>) -> SynRes<Box<Expr>> {
-	match lexer.lex(&curs) {
-		Err(_) => syn_ok!(obj, curs),
-		Ok(ans) =>
-			if ans.val == "." {
-				let ans = lex_type!(lexer, &ans.cursor, LexTP::Id);
-				let obj = Box::new(expr!(EVal::Prop(obj,ans.val), curs));
-				let curs = ans.cursor;
-				parse_prop(lexer, curs, obj)
-			} else {
-				syn_ok!(obj, curs);
-			}
-	}
-}
-
 pub fn parse_expr(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 	let mut curs : Cursor = curs.clone();
-	let mut acc = vec![];
-	let mut addr = vec![];
+	let mut acc  : Vec<Result<Box<Expr>,usize>> = vec![];
+	let mut addr : Vec<Cursor> = vec![];
 	macro_rules! finalize{() => {{
 		let res = build(&mut acc, &addr);
 		syn_ok!(res, curs);
 	}};}
 	loop {
 		let ans = lex!(lexer, &curs);
-		let mut obj;
+		let obj;
 		if ans.val == "(" {
 			curs = ans.cursor;
 			let ans = try!(parse_expr(lexer, &curs));
@@ -350,9 +345,9 @@ pub fn parse_expr(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 			addr.push(curs);
 			curs = ans.cursor;
 		}
-		let ans = try!(parse_prop(lexer, curs, obj));
-		acc.push(Ok(ans.val));
-		curs = ans.cursor;
+		//let ans = try!(parse_prop(lexer, curs, obj));
+		acc.push(Ok(obj));
+		//curs = ans.cursor;
 		match parse_operator(lexer, &curs) {
 			Err(_) => finalize!(),
 			Ok(ans) => {
