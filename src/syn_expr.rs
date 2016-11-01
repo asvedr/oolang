@@ -16,8 +16,8 @@ pub enum EVal {
 	Var(Option<Vec<String>>, String), // namespace, name
 	Arr(Vec<Expr>),
 	Asc(Vec<Pair<Expr,Expr>>),
-	Prop(Box<Expr>,String)
-	//Lambda( ... )
+	Prop(Box<Expr>,String),
+	Null
 }
 
 #[derive(Clone)]
@@ -124,7 +124,8 @@ impl Show for Expr {
 					res.push(line)
 				}
 				res
-			}
+			},
+			EVal::Null => vec![format!("{}null", tab)]
 		}
 	}
 }
@@ -200,7 +201,10 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 					obj = expr!(EVal::Char(ans.val.chars().next().unwrap()), curs, Type::Char);
 					curs = ans.cursor;
 				},
-				LexTP::Id if ans.val == "fn" => panic!("lambda"),
+				LexTP::Id if ans.val == "null" => {
+					obj = expr!(EVal::Null, curs);
+					curs = ans.cursor;
+				},
 				LexTP::Id if ans.val == "new" => {
 					let orig_c = curs;
 					curs = ans.cursor;
