@@ -11,7 +11,8 @@ pub enum Type {
 	Bool,
 	Void,
 	Arr(Box<Type>),
-	Class(String,Option<Tmpl>)
+	Class(String,Option<Tmpl>),
+	Fn(Vec<Type>, Box<Type>)
 }
 
 impl fmt::Debug for Type {
@@ -28,7 +29,8 @@ impl fmt::Debug for Type {
 				match *tmpl {
 					Some(ref val) => write!(f, "{:?}", val),
 					_         => name.fmt(f)
-				}
+				},
+			Type::Fn(ref args, ref res) => write!(f, "Fn{:?}:{:?}", args, res)
 		}
 	}
 }
@@ -43,6 +45,12 @@ pub fn parse_type(lexer : &Lexer, curs : &Cursor) -> SynRes<Type> {
 		"char" => syn_ok!(Type::Char, ans.cursor),
 		"str"  => syn_ok!(Type::Str, ans.cursor),
 		"bool" => syn_ok!(Type::Bool, ans.cursor),
+		"Fn"   => { // FUNC
+			let args = try!(parse_list(lexer, &ans.cursor, &parse_type, "(", ")"));
+			let curs = lex!(lexer, &args.cursor, ":");
+			let res = try!(parse_type(lexer, &curs));
+			syn_ok!(Type::Fn(args.val, Box::new(res.val)), res.cursor);
+		},
 		"["    => { // ARRAY
 			let inner = try!(parse_type(lexer, &ans.cursor));
 			let out = lex!(lexer, &inner.cursor, "]");

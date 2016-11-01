@@ -4,9 +4,9 @@ use syn_expr::*;
 use type_sys::*;
 //use std::fmt;
 
-pub enum ActVal {
+pub enum ActVal<DF> {
 	Expr(Expr),
-	//DFun()
+	DFun(Box<DF>),
 	//   name    var type     init val
 	DVar(String,Option<Type>,Option<Expr>),
 	//   a  =  b
@@ -14,14 +14,14 @@ pub enum ActVal {
 	Ret(Option<Expr>),
 	Break(Option<String>), // label to loop
 	//     label          cond   actions
-	While(Option<String>, Expr, Vec<Act>),
+	While(Option<String>, Expr, Vec<Act<DF>>),
 	//For(String,)
 	// cond   then    else
-	If(Expr,Vec<Act>,Vec<Act>)
+	If(Expr,Vec<Act<DF>>,Vec<Act<DF>>)
 }
 
-pub struct Act {
-	pub val    : ActVal,
+pub struct Act<DF> {
+	pub val    : ActVal<DF>,
 	pub addres : Cursor 
 }
 
@@ -29,13 +29,13 @@ macro_rules! act {
 	($v:expr, $addr:expr) => {Act{val : $v, addres : $addr}};
 }
 
-impl Show for Act {
+impl<DF : Show> Show for Act<DF> {
 	fn show(&self, layer : usize) -> Vec<String> {
 		self.val.show(layer)
 	}
 }
 
-impl Show for ActVal {
+impl<DF : Show> Show for ActVal<DF> {
 	fn show(&self, layer : usize) -> Vec<String> {
 		let mut tab = String::new();
 		for _ in 0 .. layer {
@@ -43,6 +43,7 @@ impl Show for ActVal {
 		}
 		match *self {
 			ActVal::Expr(ref e) => e.show(layer), 
+			ActVal::DFun(ref df) => df.show(layer),
 			ActVal::DVar(ref n, ref t, ref v) => {
 				let tp = match *t {
 					Some(ref t) => format!("{:?}", t),
@@ -121,7 +122,7 @@ impl Show for ActVal {
 	}
 }
 
-pub fn parse_act_list(lexer : &Lexer, curs : &Cursor) -> SynRes<Vec<Act>> {
+pub fn parse_act_list<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> SynRes<Vec<Act<DF>>> {
 	let mut curs : Cursor = lex!(lexer, curs, "{");
 	let mut acc = vec![];
 	loop {
@@ -129,7 +130,7 @@ pub fn parse_act_list(lexer : &Lexer, curs : &Cursor) -> SynRes<Vec<Act>> {
 		if ans.val == "}" {
 			syn_ok!(acc, ans.cursor);
 		}
-		let ans = syn_try!(parse_act(lexer, &curs));
+		let ans = syn_try!(parse_act(lexer, &curs, fparse));
 		acc.push(ans.val);
 		curs = ans.cursor;
 		let ans = lex!(lexer, &curs);
@@ -150,12 +151,15 @@ fn is_act_end(lexer : &Lexer, curs : &Cursor) -> bool {
 	}
 }
 
-pub fn parse_act(lexer : &Lexer, curs : &Cursor) -> SynRes<Act> {
+pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> SynRes<Act<DF>> {
 	let ans = lex!(lexer, curs);
 	let addr = curs.clone();
 	macro_rules! make {($act:expr) => {act!($act, addr)}}
 	match &*ans.val {
-		//"fn"
+		"fn" => {
+			let ans = try!(fparse(lexer, curs));
+			syn_ok!(make!(ActVal::DFun(Box::new(ans.val))), ans.cursor)
+		},
 		"var" => {
 			// name
 			let vname = lex_type!(lexer, &ans.cursor, LexTP::Id);
@@ -201,7 +205,7 @@ pub fn parse_act(lexer : &Lexer, curs : &Cursor) -> SynRes<Act> {
 			// cond
 			let cond = try!(parse_expr(lexer, &curs));
 			// act
-			let act = try!(parse_act_list(lexer, &cond.cursor));
+			let act = try!(parse_act_list(lexer, &cond.cursor, fparse));
 			syn_ok!(make!(ActVal::While(label, cond.val, act.val)), act.cursor)
 		},
 		//"for"
@@ -217,11 +221,11 @@ pub fn parse_act(lexer : &Lexer, curs : &Cursor) -> SynRes<Act> {
 			// cond
 			let cond = try!(parse_expr(lexer, &ans.cursor));
 			// then
-			let thn = try!(parse_act_list(lexer, &cond.cursor));
+			let thn = try!(parse_act_list(lexer, &cond.cursor, fparse));
 			// else
 			let sym = lex!(lexer, &thn.cursor);
 			if sym.val == "else" {
-				let els = try!(parse_act_list(lexer, &sym.cursor));
+				let els = try!(parse_act_list(lexer, &sym.cursor, fparse));
 				syn_ok!(make!(ActVal::If(cond.val, thn.val, els.val)), els.cursor)
 			} else {
 				syn_ok!(make!(ActVal::If(cond.val, thn.val, vec![])), thn.cursor)

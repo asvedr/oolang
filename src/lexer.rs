@@ -118,7 +118,7 @@ impl Lexer {
 	pub fn new(src : &str) -> Lexer {
 		// alphabets
 		let ops     : Vec<char> = ("+-*/=<>?!\\@%$^&#").chars().collect();
-		let sings   : Vec<char> = (".,;").chars().collect();
+		let sings   : Vec<char> = (".,;~").chars().collect();
 		let brs     : Vec<char> = ("()[]{}").chars().collect();
 		let slashed : Vec<char> = ("nt\\'\"").chars().collect();
 		// splitting for [[char]]
@@ -312,8 +312,9 @@ fn br(c : char, lexer : &Lexer, s : &mut State) {
 }
 
 #[allow(unused_parens)]
-fn dot(c : char, _ : &Lexer, s : &mut State) {
-	cond!(s, s.num == 0 && (c == '.' || c == ',' || c == ';'), sstate!(s,true,1))
+fn dot(c : char, lexer : &Lexer, s : &mut State) {
+	cond!(s, s.num == 0 && is_in(c, &lexer.alphs[1]), sstate!(s,true,1))
+//	cond!(s, s.num == 0 && (c == '.' || c == ',' || c == ';'), sstate!(s,true,1))
 }
 /*
 #[allow(unused_parens)]

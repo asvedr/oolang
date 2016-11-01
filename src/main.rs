@@ -6,6 +6,7 @@ mod type_sys;
 mod syn_utils;
 mod syn_expr;
 mod syn_act;
+mod syn_fn;
 use lexer::*;
 //use std::io;
 use std::io::Read;
@@ -29,7 +30,7 @@ fn main() {
 	let lxr = Lexer::new(&*source);
 	let curs = Cursor::new();
 //	match syn_expr::parse_expr(&lxr, &curs) {
-	match syn_act::parse_act(&lxr, &curs) {
+	match syn_fn::parse_fn_full(&lxr, &curs) {
 		Ok(ans) => {
 			for line in ans.val.show(0) {
 				println!("{}", line);
