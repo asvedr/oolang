@@ -11,7 +11,7 @@ pub enum Type {
 	Bool,
 	Void,
 	Arr(Box<Type>),
-	Class(String,Option<Tmpl>),
+	Class(Vec<String>,Option<Tmpl>),
 	Fn(Vec<Type>, Box<Type>)
 }
 
@@ -27,8 +27,8 @@ impl fmt::Debug for Type {
 			Type::Arr(ref val) => write!(f, "[{:?}]", val),
 			Type::Class(ref name, ref tmpl) =>
 				match *tmpl {
-					Some(ref val) => write!(f, "{:?}", val),
-					_         => name.fmt(f)
+					Some(ref val) => write!(f, "{:?}{:?}", name, val),
+					_         => write!(f, "{:?}", name)
 				},
 			Type::Fn(ref args, ref res) => write!(f, "Fn{:?}:{:?}", args, res)
 		}
@@ -65,17 +65,29 @@ pub fn parse_type(lexer : &Lexer, curs : &Cursor) -> SynRes<Type> {
 			// this may be 'Class' or 'Class<A,B...>
 			let c = ans.val.chars().next().unwrap();
 			// class name must start with uppercase
-			if ans.kind == LexTP::Id && (c >= 'A' && c <= 'Z') {
-				let name = ans.val;
-				match parse_tmpl(lexer, &ans.cursor) {
-					Ok(ans) => {
-						let rest = ans.cursor;
-						syn_ok!(Type::Class(name, Some(ans.val)), rest);
-					},
-					_ => syn_ok!(Type::Class(name,None), ans.cursor)
+			let mut acc = vec![];
+			let mut curs = curs.clone();
+			loop {
+				let ans = lex!(lexer, &curs);
+				if ans.kind == LexTP::Id && (c >= 'A' && c <= 'Z') {
+					//let name = ans.val;
+					acc.push(ans.val);
+					match lexer.lex(&ans.cursor) {
+						Err(_) => syn_ok!(Type::Class(acc,None), ans.cursor),
+						Ok(sym) => {
+							if sym.val == "::" {
+								curs = sym.cursor;
+							} else if sym.val == "<" {
+								let ans = try!(parse_tmpl(lexer, &ans.cursor));
+								syn_ok!(Type::Class(acc, Some(ans.val)), ans.cursor);
+							} else {
+								syn_ok!(Type::Class(acc,None), ans.cursor)
+							}
+						}
+					}
+				} else {
+					syn_throw!(format!("Bad class name '{}'", ans.val), curs);
 				}
-			} else {
-				syn_throw!(format!("Bad class name '{}'", ans.val), curs);
 			}
 		}
 	}

@@ -49,14 +49,16 @@ impl Show for SynFn {
 			tab.push(' ');
 		}
 		let mut res = vec![format!("{}func {:?} allowclos:{} type:{:?}", tab, self.name, self.can_be_clos, self.rettp)];
+		tab.push(' ');
+		res.push(format!("{}ARGS", tab));
 		for arg in self.args.iter() {
-			for line in arg.show(layer + 1) {
+			for line in arg.show(layer + 2) {
 				res.push(line);
 			}
 		}
 		res.push(format!("{}BODY", tab));
 		for cmd in self.body.iter() {
-			for line in cmd.show(layer + 1) {
+			for line in cmd.show(layer + 2) {
 				res.push(line);
 			}
 		}

@@ -139,6 +139,15 @@ impl Lexer {
 		}
 	}
 	pub fn lex(&self, curs : &Cursor) -> Result<LexRes,LexErr> {
+		//println!("LOOK FROM {:?}", curs);
+		let ans = try!(self.lex_priv(curs));
+		if ans.val == "" {
+			self.lex(&ans.cursor)
+		} else {
+			Ok(ans)
+		}
+	}
+	fn lex_priv(&self, curs : &Cursor) -> Result<LexRes,LexErr> {
 		let mut line   = curs.line;
 		let mut column = curs.column;
 		let mut p_line; // line on prev step
@@ -197,14 +206,22 @@ impl Lexer {
 				column += 1;
 			}
 			// comment sys
-			if sym == '/' && prev_slash {
+			if sym == '/' && prev_slash && comm_count == 0 && !comm_line { // FOUND SINGLE LINE COMMENT
+				let _ = acc.pop();
 				comm_line = true;
-			} else if sym == '*' && prev_slash && !comm_line {
+			} else if sym == '*' && prev_slash && !comm_line { // FOUND BIG COMMENT
+				if comm_count == 0 {
+					let _ = acc.pop();
+				}
 				comm_count += 1;
-			} else if sym == '/' && prev_star && !comm_count > 0 {
+			} else if sym == '/' && prev_star && comm_count > 0 {
 				comm_count -= 1;
 				sym = ' ';
+				prev_slash = false;
+				prev_star = false;
+				continue;
 			}
+			//println!("psl:{} pst:{} cl:{} cc:{} '{}'", prev_slash, prev_star, comm_line, comm_count, sym);
 			if sym == '/' {
 				prev_slash = true;
 				prev_star  = false;
@@ -218,7 +235,7 @@ impl Lexer {
 			if sym == '\t' || comm_line || comm_count > 0
 				{sym = ' '}
 			// lexers
-			if sym == ' ' && !any_on {
+			if (sym == ' ' && !any_on) || comm_line || comm_count > 0 {
 				continue
 			} else {
 				// checking machines for new symbol
