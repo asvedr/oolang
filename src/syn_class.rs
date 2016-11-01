@@ -8,6 +8,7 @@ use syn_fn::*;
 pub struct Class {
 	pub addres    : Cursor,
 	pub parent    : Option<Type>,
+	pub singleton : bool,
 	pub template  : Vec<Type>,
 	pub name      : String,
 	pub priv_fn   : Vec<SynFn>,
@@ -22,7 +23,7 @@ impl Show for Class {
 		for _ in 0 .. layer {
 			tab.push(' ');
 		}
-		let head = format!("{}CLASS {:?} {} {:?}",tab,self.template,self.name,self.parent);
+		let head = format!("{}CLASS sing:{} {:?} {} {:?}",tab,self.singleton,self.template,self.name,self.parent);
 		let mut res = vec![head];
 		tab.push(' ');
 		for p in self.priv_prop.iter() {
@@ -50,6 +51,16 @@ impl Show for Class {
 pub fn parse_class(lexer : &Lexer, curs : &Cursor) -> SynRes<Class> {
 	let addres : Cursor = curs.clone();
 	let mut curs = lex!(lexer, curs, "class");
+	// singleton
+	let singleton = {
+		let sym = lex!(lexer, &curs);
+		if sym.val == "single" {
+			curs = sym.cursor;
+			true
+		} else {
+			false
+		}
+	};
 	// template
 	let tmpl = {
 		let sym = lex!(lexer, &curs);
@@ -137,6 +148,7 @@ pub fn parse_class(lexer : &Lexer, curs : &Cursor) -> SynRes<Class> {
 
 	let cls = Class {
 		addres    : addres,
+		singleton : singleton,
 		parent    : parent,
 		template  : tmpl,
 		name      : cname,
