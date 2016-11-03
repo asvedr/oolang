@@ -1,10 +1,24 @@
-class Main : Std::Object {
+use Std::Io;
+use Std::AllFrom::*;
+use Std::Alias as Ali;
+
+extern type POSIX
+extern fn c_call : Fn(POSIX, str) : () = "c_call_ex"
+
+class single Main : Std::Object {
 	pub a : real;
-	pub b : Point;
+	pub b : Geometry::Point<int>;
 	pub fn curry_add(a : int) : Fn(int):int {
 		fn closure(b : /*int*/real) : int {
 			return a + b;
 		};
 		return closure
+	};
+	priv fn add(p : int) : () {
+		self.a = self.a + p;
 	}
+}
+
+fn apply<A>(a : A, b : A, f : Fn(A,A): A) : A {
+	f(a,b)
 }

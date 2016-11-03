@@ -216,7 +216,7 @@ impl Lexer {
 				comm_count += 1;
 			} else if sym == '/' && prev_star && comm_count > 0 {
 				comm_count -= 1;
-				sym = ' ';
+				//sym = ' ';
 				prev_slash = false;
 				prev_star = false;
 				continue;

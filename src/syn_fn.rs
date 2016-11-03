@@ -48,7 +48,10 @@ impl Show for SynFn {
 		for _ in 0 .. layer {
 			tab.push(' ');
 		}
-		let mut res = vec![format!("{}func {:?} allowclos:{} type:{:?}", tab, self.name, self.can_be_clos, self.rettp)];
+		let mut res = match self.tmpl {
+			Some(ref t) => vec![format!("{}func {:?} tmpl:{:?} allowclos:{} type:{:?}", tab, self.name, t, self.can_be_clos, self.rettp)],
+			_ => vec![format!("{}func {:?} allowclos:{} type:{:?}", tab, self.name, self.can_be_clos, self.rettp)]
+		};
 		tab.push(' ');
 		res.push(format!("{}ARGS", tab));
 		for arg in self.args.iter() {
@@ -66,6 +69,7 @@ impl Show for SynFn {
 	}
 }
 
+/*
 pub fn parse_lambda(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 	// symbol 'fn'
 	let orig = curs.clone();
@@ -89,6 +93,7 @@ pub fn parse_lambda(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 	};
 	syn_ok!(res, body.cursor)	
 }
+*/
 
 pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 	// symbol 'fn'

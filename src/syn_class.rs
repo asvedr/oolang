@@ -138,6 +138,7 @@ pub fn parse_class(lexer : &Lexer, curs : &Cursor) -> SynRes<Class> {
 		let ans = lex!(lexer, &curs);
 		if ans.val == "}" {
 			//syn_ok!(acc, ans.cursor);
+			curs = ans.cursor;
 			break;
 		} else if ans.val == ";" {
 			curs = ans.cursor;

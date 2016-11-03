@@ -8,14 +8,13 @@ mod syn_expr;
 mod syn_act;
 mod syn_fn;
 mod syn_class;
-//use lexer::*;
+mod syn_ext_c;
+mod syn_mod;
+mod syn_common;
 //use std::io;
 use std::io::Read;
 use std::fs::File;
-use syn_utils::Show;
-//use std::result::Result;
-
-use syn_reserr::*;
+use syn_common::*;
 
 fn main() {
 	let mut source = String::new();
@@ -31,10 +30,10 @@ fn main() {
 		Err(_)  => panic!("can't open file")
 	};
 	let lxr = Lexer::new(&*source);
-	let curs = Cursor::new();
-	match syn_class::parse_class(&lxr, &curs) {
-		Ok(ans) => {
-			for line in ans.val.show(0) {
+	//let curs = Cursor::new();
+	match parse_mod(&lxr) {
+		Ok(m) => {
+			for line in m.show(0) {
 				println!("{}", line);
 			}
 		},
