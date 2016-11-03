@@ -15,7 +15,7 @@ pub struct Arg {
 
 pub struct SynFn {
 	pub name        : Option<String>,
-	pub tmpl        : Option<Tmpl>,
+	pub tmpl        : Tmpl,
 	pub args        : Vec<Arg>,
 	pub rettp       : Type,
 	pub body        : Vec<Act<SynFn>>,
@@ -48,9 +48,10 @@ impl Show for SynFn {
 		for _ in 0 .. layer {
 			tab.push(' ');
 		}
-		let mut res = match self.tmpl {
-			Some(ref t) => vec![format!("{}func {:?} tmpl:{:?} allowclos:{} type:{:?}", tab, self.name, t, self.can_be_clos, self.rettp)],
-			_ => vec![format!("{}func {:?} allowclos:{} type:{:?}", tab, self.name, self.can_be_clos, self.rettp)]
+		let mut res = if self.tmpl.len() > 0 {
+			vec![format!("{}func {:?} tmpl:{:?} allowclos:{} type:{:?}", tab, self.name, self.tmpl, self.can_be_clos, self.rettp)]
+		} else {
+			vec![format!("{}func {:?} allowclos:{} type:{:?}", tab, self.name, self.can_be_clos, self.rettp)]
 		};
 		tab.push(' ');
 		res.push(format!("{}ARGS", tab));
@@ -110,10 +111,10 @@ pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 	let tmpl = if has_tmpl {
 		let tmpl = try!(parse_tmpl(lexer, &name.cursor));
 		curs = tmpl.cursor;
-		Some(tmpl.val)
+		tmpl.val
 	} else {
 		curs = name.cursor;
-		None
+		vec![]
 	};
 	// args
 	let parser = |l : &Lexer, c : &Cursor| {parse_arg(l, c, true)};

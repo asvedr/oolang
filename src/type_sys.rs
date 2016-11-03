@@ -11,7 +11,7 @@ pub enum Type {
 	Bool,
 	Void,
 	Arr(Box<Type>),
-	Class(Vec<String>,Option<Tmpl>),
+	Class(Vec<String>,Option<Vec<Type>>),
 	Fn(Vec<Type>, Box<Type>)
 }
 
@@ -35,7 +35,7 @@ impl fmt::Debug for Type {
 	}
 }
 
-pub type Tmpl = Vec<Type>;
+pub type Tmpl = Vec<String>;
 
 pub fn parse_type(lexer : &Lexer, curs : &Cursor) -> SynRes<Type> {
 	let ans = lex!(lexer, curs);
@@ -78,7 +78,8 @@ pub fn parse_type(lexer : &Lexer, curs : &Cursor) -> SynRes<Type> {
 							if sym.val == "::" {
 								curs = sym.cursor;
 							} else if sym.val == "<" {
-								let ans = try!(parse_tmpl(lexer, &ans.cursor));
+								//let ans = try!(parse_tmpl(lexer, &ans.cursor));
+								let ans : SynAns<Vec<Type>> = try!(parse_list(lexer, &ans.cursor, &parse_type, "<", ">"));
 								syn_ok!(Type::Class(acc, Some(ans.val)), ans.cursor);
 							} else {
 								syn_ok!(Type::Class(acc,None), ans.cursor)
@@ -94,6 +95,15 @@ pub fn parse_type(lexer : &Lexer, curs : &Cursor) -> SynRes<Type> {
 }
 
 #[inline(always)]
-pub fn parse_tmpl(lexer : &Lexer, curs : &Cursor) -> SynRes<Vec<Type>> {
-	parse_list(lexer, &curs, &parse_type, "<", ">")
+pub fn parse_tmpl(lexer : &Lexer, curs : &Cursor) -> SynRes<Vec<String>> {
+	fn parse_tp(lexer : &Lexer, curs : &Cursor) -> SynRes<String> {
+		let sym = lex_type!(lexer, curs, LexTP::Id);
+		let c = sym.val.chars().next().unwrap();
+		if c >= 'A' && c <= 'Z' {
+			syn_ok!(sym.val, sym.cursor);
+		} else {
+			syn_throw!("template name must start with high", curs);
+		}
+	}
+	parse_list(lexer, &curs, &parse_tp, "<", ">")
 }

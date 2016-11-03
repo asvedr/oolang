@@ -9,7 +9,7 @@ pub struct Class {
 	pub addres    : Cursor,
 	pub parent    : Option<Type>,
 	pub singleton : bool,
-	pub template  : Vec<Type>,
+	pub template  : Vec<String>,
 	pub name      : String,
 	pub priv_fn   : Vec<SynFn>,
 	pub pub_fn    : Vec<SynFn>,
