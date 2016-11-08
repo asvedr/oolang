@@ -4,6 +4,12 @@ use syn_expr::*;
 use type_sys::*;
 //use std::fmt;
 
+pub struct SynCatch<DF> {
+	except : Option<Type>,
+	vname  : Option<String>,
+	act    : Vec<Act<DF>>
+}
+
 pub enum ActVal<DF> {
 	Expr(Expr),
 	DFun(Box<DF>),
@@ -17,7 +23,9 @@ pub enum ActVal<DF> {
 	While(Option<String>, Expr, Vec<Act<DF>>),
 	//For(String,)
 	// cond   then    else
-	If(Expr,Vec<Act<DF>>,Vec<Act<DF>>)
+	If(Expr,Vec<Act<DF>>,Vec<Act<DF>>),
+	Try(Vec<Act<DF>>,Vec<SynCatch<DF>>),
+	Throw(Expr)
 }
 
 pub struct Act<DF> {
@@ -117,7 +125,31 @@ impl<DF : Show> Show for ActVal<DF> {
 				}
 				res
 			},
-			ActVal::Break(ref lab) => vec![format!("{}BREAK {:?}", tab, lab)]
+			ActVal::Break(ref lab) => vec![format!("{}BREAK {:?}", tab, lab)],
+			ActVal::Try(ref acts, ref ctchs) => {
+				let mut res = vec![format!("{}TRY", tab)];
+				for act in acts.iter() {
+					for line in act.show(layer + 1) {
+						res.push(line);
+					}
+				}
+				for ctch in ctchs.iter() {
+					res.push(format!("{}CATCH {:?}:{:?}", tab, ctch.except, ctch.vname));
+					for act in ctch.act.iter() {
+						for line in act.show(layer + 1) {
+							res.push(line);
+						}
+					}
+				}
+				res
+			},
+			ActVal::Throw(ref e) => {
+				let mut res = vec![format!("{}THROW", tab)];
+				for line in e.show(layer + 1) {
+					res.push(line);
+				}
+				res
+			}
 		}
 	}
 }
@@ -230,6 +262,42 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
 			} else {
 				syn_ok!(make!(ActVal::If(cond.val, thn.val, vec![])), thn.cursor)
 			}
+		},
+		"try" => {
+			let act = try!(parse_act_list(lexer, &ans.cursor, fparse));
+			let mut ctchs = vec![];
+			let mut curs = act.cursor;
+			let act = act.val;
+			println!("!");
+			loop {
+				let ans = lex!(lexer, &curs);
+				if ans.val == "catch" {
+					curs = ans.cursor;
+					let ans = lex!(lexer, &curs);
+					if ans.val == "{" {
+						let al = try!(parse_act_list(lexer, &curs, fparse));
+						curs = al.cursor;
+						ctchs.push(SynCatch{except : None, vname : None, act : al.val});
+					} else {
+						let ans = lex_type!(lexer, &curs, LexTP::Id);
+						curs = lex!(lexer, &ans.cursor, ":");
+						let tp = try!(parse_type(lexer, &curs));
+						let al = try!(parse_act_list(lexer, &tp.cursor, fparse));
+						curs = al.cursor;
+						ctchs.push(SynCatch{except : Some(tp.val), vname : Some(ans.val), act : al.val});
+					}
+				} else {
+					if ctchs.len() == 0 {
+						syn_throw!("'try' has no 'catch'", addr);
+					} else {
+						syn_ok!(make!(ActVal::Try(act, ctchs)), curs)
+					}
+				}
+			}
+		},
+		"throw" => {
+			let expr = try!(parse_expr(lexer, &ans.cursor));
+			syn_ok!(make!(ActVal::Throw(expr.val)), expr.cursor);
 		},
 		/* EXPR */
 		_ => {

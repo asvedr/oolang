@@ -17,6 +17,7 @@ pub enum EVal {
 	Arr(Vec<Expr>),
 	Asc(Vec<Pair<Expr,Expr>>),
 	Prop(Box<Expr>,String),
+	ChangeType(Box<Expr>, Type),
 	Null
 }
 
@@ -120,6 +121,13 @@ impl Show for Expr {
 			},
 			EVal::Prop(ref obj, ref fld) => {
 				let mut res = vec![format!("{}PROP {}{}", tab, fld, tp)];
+				for line in obj.show(layer + 1) {
+					res.push(line)
+				}
+				res
+			},
+			EVal::ChangeType(ref obj, ref tp) => {
+				let mut res = vec![format!("{}CHTP {:?}", tab, tp)];
 				for line in obj.show(layer + 1) {
 					res.push(line)
 				}
@@ -247,20 +255,28 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 	loop {
 		match lexer.lex(&curs) {
 			Ok(ans) => 
+				// CALL
 				if ans.val == "(" {
 					let args = try!(parse_list(lexer, &curs, &parse_expr, "(", ")"));
 					//let opos = obj.addres.clone();
 					obj = expr!(EVal::Call(None,Box::new(obj), args.val), curs);
 					curs = args.cursor;
+				// INDEXING
 				} else if ans.val == "[" {	
 					let index_ans = try!(parse_expr(lexer, &ans.cursor));
 					//let opos = obj.addres.clone();
 					obj = expr!(EVal::Item(Box::new(obj), Box::new(index_ans.val)), curs);
 					curs = lex!(lexer,&index_ans.cursor,"]");
+				// FIELD
 				} else if ans.val == "." {
 					let fld = lex_type!(lexer, &ans.cursor, LexTP::Id);
 					obj = expr!(EVal::Prop(Box::new(obj), fld.val), curs);
 					curs = fld.cursor;
+				} else if ans.val == "as" {
+					let tp = try!(parse_type(lexer, &ans.cursor));
+					let tpc = tp.val.clone();
+					obj = expr!(EVal::ChangeType(Box::new(obj), tp.val), curs, tpc);
+					curs = tp.cursor;
 				} else {
 					syn_ok!(obj, curs)
 				},

@@ -11,6 +11,7 @@ mod syn_class;
 mod syn_ext_c;
 mod syn_mod;
 mod syn_common;
+//mod type_check;
 //use std::io;
 use std::io::Read;
 use std::fs::File;

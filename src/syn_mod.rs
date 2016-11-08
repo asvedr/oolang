@@ -22,7 +22,7 @@ impl Import {
 	}
 }
 
-pub struct Mod {
+pub struct SynMod {
 	pub imports : Vec<Import>,
 	pub funs    : Vec<SynFn>,
 	pub classes : Vec<Class>,
@@ -30,7 +30,7 @@ pub struct Mod {
 	pub c_types : Vec<CType>
 }
 
-impl Show for Mod {
+impl Show for SynMod {
 	fn show(&self, layer : usize) -> Vec<String> {
 		let mut tab = String::new();
 		for _ in 0 .. layer {
@@ -68,7 +68,7 @@ impl Show for Mod {
 	}
 }
 
-pub fn parse_mod(lexer : &Lexer) -> Result<Mod,Vec<SynErr>> {
+pub fn parse_mod(lexer : &Lexer) -> Result<SynMod,Vec<SynErr>> {
 	let curs = Cursor::new();
 	match parse_mod_syn(lexer, &curs) {
 		Ok(ans) => Ok(ans.val),
@@ -76,7 +76,7 @@ pub fn parse_mod(lexer : &Lexer) -> Result<Mod,Vec<SynErr>> {
 	}
 }
 
-fn parse_mod_syn(lexer : &Lexer, curs : &Cursor) -> SynRes<Mod> {
+fn parse_mod_syn(lexer : &Lexer, curs : &Cursor) -> SynRes<SynMod> {
 	let mut imps = vec![];
 	let mut funs = vec![];
 	let mut clss = vec![];
@@ -88,7 +88,7 @@ fn parse_mod_syn(lexer : &Lexer, curs : &Cursor) -> SynRes<Mod> {
 	loop {
 		match lexer.lex(&curs) {
 			Err(_) =>
-				syn_ok!(Mod{imports : imps, funs : funs, classes : clss, c_fns : cfns, c_types : ctps}, curs),
+				syn_ok!(SynMod{imports : imps, funs : funs, classes : clss, c_fns : cfns, c_types : ctps}, curs),
 			Ok(ans) =>
 				match &*ans.val {
 					"class"  => {

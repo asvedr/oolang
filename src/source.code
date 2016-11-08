@@ -1,3 +1,4 @@
+/*
 use Std::Io;
 use Std::AllFrom::*;
 use Std::Alias as Ali;
@@ -21,4 +22,16 @@ class single Main : Std::Object {
 
 fn apply<A>(a : A, b : A, f : Fn(A,A): A) : A {
 	f(a,b)
+}
+*/
+
+fn main() : () {
+	var store = Store() as Parent;
+	try {
+		store.show_all();
+	} catch a : Exception {
+		print("int code", a)
+	} catch {
+		print("catch all")
+	}
 }
