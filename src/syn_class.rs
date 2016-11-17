@@ -11,10 +11,16 @@ pub struct Class {
 	pub singleton : bool,
 	pub template  : Vec<String>,
 	pub name      : String,
-	pub priv_fn   : Vec<SynFn>,
-	pub pub_fn    : Vec<SynFn>,
+	pub priv_fn   : Vec<Method>,//SynFn>,
+	pub pub_fn    : Vec<Method>,//SynFn>,
 	pub priv_prop : Vec<Pair<String,Type>>,
 	pub pub_prop  : Vec<Pair<String,Type>>
+}
+
+pub struct Method {
+	pub is_virt : bool,
+	pub func    : SynFn,
+	pub ftype   : Type // fill in type check
 }
 
 impl Show for Class {
@@ -33,14 +39,22 @@ impl Show for Class {
 			res.push(format!("{}PUBL {} : {:?}", tab, p.a, p.b));
 		}
 		for f in self.priv_fn.iter() {
-			res.push(format!("{}PRIV", tab));
-			for line in f.show(layer + 1) {
+			if f.is_virt {
+				res.push(format!("{}PRIV VIRT", tab));
+			} else {
+				res.push(format!("{}PRIV", tab));
+			}
+			for line in f.func.show(layer + 1) {
 				res.push(line);
 			}
 		}
-		for f in self.pub_fn.iter() {	
-			res.push(format!("{}PUBL", tab));
-			for line in f.show(layer + 1) {
+		for f in self.pub_fn.iter() {
+			if f.is_virt {
+				res.push(format!("{}PUBL VIRT", tab));
+			} else {
+				res.push(format!("{}PUBL", tab));
+			}
+			for line in f.func.show(layer + 1) {
 				res.push(line);
 			}
 		}
@@ -103,6 +117,7 @@ pub fn parse_class(lexer : &Lexer, curs : &Cursor) -> SynRes<Class> {
 			break;
 			//syn_ok!(acc, ans.cursor);
 		}
+		// modif
 		let is_pub = {
 			let sym = lex_type!(lexer, &curs, LexTP::Id);
 			if sym.val == "pub" {
@@ -115,13 +130,22 @@ pub fn parse_class(lexer : &Lexer, curs : &Cursor) -> SynRes<Class> {
 				syn_throw!(format!("expected 'pub' or 'priv', found '{}'", sym.val), curs)
 			}
 		};
+		// data
 		let sym = lex!(lexer, &curs);
 		if sym.val == "fn" {
 			let meth = try!(parse_fn_full(lexer, &curs));
 			if is_pub {
-				pub_fn.push(meth.val);
+				pub_fn.push(Method{is_virt : false, func : meth.val, ftype : Type::Unk});
 			} else {
-				priv_fn.push(meth.val);
+				priv_fn.push(Method{is_virt : false, func : meth.val, ftype : Type::Unk});
+			}
+			curs = meth.cursor;
+		} else if sym.val == "virtual" {
+			let meth = try!(parse_fn_full(lexer, &sym.cursor));
+			if is_pub {
+				pub_fn.push(Method{is_virt : true, func : meth.val, ftype : Type::Unk});
+			} else {
+				priv_fn.push(Method{is_virt : true, func : meth.val, ftype : Type::Unk});
 			}
 			curs = meth.cursor;
 		} else {

@@ -23,7 +23,7 @@ class single Main : Std::Object {
 fn apply<A>(a : A, b : A, f : Fn(A,A): A) : A {
 	f(a,b)
 }
-*/
+
 
 fn main() : () {
 	var store = Store() as Parent;
@@ -34,4 +34,13 @@ fn main() : () {
 	} catch {
 		print("catch all")
 	}
+}
+
+*/
+
+fn main() : () {
+	var a = 1;
+	var b = a + 1;
+	b = b + 1;
+	//print(b.to_string())
 }

@@ -6,11 +6,24 @@ use syn_reserr::*;
 use syn_fn::*;
 use syn_class::*;
 use syn_ext_c::*;
+use std::fmt;
 
 pub struct Import {
 	pub path   : Vec<String>,
 	pub alias  : Option<String>
 //	pub getall : bool
+}
+
+impl fmt::Debug for Import {
+	fn fmt(&self, f : &mut fmt::Formatter) -> fmt::Result {
+		for n in self.path.iter() {
+			try!(write!(f, "{}::", n));
+		}
+		match self.alias {
+			Some(ref a) => write!(f, ". as {}", a),
+			_ => write!(f, "*")
+		}
+	}
 }
 
 impl Import {
@@ -95,7 +108,7 @@ fn parse_mod_syn(lexer : &Lexer, curs : &Cursor) -> SynRes<SynMod> {
 						let cls = try!(parse_class(lexer, &curs));
 						clss.push(cls.val);
 						curs = cls.cursor;
-						println!("AFTER CLASS: {:?}", curs);
+						//println!("AFTER CLASS: {:?}", curs);
 					},
 					"use"    => {
 						let imp = try!(parse_import(lexer, &curs));

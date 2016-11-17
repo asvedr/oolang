@@ -13,8 +13,8 @@ pub struct SynCatch<DF> {
 pub enum ActVal<DF> {
 	Expr(Expr),
 	DFun(Box<DF>),
-	//   name    var type     init val
-	DVar(String,Option<Type>,Option<Expr>),
+	//   name   var type     init val
+	DVar(String,Type,Option<Expr>),
 	//   a  =  b
 	Asg(Expr,Expr),
 	Ret(Option<Expr>),
@@ -29,12 +29,13 @@ pub enum ActVal<DF> {
 }
 
 pub struct Act<DF> {
-	pub val    : ActVal<DF>,
-	pub addres : Cursor 
+	pub val       : ActVal<DF>,
+	pub addres    : Cursor, 
+	pub exist_unk : bool // field for typecheck 'unknown type exist in this action'
 }
 
 macro_rules! act {
-	($v:expr, $addr:expr) => {Act{val : $v, addres : $addr}};
+	($v:expr, $addr:expr) => {Act{val : $v, addres : $addr, exist_unk : true}};
 }
 
 impl<DF : Show> Show for Act<DF> {
@@ -53,10 +54,7 @@ impl<DF : Show> Show for ActVal<DF> {
 			ActVal::Expr(ref e) => e.show(layer), 
 			ActVal::DFun(ref df) => df.show(layer),
 			ActVal::DVar(ref n, ref t, ref v) => {
-				let tp = match *t {
-					Some(ref t) => format!("{:?}", t),
-					_ => "(?)".to_string()
-				};
+				let tp = format!("{:?}", t);
 				let mut res = vec![format!("{}DEF VAR '{}' : {:?}", tab, n, tp)];
 				match *v {
 					Some(ref e) =>
@@ -202,9 +200,9 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
 			let tp = if tpflag.val == ":" {
 				let tp = try!(parse_type(lexer, &tpflag.cursor));
 				curs = tp.cursor;
-				Some(tp.val)
+				tp.val
 			} else {
-				None
+				Type::Unk
 			};
 			// try find init val
 			if is_act_end(lexer, &curs) {
@@ -268,7 +266,7 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
 			let mut ctchs = vec![];
 			let mut curs = act.cursor;
 			let act = act.val;
-			println!("!");
+			//println!("!");
 			loop {
 				let ans = lex!(lexer, &curs);
 				if ans.val == "catch" {

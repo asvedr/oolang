@@ -20,7 +20,22 @@ pub struct SynFn {
 	pub rettp       : Type,
 	pub body        : Vec<Act<SynFn>>,
 	pub addr        : Cursor,
-	pub can_be_clos : bool // if has names args or option args then can't be used as closure
+	pub can_be_clos : bool, // if has names args or option args then can't be used as closure
+	pub has_named   : bool
+}
+
+impl SynFn {
+	pub fn type_of(&self) -> Type {
+		let mut atypes = vec![];
+		for a in self.args.iter() {
+			atypes.push(a.tp.clone());
+		}
+		if self.tmpl.len() == 0 {
+			Type::Fn(None, atypes, Box::new(self.rettp.clone()))
+		} else {
+			Type::Fn(Some(self.tmpl.clone()), atypes, Box::new(self.rettp.clone()))
+		}
+	}
 }
 
 impl Show for Arg {
@@ -119,10 +134,12 @@ pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 	// args
 	let parser = |l : &Lexer, c : &Cursor| {parse_arg(l, c, true)};
 	let args = try!(parse_list(lexer, &curs, &parser, "(", ")"));
-	let mut can_be_clos = true;
+	let mut can_be_clos = !has_tmpl;//true;
+	let mut has_named = false;
 	for a in args.val.iter() {
 		if a.named || match a.val {None => false, _ => true} {
 			can_be_clos = false;
+			has_named = true;
 			break;
 		}
 	}
@@ -138,7 +155,8 @@ pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 		rettp       : tp.val,
 		body        : body.val,
 		addr        : orig,
-		can_be_clos : can_be_clos
+		can_be_clos : can_be_clos,
+		has_named   : has_named
 	};
 	syn_ok!(res, body.cursor)
 }

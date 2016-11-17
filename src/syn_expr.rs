@@ -24,7 +24,7 @@ pub enum EVal {
 #[derive(Clone)]
 pub struct Expr {
 	pub val    : EVal,
-	pub kind   : Option<Type>,
+	pub kind   : Type,
 	pub addres : Cursor
 }
 
@@ -34,10 +34,7 @@ impl Show for Expr {
 		for _ in 0 .. layer {
 			tab.push(' ')
 		}
-		let tp = match self.kind {
-			None => ":(?)".to_string(),
-			Some(ref t) => format!(":{:?}",t)
-		};
+		let tp = format!(":{:?}",self.kind);
 		match self.val {
 			EVal::Int(ref a)  => vec![format!("{}{}{}",tab,a,tp)],
 			EVal::Real(ref a) => vec![format!("{}{}{}",tab,a,tp)],
@@ -139,8 +136,8 @@ impl Show for Expr {
 }
 
 macro_rules! expr {
-	($v:expr, $addr:expr, $k:expr) => {Expr{val : $v, kind : Some($k), addres : $addr}};
-	($v:expr, $addr:expr)          => {Expr{val : $v, kind : None, addres : $addr}};
+	($v:expr, $addr:expr, $k:expr) => {Expr{val : $v, kind : $k,        addres : $addr}};
+	($v:expr, $addr:expr)          => {Expr{val : $v, kind : Type::Unk, addres : $addr}};
 }
 
 fn parse_prefix(lexer : &Lexer, curs : &Cursor) -> Option<SynAns<Vec<String>>> {
