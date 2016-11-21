@@ -15,7 +15,7 @@ pub enum EVal {
 	Item(Box<Expr>,Box<Expr>),
 	Var(Option<Vec<String>>, String), // namespace, name
 	Arr(Vec<Expr>),
-	Asc(Vec<Pair<Expr,Expr>>),
+	Asc(Vec<Pair<Expr,Expr>>), // only strings, chars and int allowed for key
 	Prop(Box<Expr>,String),
 	ChangeType(Box<Expr>, Type),
 	Null

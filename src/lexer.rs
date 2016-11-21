@@ -157,7 +157,7 @@ impl Lexer {
 		let mut prev_slash = false; // flag for symbol '\' enter for comment
 		let mut prev_star  = false; // flag for symbol '*' exit for comment
 		let machines : Vec<Machine> = vec![
-			mach!(id, Id), mach!(numi, Int), mach!(numr, Real), mach!(stra, Str, read_str), mach!(chara, Char, read_char),
+			mach!(id, Id), mach!(numi, Int), mach!(numr, Real, read_float), mach!(stra, Str, read_str), mach!(chara, Char, read_char),
 			mach!(br, Br), mach!(opr, Opr), mach!(dectp, DecType), mach!(namesp, NSpace),
 			mach!(dot, Dot)//, mach!(comma, Comma)
 		];
@@ -313,6 +313,7 @@ fn numr(c : char, _ : &Lexer, s : &mut State) {
 		0 if isnum!(c) => sstate!(s, false, 1),
 		1 if isnum!(c) => sstate!(s, false, 1),
 		1 if c == '.'  => sstate!(s, false, 2),
+		1 if c == 'f'  => sstate!(s, true, 10),
 		2 if isnum!(c) => sstate!(s, true, 2),
 		_ => sstate!(s)
 	}
@@ -395,6 +396,21 @@ fn is_in(c : char, v : &Vec<char>) -> bool {
 			{ return true }
 	}
 	return false;
+}
+
+fn read_float(s : &str) -> Result<String, String> {
+	let vec : Vec<char> = s.chars().collect();
+	if vec[vec.len() - 1] == 'f' {
+		let mut res = String::new();
+		for i in 0 .. vec.len() - 1 {
+			res.push(vec[i]);
+		}
+		res.push('.');
+		res.push('0');
+		Ok(res)
+	} else {
+		Ok(s.to_string())
+	}
 }
 
 fn read_char(s : &str) -> Result<String,String> {

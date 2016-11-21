@@ -12,7 +12,10 @@ pub enum Type {
 	Bool,
 	Void,
 	Arr(Box<Type>),
+	// Asc(Box<Type>,Box<Type>),
+	//    prefix       name   template
 	Class(Vec<String>,String,Option<Vec<Type>>),
+	//  (template)?         args        result
 	Fn(Option<Vec<String>>, Vec<Type>, Box<Type>),
 }
 
@@ -26,19 +29,54 @@ macro_rules! type_fn {
 	};
 }
 
+macro_rules! check_is {($_self:expr, $t:ident) => {
+	match *$_self {
+		Type::$t => true,
+		_ => false
+	}
+};}
+
 impl Type {
+	pub fn is_int(&self)  -> bool {check_is!(self, Int)}
+	pub fn is_real(&self) -> bool {check_is!(self, Real)}
+	pub fn is_char(&self) -> bool {check_is!(self, Char)}
+	pub fn is_str(&self)  -> bool {check_is!(self, Str)}
+	pub fn is_bool(&self) -> bool {check_is!(self, Bool)}
+	pub fn is_void(&self) -> bool {check_is!(self, Void)}
+	pub fn is_unk(&self)  -> bool {check_is!(self, Unk)}
+	pub fn is_asc(&self)  -> bool {
+		match *self {
+			Type::Class(ref p, ref n,_) => p.len() == 1 && p[0] == "%std" && n == "Asc",
+			_ => false
+		}
+	}
+	pub fn asc_key_val(&self, key : &mut Type, val : &mut Type) {
+		match *self {
+			Type::Class(_,_,Some(ref params)) => {
+				*key = params[0].clone();
+				*val = params[1].clone();
+			},
+			_ => ()
+		}
+	}
+	pub fn is_arr(&self) -> bool {
+		match *self {
+			Type::Arr(_) => true,
+			_ => false
+		}
+	}
+	pub fn arr_item(&self) -> &Type {
+		match *self {
+			Type::Arr(ref i) => i,
+			_ => panic!()
+		}
+	}
 	pub fn is_prim(&self) -> bool {
 		match *self {
 			Type::Arr(_) => false,
 			Type::Class(_,_,_) => false,
 			Type::Fn(_,_,_) => false,
 			_ => true
-		}
-	}
-	pub fn is_unk(&self) -> bool {
-		match *self {
-			Type::Unk => true,
-			_ => false
 		}
 	}
 	pub fn is_class(&self) -> bool {
@@ -104,8 +142,8 @@ impl fmt::Debug for Type {
 					}
 				}
 				match *tmpl {
-					Some(ref val) => write!(f, "{:?}{:?}{:?}", pref, name, val),
-					_             => write!(f, "{:?}{:?}", pref, name)
+					Some(ref val) => write!(f, "{}{:?}", name, val),
+					_             => write!(f, "{}", name)
 				}
 			},
 			Type::Fn(ref t, ref args, ref res) =>
