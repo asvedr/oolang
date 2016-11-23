@@ -24,7 +24,7 @@ pub enum ActVal<DF> {
 	//For(String,)
 	// cond   then    else
 	If(Expr,Vec<Act<DF>>,Vec<Act<DF>>),
-	Try(Vec<Act<DF>>,Vec<SynCatch<DF>>),
+	Try(Vec<Act<DF>>,Vec<SynCatch<DF>>), // try-catch
 	Throw(Expr)
 }
 

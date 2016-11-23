@@ -2,6 +2,7 @@ use syn_common::*;
 use type_check_utils::*;
 use std::collections::{HashMap/*, HashSet, BTreeMap*/};
 use std::mem;
+use regressor::*;
 
 /*
 	Типы привязаны к выражениям. В синтаксическом дереве выражений и прочего хранятся все типы.
@@ -95,10 +96,16 @@ impl Checker {
 	}
 	fn check_fn(&self, pack : &Pack, fun : &mut SynFn, out_env : Option<&LocEnv>) -> CheckRes {
 		let mut env = LocEnv::new(&*pack);
+		for t in fun.tmpl.iter() {
+			env.templates.insert(t.clone());
+		}
 		for arg in fun.args.iter_mut() {
+			try!(self.check_type(&env, &mut arg.tp, &fun.addr));
 			let p : *mut Type = &mut arg.tp;
 			add_loc_knw!(env, arg.name.clone(), p, fun.addr);
 		}
+		try!(self.check_type(&env, &mut fun.rettp, &fun.addr));
+		env.set_ret_type(&fun.rettp);
 		self.check_actions(&mut env, &mut fun.body)
 	}
 	fn check_actions(&self, env : &mut LocEnv, src : &mut Vec<ActF>) -> CheckRes {
@@ -106,6 +113,22 @@ impl Checker {
 		for act in src.iter_mut() {
 			match act.val {
 				ActVal::Expr(ref mut e) => act.exist_unk = expr!(e),
+				ActVal::Ret(ref mut opt_e) => {
+					match *opt_e {
+						Some(ref mut e) => {
+							expr!(e);
+							if e.kind.is_unk() {
+								// REGRESS CALL
+							} else if !env.check_ret_type(&e.kind) {
+								throw!(format!("expect type {:?}, found {:?}", env.ret_type(), e.kind), act.addres)
+							}
+						},
+						None =>
+							if !env.check_ret_type(&Type::Void) {
+								throw!(format!("expect type {:?}, found void", env.ret_type()), act.addres)
+							}
+					}
+				},
 				ActVal::DVar(ref name, ref mut tp, ref mut val) => {
 					match *val {
 						Some(ref mut val) => {
@@ -132,15 +155,28 @@ impl Checker {
 							add_loc_knw!(env, name, tp, act.addres);
 						}
 					}
-					/*match *tp {
-						Some(ref mut tp) => add_loc!(env, name, &*tp),
-						_ => panic!()
-					}*/
-					// add_loc!(env, name, link_type)
 				},
 				ActVal::Asg(ref mut var, ref mut val) => {
 					act.exist_unk = expr!(var) || expr!(val);
+					let ua = var.kind.is_unk();
+					let ub = val.kind.is_unk();
+					if ua && ub {
+						// PASS
+					} else if ua {
+						// REGRESS CALL
+					} else if ub {
+						// REGRESS CALL
+					} else if var.kind != val.kind {
+						throw!(format!("assign parts incompatible: {:?} and {:?}", var.kind, val.kind), act.addres)
+					}
 				},
+				ActVal::Throw(ref mut e) => {
+					expr!(e);
+					if !e.kind.is_class() {
+						throw!(format!("expr must be a class"), e.addres)
+					}
+				},
+				//ActVal::Try() => {}
 				_ => ()
 			}
 		}
@@ -228,7 +264,7 @@ impl Checker {
 								} else if (*b).is_real() {
 									let addr = args[0].addres.clone();
 									let arg = mem::replace(&mut args[0].val, EVal::Null);
-									let arg = Expr{val : arg, kind : Type::Int, addres : addr};
+									let arg = Expr{val : arg, kind : Type::Int, addres : addr, op_flag : 0};
 									args[0].val = EVal::ChangeType(Box::new(arg), Type::Real);
 									args[0].kind = Type::Real;
 									//args[0] = Expr{val : EVal::ChangeType(Box::new(args[0]), Type::Real), kind : Type::Real, addres : addr};
@@ -242,7 +278,7 @@ impl Checker {
 								} else if (*b).is_int() {
 									let addr = args[1].addres.clone();
 									let arg = mem::replace(&mut args[1].val, EVal::Null);
-									let arg = Expr{val : arg, kind : Type::Int, addres : addr};
+									let arg = Expr{val : arg, kind : Type::Int, addres : addr, op_flag : 0};
 									args[1].val = EVal::ChangeType(Box::new(arg), Type::Real);
 									args[1].kind = Type::Real;
 									//args[1] = Expr{val : EVal::ChangeType(Box::new(args[1]), Type::Real), kind : Type::Real, addres : addr};
@@ -342,7 +378,45 @@ impl Checker {
 					}
 				}
 			},
-			//NewClass(Option<Vec<Type>>,Option<Vec<String>>,String,Vec<Expr>),
+			EVal::NewClass(ref mut tmpl, ref mut pref, ref mut name, ref mut args) => {
+				let mut p = match mem::replace(pref, None) {
+					Some(p) => p,
+					_ => vec![]
+				};
+				let pcnt = match *tmpl {
+					Some(ref mut tmpl) => {
+						for t in tmpl.iter_mut() {
+							check_type!(t);
+						};
+						tmpl.len()
+					},
+					_ => 0
+				};
+				try!(env.check_class(&mut p, name, tmpl, &expr.addres));
+				*pref = Some(p);
+				for a in args.iter_mut() {
+					check!(a);
+				}
+				unsafe {
+					let cls = match *pref {
+						Some(ref p) => (*env.global).get_cls(Some(p), name).unwrap(),
+						_ => panic!()
+					};
+					if (*cls).params != pcnt {
+						throw!(format!("class {} expect {} params, given {}", name, (*cls).params, pcnt), &expr.addres)
+					}
+					if (*cls).args.len() != args.len() {
+						throw!(format!("class {} initializer expect {} args, given {}", name, (*cls).args.len(), args.len()), &expr.addres)
+					}
+					for i in 0 .. args.len() {
+						if args[i].kind.is_unk() {
+							// REGRESS CALL
+						} else if *(*cls).args[i] != args[i].kind {
+							throw!(format!("expected {:?}, found {:?}", *(*cls).args[i], args[i].kind), &args[i].addres)
+						}
+					}
+				}
+			},
 			EVal::Item(ref mut a, ref mut i) => {
 				check!(a);
 				check!(i);

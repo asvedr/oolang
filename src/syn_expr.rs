@@ -6,26 +6,35 @@ use std::mem;
 
 #[derive(Clone)]
 pub enum EVal {
-	Int(i64),
-	Real(f64),
-	Str(String),
-	Char(char),
-	Call(Option<Vec<Type>>,Box<Expr>,Vec<Expr>),
-	NewClass(Option<Vec<Type>>,Option<Vec<String>>,String,Vec<Expr>),
-	Item(Box<Expr>,Box<Expr>),
-	Var(Option<Vec<String>>, String), // namespace, name
-	Arr(Vec<Expr>),
-	Asc(Vec<Pair<Expr,Expr>>), // only strings, chars and int allowed for key
-	Prop(Box<Expr>,String),
-	ChangeType(Box<Expr>, Type),
+	Int        (i64),
+	Real       (f64),
+	Str        (String),
+	Char       (char),
+	Call       (Option<Vec<Type>>,Box<Expr>,Vec<Expr>),
+	NewClass   (Option<Vec<Type>>,Option<Vec<String>>,String,Vec<Expr>),
+	Item       (Box<Expr>,Box<Expr>),
+	Var        (Option<Vec<String>>, String), // namespace, name
+	Arr        (Vec<Expr>),
+	Asc        (Vec<Pair<Expr,Expr>>), // only strings, chars and int allowed for key
+	Prop       (Box<Expr>,String),
+	ChangeType (Box<Expr>, Type),
 	Null
 }
 
+pub const NOP   : u8 = 0; // not operation
+pub const IROP  : u8 = 1; // int real op
+pub const IOP   : u8 = 2; // int op
+pub const ROP   : u8 = 3; // real op
+pub const AOP   : u8 = 4; // all op
+pub const BOP   : u8 = 5; // bool op
+pub const IROPB : u8 = 6; // int real op => bool
+
 #[derive(Clone)]
 pub struct Expr {
-	pub val    : EVal,
-	pub kind   : Type,
-	pub addres : Cursor
+	pub val     : EVal,
+	pub kind    : Type,
+	pub addres  : Cursor,
+	pub op_flag : u8
 }
 
 impl Show for Expr {
@@ -136,8 +145,8 @@ impl Show for Expr {
 }
 
 macro_rules! expr {
-	($v:expr, $addr:expr, $k:expr) => {Expr{val : $v, kind : $k,        addres : $addr}};
-	($v:expr, $addr:expr)          => {Expr{val : $v, kind : Type::Unk, addres : $addr}};
+	($v:expr, $addr:expr, $k:expr) => {Expr{val : $v, kind : $k,        addres : $addr, op_flag : 0}};
+	($v:expr, $addr:expr)          => {Expr{val : $v, kind : Type::Unk, addres : $addr, op_flag : 0}};
 }
 
 fn parse_prefix(lexer : &Lexer, curs : &Cursor) -> Option<SynAns<Vec<String>>> {

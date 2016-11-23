@@ -14,7 +14,8 @@ pub struct TClass {
 	pub parent : Option<*const TClass>,
 	pub privs  : BTreeMap<String,*const Type>, // orig type saved in syn_class
 	pub pubs   : BTreeMap<String,*const Type>, 
-	pub params : usize                         // count of params
+	pub params : usize,                        // count of params
+	pub args   : Vec<*const Type>              // constructor 
 }
 
 impl TClass {
@@ -168,7 +169,8 @@ pub struct LocEnv {
 	pub global     : *const Pack,
 	pub local      : BTreeMap<String, Result<*const Type, *mut Type>>, // Ok  (WE TRULY KNOW WHAT IT IS)
 	pub outers     : BTreeMap<String, Result<*const Type, *mut Type>>, // Err (WE CALCULATED THIS AND WE CAN MISTAKE)
-	pub templates  : HashSet<String>                                   // local templates
+	pub templates  : HashSet<String>,                                  // local templates
+	pub ret_type   : Option<*const Type>
 }
 
 #[macro_export]
@@ -196,7 +198,23 @@ impl LocEnv {
 			global    : pack,
 			local     : BTreeMap::new(),
 			outers    : BTreeMap::new(),
-			templates : HashSet::new()
+			templates : HashSet::new(),
+			ret_type  : None
+		}
+	}
+	pub fn set_ret_type(&mut self, t : &Type) {
+		self.ret_type = Some(&*t);
+	}
+	pub fn check_ret_type(&self, t : &Type) -> bool {
+		match self.ret_type {
+			Some(ref t1) => unsafe{ **t1 == *t },
+			_ => false
+		}
+	}
+	pub fn ret_type(&self) -> &Type {
+		match self.ret_type {
+			Some(ref t) => unsafe { &**t },
+			_ => panic!()
 		}
 	}
 	pub fn show(&self) -> String {
