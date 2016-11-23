@@ -1,0 +1,6 @@
++ lexical
++ synax
++/- type check with hindley-milner
+- compile to c
+- GC
+- FFI
