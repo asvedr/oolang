@@ -1,6 +1,6 @@
 use syn_common::*;
 use type_check_utils::*;
-use std::collections::{HashMap, HashSet, BTreeMap};
+use std::collections::{HashMap/*, HashSet, BTreeMap*/};
 use std::mem;
 
 /*
@@ -109,7 +109,9 @@ impl Checker {
 				ActVal::DVar(ref name, ref mut tp, ref mut val) => {
 					match *val {
 						Some(ref mut val) => {
+							//println!("<<<");
 							act.exist_unk = expr!(val);
+							//println!(">>>");
 						},
 						None => {
 							act.exist_unk = false;
@@ -145,10 +147,11 @@ impl Checker {
 		ok!()
 	}
 	fn check_expr(&self, env : &LocEnv, expr : &mut Expr) -> CheckAns<bool> {
+		//println!("CHECK EXPR");
 		let mut has_unk = false;
 		// recursive check expression
 		macro_rules! check {($e:expr) => {has_unk = try!(self.check_expr(env, $e)) || has_unk};};
-		macro_rules! check_type {($t:expr) => {try!(self.check_type(env, $t))}}
+		macro_rules! check_type {($t:expr) => {try!(self.check_type(env, $t, &expr.addres))}}
 		// macro for check what category of operator is
 		macro_rules! is_in {
 			($e:expr, $out:expr, $seq:ident, $els:expr) => {
@@ -183,11 +186,19 @@ impl Checker {
 		// 	Type::Unk => (), _ => return Ok(false)
 		// }
 		match expr.val {
-			EVal::Call(_, ref mut f, ref mut args) => {
+			EVal::Call(ref mut tmpl, ref mut f, ref mut args) => {
 				let mut res_type = Type::Unk;
 				let chf : Option <*const HashMap<String,Type>> = check_fun!(**f, res_type);
 				for a in args.iter_mut() {
 					check!(a);
+				}
+				match *tmpl {
+					Some(ref mut tmpl) => {
+						for t in tmpl.iter_mut() {
+							check_type!(t);
+						}
+					},
+					_ => ()
 				}
 				match chf {
 					Some(seq_l) => unsafe {
@@ -197,8 +208,9 @@ impl Checker {
 						// INT OR REAL OPERATIONS + - * >= <= < > / 
 						if seq_l == &self.int_real_op {
 							macro_rules! ok {($tp:expr) => {{
-								set_var_type!(env, args[0], $tp);
-								set_var_type!(env, args[1], $tp);
+								//set_var_type!(env, args[0], $tp);
+								//set_var_type!(env, args[1], $tp);
+								// REGRESS CALL
 								match res_type {
 									Type::Unk => {
 										f.kind = type_fn!(vec![$tp, $tp], $tp);
@@ -258,8 +270,9 @@ impl Checker {
 							} else if !((*b).is_int() || (*b).is_unk()) {
 								throw!(format!("expect int, found {:?}", *b), args[1].addres.clone())
 							} else {
-								set_var_type!(env, args[0], Type::Int);
-								set_var_type!(env, args[1], Type::Int);
+								//set_var_type!(env, args[0], Type::Int);
+								//set_var_type!(env, args[1], Type::Int);
+								// REGRESS CALL
 								f.kind = type_fn!(vec![Type::Int, Type::Int], Type::Int);
 								expr.kind = Type::Int
 							}
@@ -270,8 +283,9 @@ impl Checker {
 							} else if !((*b).is_real() || (*b).is_unk()) {
 								throw!(format!("expect real found {:?}", *b), args[1].addres.clone())
 							} else {
-								set_var_type!(env, args[0], Type::Real);
-								set_var_type!(env, args[1], Type::Real);
+								//set_var_type!(env, args[0], Type::Real);
+								//set_var_type!(env, args[1], Type::Real);
+								// REGRESS CALL
 								f.kind = type_fn!(vec![Type::Real, Type::Real], Type::Real);
 								expr.kind = Type::Real
 							}
@@ -288,7 +302,44 @@ impl Checker {
 							expr.kind = Type::Bool
 						}
 					},
-					None => check!(f)
+					// NOT OPERATOR, REGULAR FUNC CALL
+					None => {
+						// ref mut tmpl, ref mut f, ref mut args
+						match *tmpl {
+							Some(ref mut t) =>
+								for tp in t.iter_mut() {
+									check_type!(tp);
+								},
+							_ => (),
+						}
+						check!(f);
+						/*for a in args.iter_mut() {
+							check!(a);
+						}*/
+						match f.kind {
+							Type::Fn(ref tmpl_t, ref args_t, ref res_t) => {
+								// CHECK TMPL
+								if args.len() != args_t.len() {
+									throw!(format!("expect {} args, found {}", args_t.len(), args.len()), expr.addres.clone());
+								} else {
+									for i in 0 .. args.len() {
+										let a = &args[i];
+										let t = &args_t[i];
+										if a.kind == *t {
+											// ALL OK
+										} else if a.kind.is_unk() {
+											// REGRESS CALL
+										} else {
+											throw!(format!("expect {:?}, found {:?}", t, a.kind), a.addres.clone())
+										}
+									}
+									expr.kind = (**res_t).clone();
+								}
+							},
+							Type::Unk => has_unk = true,
+							ref t => throw!(format!("expect Fn found {:?}", t), f.addres.clone())
+						}
+					}
 				}
 			},
 			//NewClass(Option<Vec<Type>>,Option<Vec<String>>,String,Vec<Expr>),
@@ -311,7 +362,7 @@ impl Checker {
 					let mut val = Type::Unk;
 					a.kind.asc_key_val(&mut key, &mut val);
 					if key == i.kind {
-						// ALL
+						// ALL OK
 					} else if i.kind.is_unk() {
 						// REGRESS CALL
 					} else {
@@ -324,6 +375,7 @@ impl Checker {
 			},
 			EVal::Var(ref mut pref, ref name) => { // namespace, name
 				println!("GET VAR FOR {:?} {}", pref, name);
+				//println!("{}", env.show());
 				try!(env.get_var(pref, name, &mut expr.kind, &expr.addres));
 				/* MUST RECUSRIVE CHECK FOR COMPONENTS */
 				match expr.kind {
@@ -404,7 +456,7 @@ impl Checker {
 				// REGRESS CALL
 			},
 			EVal::Prop(ref mut obj, _) => check!(obj),
-			EVal::ChangeType(ref mut e, ref tp) => {
+			EVal::ChangeType(ref mut e, ref mut tp) => {
 				check!(e);
 				check_type!(tp);
 			}
@@ -412,7 +464,37 @@ impl Checker {
 		}
 		return Ok(has_unk);
 	}
-	fn check_type(&self, env : &LocEnv, t : &Type) -> CheckRes {
+	fn check_type(&self, env : &LocEnv, t : &mut Type, addr : &Cursor) -> CheckRes {
+		macro_rules! rec {($t:expr) => {try!(self.check_type(env, $t, addr))}; }
+		match *t {
+			Type::Arr(ref mut item) => {
+				rec!(&mut **item);
+			},
+			Type::Class(ref mut pref, ref name, ref mut params) => {
+				match *params {
+					Some(ref mut params) =>
+						for t in params.iter_mut() {
+							rec!(t);
+						},
+					_ => ()
+				}
+				try!(env.check_class(pref, name, params, addr));
+			}
+			Type::Fn(_, ref mut args, ref mut res) => {
+				/*match *tmpl {
+					Some(ref tmpl) =>
+						for t in tmpl.iter() {
+							rec!(t);
+						},
+					_ => ()
+				}*/
+				for t in args.iter_mut() {
+					rec!(t);
+				}
+				rec!(&mut **res);
+			},
+			_ => ()
+		}
 		Ok(())
 	}
 }

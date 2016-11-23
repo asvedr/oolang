@@ -1,5 +1,6 @@
 use syn_common::*;
 use std::collections::{HashMap, HashSet, BTreeMap};
+use std::fmt::Write;
 
 #[macro_export]
 macro_rules! throw {
@@ -12,7 +13,8 @@ macro_rules! ok {() => {return Ok(())};}
 pub struct TClass {
 	pub parent : Option<*const TClass>,
 	pub privs  : BTreeMap<String,*const Type>, // orig type saved in syn_class
-	pub pubs   : BTreeMap<String,*const Type>
+	pub pubs   : BTreeMap<String,*const Type>, 
+	pub params : usize                         // count of params
 }
 
 impl TClass {
@@ -66,18 +68,36 @@ impl Pack {
 			fns     : BTreeMap::new()
 		}
 	}
+	pub fn show(&self) -> String {
+		let mut out = String::new();
+		let _ = write!(out, "pack: {:?}\nusing: [", self.name);
+		let _ = write!(out, "\nusing: [");
+		for name in self.packs.keys() {
+			let _ = write!(out, "{}, ", name);
+		}
+		let _ = write!(out, "]\nfns:\n");
+		for name in self.fns.keys() {
+			let _ = write!(out, "\t{} : {:?}\n", name, self.fns.get(name).unwrap());
+		}
+		return out;
+	}
 }
 
 macro_rules! pack_of {
-	($_self:expr, $pref:expr) => {unsafe {
+	($_self:expr, $pref:expr) => {{
 		let mut cur : *const Pack = &*$_self;
-		for name in $pref.iter() {
+		let mut fail = false;
+		for name in $pref.iter() {// unsafe {
 			match (*cur).packs.get(name) {
 				Some(pack) => cur = *pack,
-				None => panic!()
+				None => {//panic!()
+					fail = true;
+					break;
+				}
 			}
-		}
-		cur
+		}//}
+		if fail {None}
+		else {Some(cur)}
 	}};
 }
 
@@ -86,8 +106,12 @@ macro_rules! get_obj {
 		match $pref {
 			Some(pref) => {
 				let pack = pack_of!($_self, pref);
-				match (*pack).$map.get($name) {
-					Some(ans) => Some(&*ans),
+				match pack {
+					Some(ptr) =>
+						match (*ptr).$map.get($name) {
+							Some(ans) => Some(&*ans),
+							None => None
+						},
 					None => None
 				}
 			},
@@ -126,8 +150,11 @@ impl Pack {
 	}
 	// changing arg
 	pub fn open_pref(&self, pref : &mut Vec<String>) {
-		let pack = pack_of!(self, pref);
-		unsafe {*pref = (*pack).name.clone()};
+		let pack = unsafe {pack_of!(self, pref)};
+		match pack {
+			Some(ptr) => unsafe {*pref = (*ptr).name.clone()},
+			_ => ()
+		}
 	}
 	pub fn pack_of_fn(&self, name : &String) -> Option<Vec<String>> { // Some(pack) or None[it mean then fun is in self module]
 		find_import!(self, name, fns, out_fns)
@@ -140,7 +167,8 @@ impl Pack {
 pub struct LocEnv {
 	pub global     : *const Pack,
 	pub local      : BTreeMap<String, Result<*const Type, *mut Type>>, // Ok  (WE TRULY KNOW WHAT IT IS)
-	pub outers     : BTreeMap<String, Result<*const Type, *mut Type>>  // Err (WE CALCULATED THIS AND WE CAN MISTAKE)
+	pub outers     : BTreeMap<String, Result<*const Type, *mut Type>>, // Err (WE CALCULATED THIS AND WE CAN MISTAKE)
+	pub templates  : HashSet<String>                                   // local templates
 }
 
 #[macro_export]
@@ -165,16 +193,30 @@ macro_rules! add_loc_knw {
 impl LocEnv {
 	pub fn new(pack : *const Pack) -> LocEnv {
 		LocEnv {
-			global : pack,
-			local  : BTreeMap::new(),
-			outers : BTreeMap::new()
+			global    : pack,
+			local     : BTreeMap::new(),
+			outers    : BTreeMap::new(),
+			templates : HashSet::new()
 		}
 	}
-	/*fn check_class_use(&self, cls : &Type, curs : Cursor) -> CheckRes {
-		match *cls {
-		self.global.get_cls()
+	pub fn show(&self) -> String {
+		let mut out = String::new();
+		let _ = write!(out, "LocEnv:\ntempls: [");
+		for name in self.templates.iter() {
+			let _ = write!(out, "{}, ", name);
 		}
-	}*/
+		let _ = write!(out, "]\nlocal: [");
+		for name in self.local.keys() {
+			let _ = write!(out, "{}, ", name);
+		}
+		let _ = write!(out, "]\nouter: [");
+		for name in self.local.keys() {
+			let _ = write!(out, "{}, ", name);
+		}
+		let _ = write!(out, "]\n");
+		out
+
+	}
 	pub fn replace_unk(&self, name : &String, tp : &Type) {
 		match self.local.get(name) {
 			Some(ans) =>
@@ -208,8 +250,10 @@ impl LocEnv {
 								ok!()
 							},
 							None => unsafe {
+								//println!("LOOK FOR {} {}", name, unsafe {(*self.global).show()} );
 								match (*self.global).get_fn(None, name) {
 									Some(t) => {
+										//println!("FOUND {}", name);
 										*tp_dst = (*t).clone();
 										*pref = match (*self.global).pack_of_fn(name) {
 											Some(p) => Some(p),
@@ -217,7 +261,10 @@ impl LocEnv {
 										};
 										ok!()
 									},
-									None => throw!(format!("var {} not found", name), pos)
+									None => {
+										//println!("NOT FOUND {}", name);
+										throw!(format!("var {} not found", name), pos)
+									}
 								}
 							}
 						}
@@ -242,6 +289,44 @@ impl LocEnv {
 				}
 			}
 		}
+	}
+	pub fn check_class(&self, pref : &mut Vec<String>, name : &String, params : &Option<Vec<Type>>, pos : &Cursor) -> CheckRes {
+		if pref.len() == 0 {
+			// PREFIX NOT EXIST OR IT'S A TEMPLATE TYPE
+			if self.templates.contains(name) {
+				pref.push("%tmpl".to_string())
+			} else {
+				unsafe {
+					match (*self.global).get_cls(None, name) {
+						Some(cls) => {
+							let pcnt = match *params {Some(ref vec) => vec.len(), _ => 0};
+							if (*cls).params != pcnt {
+								throw!(format!("class {:?}{} need {} params, given {}", pref, name, (*cls).params, pcnt), pos)
+							}
+						},
+						None => throw!(format!("class {} not found", name), pos)
+					}
+					match (*self.global).pack_of_cls(name) {
+						None => pref.push("%mod".to_string()),
+						Some(path) => *pref = path
+					}
+				}
+			}
+		} else {
+			unsafe {
+				match (*self.global).get_cls(Some(pref), name) {
+					None => throw!(format!("class {} not found", name), pos),
+					Some(cls) => {
+						(*self.global).open_pref(pref);
+						let pcnt = match *params {Some(ref vec) => vec.len(), _ => 0};
+						if (*cls).params != pcnt {
+							throw!(format!("class {:?}{} need {} params, given {}", pref, name, (*cls).params, pcnt), pos)
+						}
+					}
+				}
+			}
+		}
+		ok!()
 	}
 }
 

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 mod lexer;
 #[macro_use]
 mod syn_reserr;
