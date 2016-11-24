@@ -34,7 +34,7 @@ pub struct Expr {
 	pub val     : EVal,
 	pub kind    : Type,
 	pub addres  : Cursor,
-	pub op_flag : u8
+	pub op_flag : u8      // field for regress type calculation
 }
 
 impl Show for Expr {
@@ -149,6 +149,7 @@ macro_rules! expr {
 	($v:expr, $addr:expr)          => {Expr{val : $v, kind : Type::Unk, addres : $addr, op_flag : 0}};
 }
 
+// search for prefix part of id : ModA::ModB::var => [ModA::ModB::]
 fn parse_prefix(lexer : &Lexer, curs : &Cursor) -> Option<SynAns<Vec<String>>> {
 	let mut acc = vec![];
 	let mut curs = curs.clone();
@@ -303,7 +304,14 @@ fn parse_operator(lexer : &Lexer, curs : &Cursor) -> SynRes<usize> {
 	syn_throw!("");
 }
 
+// build expr tree from list of operands and operators
 fn build(seq : &mut Vec<Result<Box<Expr>,usize>>, addr : &Vec<Cursor>) -> Expr {
+	/*
+		build_local:
+			seq : ['1', '+', '2', '-', '3', '*', '4']
+			call : (seq, addr, 2, 7)
+				['1', '+' ! '2', '-', '3', '*', '4' ! ] ==> call('-', 2, call('*', 3, 4))
+	*/
 	fn build_local(seq : &mut Vec<Result<Box<Expr>,usize>>, addr : &Vec<Cursor>, left : usize, right : usize) -> Expr {
 		if right - left == 1 {
 			let a = mem::replace(&mut seq[left], Err(0));

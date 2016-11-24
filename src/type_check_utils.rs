@@ -176,7 +176,7 @@ pub struct LocEnv {
 #[macro_export]
 macro_rules! add_loc_unk {
 	($loc_e:expr, $name:expr, $tp:expr, $pos:expr) => {
-		match $loc_e.local.insert($name.clone(), Ok($tp)) {
+		match $loc_e.local.insert($name.clone(), Err($tp)) {
 			Some(_) => throw!(format!("local var {} already exist", $name), $pos),
 			_ => ()
 		}
@@ -185,7 +185,7 @@ macro_rules! add_loc_unk {
 #[macro_export]
 macro_rules! add_loc_knw {
 	($loc_e:expr, $name:expr, $tp:expr, $pos:expr) => {
-		match $loc_e.local.insert($name.clone(), Err($tp)) {
+		match $loc_e.local.insert($name.clone(), Ok($tp)) {
 			Some(_) => throw!(format!("local var {} already exist", $name), $pos),
 			_ => ()
 		}
@@ -200,6 +200,19 @@ impl LocEnv {
 			outers    : BTreeMap::new(),
 			templates : HashSet::new(),
 			ret_type  : None
+		}
+	}
+	pub fn add_outer(&mut self, out : &LocEnv) {
+		for name in out.local.keys() {
+			self.outers.insert(name.clone(), out.local.get(name).unwrap().clone());
+		}
+		for name in out.outers.keys() {
+			if !self.outers.contains_key(name) {
+				self.outers.insert(name.clone(), out.outers.get(name).unwrap().clone());
+			}
+		}
+		for name in out.templates.iter() {
+			self.templates.insert(name.clone());
 		}
 	}
 	pub fn set_ret_type(&mut self, t : &Type) {
@@ -241,8 +254,28 @@ impl LocEnv {
 				unsafe {
 					match *ans {
 						Err(ref ptr) => **ptr = tp.clone(),
-						_ => ()
+						_ => panic!("replace_unk: var known: {}", name)
 					}
+				},
+			_ =>
+				match self.outers.get(name) {
+					Some(ans) => 
+						unsafe {
+							match *ans {
+								Err(ref ptr) => **ptr = tp.clone(),
+								_ => panic!("replace_unk: var known: {}", name)
+							}
+						},
+					_ => panic!("replace_unk: var out: {}", name)
+				}
+		}
+	}
+	pub fn get_local_var(&self, name : &String) -> &Type {
+		match self.local.get(name) {
+			Some(v) =>
+				match *v {
+					Ok(l)  => unsafe { &*l },
+					Err(l) => unsafe { &*l }
 				},
 			_ => panic!()
 		}
@@ -289,6 +322,16 @@ impl LocEnv {
 				}
 			},
 			Some(ref mut arr) => unsafe {
+				if arr[0] == "%loc" {
+					*tp_dst = clone_type!(self.local.get(name).unwrap());
+					ok!()
+				} else if arr[0] == "%out" {
+					*tp_dst = clone_type!(self.outers.get(name).unwrap());
+					ok!()
+				} else if arr[0] == "%mod" {
+					*tp_dst = (*(*self.global).get_fn(None, name).unwrap()).clone();
+					ok!()
+				}
 				match (*self.global).get_fn(Some(arr), name) {
 					Some(t) => {
 						(*self.global).open_pref(arr);
@@ -350,3 +393,90 @@ impl LocEnv {
 
 pub type CheckRes    = Result<(),Vec<SynErr>>;
 pub type CheckAns<A> = Result<A,Vec<SynErr>>;
+
+pub fn find_unknown(body : &Vec<ActF>) -> &Cursor {	
+	macro_rules! go_e {($e:expr) => {match check($e) {Some(p) => return Some(p) , _ => ()}};}
+	macro_rules! go_a {($e:expr) => {match rec($e) {Some(p) => return Some(p) , _ => ()}};}
+	fn check(e : &Expr) -> Option<&Cursor> {	
+		if e.kind.is_unk() {
+			Some(&e.addres)
+		} else {
+			match e.val {
+				EVal::Call(_, ref f, ref a) => {
+					go_e!(f);
+					for i in a.iter() {
+						go_e!(i);
+					}
+				},
+				EVal::NewClass(_,_,_,ref args) => {
+					for a in args.iter() {
+						go_e!(a);
+					}
+				},
+				EVal::Item(ref a, ref b) => {
+					go_e!(a);
+					go_e!(b);
+				},
+				EVal::Arr(ref items) =>
+					for i in items {
+						go_e!(i);
+					},
+				EVal::Asc(ref pairs) => {
+					for pair in pairs {
+						go_e!(&pair.a);
+						go_e!(&pair.b);
+					}
+				},
+				EVal::Prop(ref a, _) => go_e!(a),
+				EVal::ChangeType(ref a, _) => go_e!(a),
+				_ => ()
+			}
+			None
+		}
+	}
+	fn rec(body : &Vec<ActF>) -> Option<&Cursor> {
+		for act in body.iter() {
+			match act.val {
+				ActVal::Expr(ref e) => go_e!(e),
+				ActVal::DFun(ref dfun) => go_a!(&dfun.body),
+				ActVal::DVar(_,_,ref oe) => for e in oe.iter() { go_e!(e) },
+				ActVal::Asg(ref a, ref b) => {
+					go_e!(a);
+					go_e!(b);
+				},
+				ActVal::Ret(ref oe) => for e in oe.iter() { go_e!(e) },
+				ActVal::While(_, ref e, ref a) => {
+					go_e!(e);
+					go_a!(a);
+				},
+				ActVal::For(_,_,ref e1,ref e2,ref a) => {
+					go_e!(e1);
+					go_e!(e2);
+					go_a!(a);
+				},
+				ActVal::Foreach(_,_,ref e,ref a) => {
+					go_e!(e);
+					go_a!(a);
+				},
+				ActVal::If(ref e, ref a, ref b) => {
+					go_e!(e);
+					go_a!(a);
+					go_a!(b);
+				},
+				ActVal::Try(ref a, ref ctchs) => {
+					go_a!(a);
+					for c in ctchs.iter() {
+						go_a!(&c.act);
+					}
+				},
+				ActVal::Throw(ref e) => go_e!(e),
+				_ => ()
+			}
+		}
+		None
+	}
+	match rec(body) {
+		Some(a) => a,
+		_ => panic!()
+	}
+}

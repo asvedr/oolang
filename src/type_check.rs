@@ -84,7 +84,7 @@ impl Checker {
 				Some(ref n) => n.clone(),
 				_ => panic!()
 			};
-			match pack.fns.insert(n, f.type_of()) {
+			match pack.fns.insert(n, f.ftype.clone()) {
 				Some(_) => throw!("fun with this name already exist in this module", f.addr),
 				_ => ()
 			}
@@ -94,31 +94,67 @@ impl Checker {
 		}
 		ok!()
 	}
-	fn check_fn(&self, pack : &Pack, fun : &mut SynFn, out_env : Option<&LocEnv>) -> CheckRes {
+	fn check_fn(&self, pack : &Pack, fun : &mut SynFn, out_env : Option<&LocEnv>) -> CheckAns<isize> {
 		let mut env = LocEnv::new(&*pack);
+		// PREPARE LOCAL ENV
+		let top_level = match out_env {
+			Some(eo) => {
+				env.add_outer(eo);
+				false
+			},
+			_ => true
+		};
 		for t in fun.tmpl.iter() {
 			env.templates.insert(t.clone());
 		}
+		// ARGS
 		for arg in fun.args.iter_mut() {
 			try!(self.check_type(&env, &mut arg.tp, &fun.addr));
 			let p : *mut Type = &mut arg.tp;
 			add_loc_knw!(env, arg.name.clone(), p, fun.addr);
 		}
+		// RET TYPE
 		try!(self.check_type(&env, &mut fun.rettp, &fun.addr));
 		env.set_ret_type(&fun.rettp);
-		self.check_actions(&mut env, &mut fun.body)
+		// CHECK BODY AND COERSING
+		if top_level {
+			let mut unknown = -1;
+			loop {
+				let unk_count = try!(self.check_actions(&mut env, &mut fun.body, unknown > 0));
+				if unk_count > 0 {
+					if unknown < 0 || unknown > unk_count {
+						// REPEATING CHECK TYPE FOR REGRESS CALCULATION
+						unknown = unk_count;
+					} else {
+						// CAN'T GET TYPE SOLUTION
+						let pos = find_unknown(&fun.body);
+						throw!("can't calculate type of expression", pos);
+					}
+				} else {
+					// TYPING OK
+					return Ok(0)
+				}
+			}
+		} else {
+			self.check_actions(&mut env, &mut fun.body, false)
+		}
 	}
-	fn check_actions(&self, env : &mut LocEnv, src : &mut Vec<ActF>) -> CheckRes {
-		macro_rules! expr {($e:expr) => {try!(self.check_expr(env, $e))}; }
+	fn check_actions(&self, env : &mut LocEnv, src : &mut Vec<ActF>, repeated : bool) -> CheckAns<isize> {
+		let mut unk_count = 0;
+		macro_rules! expr {($e:expr) => { unk_count += try!(self.check_expr(env, $e))}; }
+		let env_pt : *mut LocEnv = &mut *env;
+		let env_ln : &mut LocEnv = unsafe{ mem::transmute(env_pt) };
+		macro_rules! regress {($e:expr, $t:expr) => {try!(regress_expr(env_ln, $e, $t))}; }
 		for act in src.iter_mut() {
 			match act.val {
-				ActVal::Expr(ref mut e) => act.exist_unk = expr!(e),
+				ActVal::Expr(ref mut e) => /*act.exist_unk =*/ expr!(e),
 				ActVal::Ret(ref mut opt_e) => {
 					match *opt_e {
 						Some(ref mut e) => {
 							expr!(e);
 							if e.kind.is_unk() {
 								// REGRESS CALL
+								regress!(e, env.ret_type());
 							} else if !env.check_ret_type(&e.kind) {
 								throw!(format!("expect type {:?}, found {:?}", env.ret_type(), e.kind), act.addres)
 							}
@@ -130,16 +166,13 @@ impl Checker {
 					}
 				},
 				ActVal::DVar(ref name, ref mut tp, ref mut val) => {
-					match *val {
+					let unk_val = match *val {
 						Some(ref mut val) => {
-							//println!("<<<");
-							act.exist_unk = expr!(val);
-							//println!(">>>");
+							expr!(val);
+							val.kind.is_unk()
 						},
-						None => {
-							act.exist_unk = false;
-						}
-					}
+						None => false
+					};
 					match *tp {
 						Type::Unk => {
 							*tp = match *val {
@@ -148,24 +181,43 @@ impl Checker {
 									v.kind.clone()
 								}
 							};
-							add_loc_unk!(env, name, tp, act.addres);
+							if !repeated {
+								add_loc_unk!(env, name, tp, act.addres);
+							}
 						},
 						_ => {
 							// regression recovery
-							add_loc_knw!(env, name, tp, act.addres);
+							if !repeated {
+								add_loc_knw!(env, name, tp, act.addres);
+							}
+						}
+					}
+					if unk_val {
+						match *val {
+							Some(ref mut v) => {
+								let tp = env.get_local_var(name);
+								if !tp.is_unk() {
+									regress!(v, tp);
+								}
+							},
+							_ => panic!()
 						}
 					}
 				},
 				ActVal::Asg(ref mut var, ref mut val) => {
-					act.exist_unk = expr!(var) || expr!(val);
+					//act.exist_unk = expr!(var) || expr!(val);
+					expr!(var);
+					expr!(val);
 					let ua = var.kind.is_unk();
 					let ub = val.kind.is_unk();
 					if ua && ub {
 						// PASS
 					} else if ua {
 						// REGRESS CALL
+						regress!(var, &val.kind);
 					} else if ub {
 						// REGRESS CALL
+						regress!(val, &var.kind);
 					} else if var.kind != val.kind {
 						throw!(format!("assign parts incompatible: {:?} and {:?}", var.kind, val.kind), act.addres)
 					}
@@ -176,18 +228,29 @@ impl Checker {
 						throw!(format!("expr must be a class"), e.addres)
 					}
 				},
+				ActVal::DFun(ref mut df) => {
+					if !repeated {
+						match df.name {
+							Some(ref name) => add_loc_knw!(env, name, &df.ftype, df.addr),
+							_ => panic!()
+						}
+					}
+					let pack : &Pack = unsafe { &(*env.global) };
+					unk_count += try!(self.check_fn(pack, &mut **df, Some(env)));
+				}
 				//ActVal::Try() => {}
 				_ => ()
 			}
 		}
-		ok!()
+		Ok(unk_count)
 	}
-	fn check_expr(&self, env : &LocEnv, expr : &mut Expr) -> CheckAns<bool> {
+	fn check_expr(&self, env : &mut LocEnv, expr : &mut Expr) -> CheckAns<isize> {
 		//println!("CHECK EXPR");
-		let mut has_unk = false;
+		let mut unk_count = 0;
 		// recursive check expression
-		macro_rules! check {($e:expr) => {has_unk = try!(self.check_expr(env, $e)) || has_unk};};
+		macro_rules! check {($e:expr) => {unk_count += try!(self.check_expr(env, $e))};};
 		macro_rules! check_type {($t:expr) => {try!(self.check_type(env, $t, &expr.addres))}}
+		macro_rules! regress {($e:expr, $t:expr) => {try!(regress_expr(env, $e, $t))}; }
 		// macro for check what category of operator is
 		macro_rules! is_in {
 			($e:expr, $out:expr, $seq:ident, $els:expr) => {
@@ -247,6 +310,8 @@ impl Checker {
 								//set_var_type!(env, args[0], $tp);
 								//set_var_type!(env, args[1], $tp);
 								// REGRESS CALL
+								regress!(&mut args[0], &$tp);
+								regress!(&mut args[1], &$tp);
 								match res_type {
 									Type::Unk => {
 										f.kind = type_fn!(vec![$tp, $tp], $tp);
@@ -292,7 +357,7 @@ impl Checker {
 								} else if (*b).is_real() {
 									ok!(Type::Real)
 								} else if (*b).is_unk() {
-									has_unk = true;
+									unk_count += 1;
 								} else {
 									throw!(format!("operands must be int or real, found {:?}", *b), args[1].addres.clone())
 								}
@@ -309,6 +374,8 @@ impl Checker {
 								//set_var_type!(env, args[0], Type::Int);
 								//set_var_type!(env, args[1], Type::Int);
 								// REGRESS CALL
+								regress!(&mut args[0], &Type::Int);
+								regress!(&mut args[1], &Type::Int);
 								f.kind = type_fn!(vec![Type::Int, Type::Int], Type::Int);
 								expr.kind = Type::Int
 							}
@@ -322,20 +389,43 @@ impl Checker {
 								//set_var_type!(env, args[0], Type::Real);
 								//set_var_type!(env, args[1], Type::Real);
 								// REGRESS CALL
+								regress!(&mut args[0], &Type::Real);
+								regress!(&mut args[1], &Type::Real);
 								f.kind = type_fn!(vec![Type::Real, Type::Real], Type::Real);
 								expr.kind = Type::Real
 							}
 						// ALL OPERATIONS
 						} else if seq_l == &self.all_op {
-							if *a == *b {
-								f.kind = type_fn!(vec![(*a).clone(), (*b).clone()], Type::Bool);
+							if (*a).is_unk() && (*b).is_unk() {
+								// PASS
+							} if *a == *b || (*a).is_unk() || (*b).is_unk() {
+								let tp : Type;
+								if (*a).is_unk() {
+									tp = (*b).clone();
+									regress!(&mut args[0], &tp);
+								} else if (*b).is_unk() {
+									tp = (*a).clone();
+									regress!(&mut args[1], &tp);
+								} else {
+									tp = (*a).clone();
+								}
+								f.kind = type_fn!(vec![tp.clone(), tp], Type::Bool);
 								expr.kind = Type::Bool
 							} else {
 								throw!(format!("expect {:?}, found {:?}", *a, *b), args[1].addres.clone())
 							}
 						// BOOL OPERATIONS (bool, bool) -> bool
 						} else /* if seq_l == &self.bool_op */ {
-							expr.kind = Type::Bool
+							if !((*a).is_bool() || (*a).is_unk()) {
+								throw!(format!("expect bool, found {:?}", *a), args[0].addres.clone());
+							} else if !((*b).is_bool() || (*b).is_unk()) {
+								throw!(format!("expect bool, found {:?}", *b), args[1].addres.clone());
+							} else {
+								regress!(&mut args[0], &Type::Bool);
+								regress!(&mut args[1], &Type::Bool);
+								f.kind = type_fn!(vec![Type::Bool, Type::Bool], Type::Bool);
+								expr.kind = Type::Bool
+							}
 						}
 					},
 					// NOT OPERATOR, REGULAR FUNC CALL
@@ -359,12 +449,13 @@ impl Checker {
 									throw!(format!("expect {} args, found {}", args_t.len(), args.len()), expr.addres.clone());
 								} else {
 									for i in 0 .. args.len() {
-										let a = &args[i];
+										let a = &mut args[i];
 										let t = &args_t[i];
 										if a.kind == *t {
 											// ALL OK
 										} else if a.kind.is_unk() {
 											// REGRESS CALL
+											regress!(a, t);
 										} else {
 											throw!(format!("expect {:?}, found {:?}", t, a.kind), a.addres.clone())
 										}
@@ -372,7 +463,7 @@ impl Checker {
 									expr.kind = (**res_t).clone();
 								}
 							},
-							Type::Unk => has_unk = true,
+							Type::Unk => unk_count += 1,
 							ref t => throw!(format!("expect Fn found {:?}", t), f.addres.clone())
 						}
 					}
@@ -409,6 +500,7 @@ impl Checker {
 					for i in 0 .. args.len() {
 						if args[i].kind.is_unk() {
 							// REGRESS CALL
+							regress!(&mut args[i], &*(*cls).args[i]);
 						} else if *(*cls).args[i] != args[i].kind {
 							throw!(format!("expected {:?}, found {:?}", *(*cls).args[i], args[i].kind), &args[i].addres)
 						}
@@ -419,12 +511,13 @@ impl Checker {
 				check!(a);
 				check!(i);
 				if a.kind.is_unk() {
-					has_unk = true;
+					unk_count += 1;
 				} else if a.kind.is_arr() {
 					if i.kind.is_int() {
 						// ALL OK
 					} else if i.kind.is_unk() {
 						// REGRESS CALL
+						regress!(i, &Type::Int);
 					} else {
 						throw!(format!("expect int, found {:?}", i.kind), i.addres.clone())
 					}
@@ -437,6 +530,7 @@ impl Checker {
 						// ALL OK
 					} else if i.kind.is_unk() {
 						// REGRESS CALL
+						regress!(i, &key);
 					} else {
 						throw!(format!("expect {:?}, found {:?}", key, i.kind), i.addres.clone())
 					}
@@ -451,8 +545,8 @@ impl Checker {
 				try!(env.get_var(pref, name, &mut expr.kind, &expr.addres));
 				/* MUST RECUSRIVE CHECK FOR COMPONENTS */
 				match expr.kind {
-					Type::Unk => return Ok(true),
-					_ => return Ok(false)
+					Type::Unk => return Ok(1),
+					_ => return Ok(0)
 				}
 			},
 			EVal::Arr(ref mut items) => {
@@ -473,10 +567,15 @@ impl Checker {
 					}
 				}
 				match item {
-					Some(t) => expr.kind = Type::Arr(Box::new(t)),
-					_ => has_unk = true
+					Some(t) => {
+						// REGRESS CALL
+						for i in items.iter_mut() {
+							regress!(i, &t);
+						}
+						expr.kind = Type::Arr(Box::new(t));
+					},
+					_ => unk_count += 1
 				}
-				// REGRESS CALL
 			},
 			EVal::Asc(ref mut items) => {
 				let mut key_type : Option<Type> = None;
@@ -504,7 +603,7 @@ impl Checker {
 						Type::Str  => skey!(Type::Str,  pair.a.addres),
 						Type::Char => skey!(Type::Char, pair.a.addres),
 						Type::Int  => skey!(Type::Int,  pair.a.addres),
-						Type::Unk  => has_unk = true,
+						Type::Unk  => unk_count += 1,
 						ref a => throw!(format!("asc key must be int, char or str, found {:?}", a), pair.a.addres.clone())
 					}
 					match val_type {
@@ -520,12 +619,18 @@ impl Checker {
 				}
 				match key_type {
 					Some(k) => match val_type {
-						Some(v) => expr.kind = Type::Class(vec!["%std".to_string()], "Asc".to_string(), Some(vec![k, v])),
-						_ => has_unk = true
+						Some(v) => {
+							// REGRESS CALL
+							for pair in items.iter_mut() {
+								regress!(&mut pair.a, &k);
+								regress!(&mut pair.b, &v);
+							}
+							expr.kind = Type::Class(vec!["%std".to_string()], "Asc".to_string(), Some(vec![k, v]));
+						},
+						_ => unk_count += 1
 					},
-					_ => has_unk = true
+					_ => unk_count += 1
 				}
-				// REGRESS CALL
 			},
 			EVal::Prop(ref mut obj, _) => check!(obj),
 			EVal::ChangeType(ref mut e, ref mut tp) => {
@@ -534,7 +639,7 @@ impl Checker {
 			}
 			_ => ()
 		}
-		return Ok(has_unk);
+		return Ok(unk_count);
 	}
 	fn check_type(&self, env : &LocEnv, t : &mut Type, addr : &Cursor) -> CheckRes {
 		macro_rules! rec {($t:expr) => {try!(self.check_type(env, $t, addr))}; }

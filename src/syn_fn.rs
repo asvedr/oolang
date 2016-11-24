@@ -21,22 +21,32 @@ pub struct SynFn {
 	pub body        : Vec<Act<SynFn>>,
 	pub addr        : Cursor,
 	pub can_be_clos : bool, // if has names args or option args then can't be used as closure
-	pub has_named   : bool
+	pub has_named   : bool,
+	pub ftype       : Type
 }
-
+/*
 impl SynFn {
-	pub fn type_of(&self) -> Type {
-		let mut atypes = vec![];
-		for a in self.args.iter() {
-			atypes.push(a.tp.clone());
-		}
-		if self.tmpl.len() == 0 {
-			Type::Fn(None, atypes, Box::new(self.rettp.clone()))
-		} else {
-			Type::Fn(Some(self.tmpl.clone()), atypes, Box::new(self.rettp.clone()))
+	pub fn type_of(&mut self) -> &Type {
+		match self.ftype {
+			Some(ref t) => t,
+			_ => {
+				let mut atypes = vec![];
+				for a in self.args.iter() {
+					atypes.push(a.tp.clone());
+				}
+				if self.tmpl.len() == 0 {
+					self.ftype = Some(Type::Fn(None, atypes, Box::new(self.rettp.clone())))
+				} else {
+					self.ftype = Some(Type::Fn(Some(self.tmpl.clone()), atypes, Box::new(self.rettp.clone())))
+				}
+				match self.ftype {
+					Some(ref t) => t,
+					_ => panic!()
+				}
+			}
 		}
 	}
-}
+}*/
 
 impl Show for Arg {
 	fn show(&self, layer : usize) -> Vec<String> {
@@ -152,6 +162,17 @@ pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 	let tp = try!(parse_type(lexer, &curs));
 	// body
 	let body = try!(parse_act_list(lexer, &tp.cursor, &parse_fn_full));
+	// type
+	let mut atypes = vec![];
+	for a in args.val.iter() {
+		atypes.push(a.tp.clone())
+	}
+	let ftype =
+		if tmpl.len() == 0 {
+			Type::Fn(None, atypes, Box::new(tp.val.clone()))
+		} else {
+			Type::Fn(Some(tmpl.clone()), atypes, Box::new(tp.val.clone()))
+		};
 	let res = SynFn {
 		name        : Some(name.val),
 		tmpl        : tmpl,
@@ -160,7 +181,8 @@ pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 		body        : body.val,
 		addr        : orig,
 		can_be_clos : can_be_clos,
-		has_named   : has_named
+		has_named   : has_named,
+		ftype       : ftype
 	};
 	syn_ok!(res, body.cursor)
 }

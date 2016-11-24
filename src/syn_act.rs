@@ -4,10 +4,11 @@ use syn_expr::*;
 use type_sys::*;
 //use std::fmt;
 
+// DF is non declared struct for 'def function'
 pub struct SynCatch<DF> {
-	except : Option<Type>,
-	vname  : Option<String>,
-	act    : Vec<Act<DF>>
+	pub except : Option<Type>,
+	pub vname  : Option<String>,
+	pub act    : Vec<Act<DF>>
 }
 
 pub enum ActVal<DF> {
@@ -32,11 +33,11 @@ pub enum ActVal<DF> {
 pub struct Act<DF> {
 	pub val       : ActVal<DF>,
 	pub addres    : Cursor, 
-	pub exist_unk : bool // field for typecheck 'unknown type exist in this action'
+//	pub exist_unk : bool // field for typecheck 'unknown type exist in this action'
 }
 
 macro_rules! act {
-	($v:expr, $addr:expr) => {Act{val : $v, addres : $addr, exist_unk : true}};
+	($v:expr, $addr:expr) => {Act{val : $v, addres : $addr/*, exist_unk : true*/}};
 }
 
 impl<DF : Show> Show for Act<DF> {
@@ -186,6 +187,7 @@ impl<DF : Show> Show for ActVal<DF> {
 	}
 }
 
+// {a; b; c; ..}
 pub fn parse_act_list<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> SynRes<Vec<Act<DF>>> {
 	let mut curs : Cursor = lex!(lexer, curs, "{");
 	let mut acc = vec![];
@@ -208,6 +210,7 @@ pub fn parse_act_list<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) 
 	}
 }
 
+// ask lexer for ';' or '}'
 fn is_act_end(lexer : &Lexer, curs : &Cursor) -> bool {
 	match lexer.lex(curs) {
 		Ok(ans) => ans.val == ";" || ans.val == "}",
