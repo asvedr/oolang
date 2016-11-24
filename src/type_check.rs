@@ -379,10 +379,6 @@ impl Checker {
 				}
 			},
 			EVal::NewClass(ref mut tmpl, ref mut pref, ref mut name, ref mut args) => {
-				let mut p = match mem::replace(pref, None) {
-					Some(p) => p,
-					_ => vec![]
-				};
 				let pcnt = match *tmpl {
 					Some(ref mut tmpl) => {
 						for t in tmpl.iter_mut() {
@@ -392,16 +388,18 @@ impl Checker {
 					},
 					_ => 0
 				};
-				try!(env.check_class(&mut p, name, tmpl, &expr.addres));
-				*pref = Some(p);
+				try!(env.check_class(pref, name, tmpl, &expr.addres));
 				for a in args.iter_mut() {
 					check!(a);
 				}
 				unsafe {
-					let cls = match *pref {
-						Some(ref p) => (*env.global).get_cls(Some(p), name).unwrap(),
-						_ => panic!()
-					};
+					let cls =
+						if pref[0] == "%mod" {
+							(*env.global).get_cls(None, name).unwrap()
+						}
+						else { 
+							(*env.global).get_cls(Some(pref), name).unwrap()
+						};
 					if (*cls).params != pcnt {
 						throw!(format!("class {} expect {} params, given {}", name, (*cls).params, pcnt), &expr.addres)
 					}

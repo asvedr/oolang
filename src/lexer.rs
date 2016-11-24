@@ -159,7 +159,7 @@ impl Lexer {
 		let machines : Vec<Machine> = vec![
 			mach!(id, Id), mach!(numi, Int), mach!(numr, Real, read_float), mach!(stra, Str, read_str), mach!(chara, Char, read_char),
 			mach!(br, Br), mach!(opr, Opr), mach!(dectp, DecType), mach!(namesp, NSpace),
-			mach!(dot, Dot)//, mach!(comma, Comma)
+			mach!(rangesp, Dot), mach!(dot, Dot)//, mach!(comma, Comma)
 		];
 		let mut any_on = false; // flag for any machine is activated
 		let mut last_true = None; // last machine which was in final state
@@ -356,6 +356,14 @@ fn namesp(c : char, _ : &Lexer, s : &mut State) {
 	cond!(s, s.num == 0 && c == ':',
 			sstate!(s,false,1),
 			cond!(s, s.num == 1 && c == ':', sstate!(s,true,2))
+		)
+}
+
+#[allow(unused_parens)]
+fn rangesp(c : char, _ : &Lexer, s : &mut State) {
+	cond!(s, s.num == 0 && c == '.',
+			sstate!(s,false,1),
+			cond!(s, s.num == 1 && c == '.', sstate!(s,true,2))
 		)
 }
 

@@ -63,10 +63,14 @@ impl Show for SynFn {
 		for _ in 0 .. layer {
 			tab.push(' ');
 		}
+		let name : &str = match self.name {
+			Some(ref n) => &**n,
+			_ => "%lambda"
+		};
 		let mut res = if self.tmpl.len() > 0 {
-			vec![format!("{}func {:?} tmpl:{:?} allowclos:{} type:{:?}", tab, self.name, self.tmpl, self.can_be_clos, self.rettp)]
+			vec![format!("{}func {} tmpl:{:?} allowclos:{} type:{:?}", tab, name, self.tmpl, self.can_be_clos, self.rettp)]
 		} else {
-			vec![format!("{}func {:?} allowclos:{} type:{:?}", tab, self.name, self.can_be_clos, self.rettp)]
+			vec![format!("{}func {} allowclos:{} type:{:?}", tab, name, self.can_be_clos, self.rettp)]
 		};
 		tab.push(' ');
 		res.push(format!("{}ARGS", tab));

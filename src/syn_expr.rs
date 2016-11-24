@@ -11,7 +11,7 @@ pub enum EVal {
 	Str        (String),
 	Char       (char),
 	Call       (Option<Vec<Type>>,Box<Expr>,Vec<Expr>),
-	NewClass   (Option<Vec<Type>>,Option<Vec<String>>,String,Vec<Expr>),
+	NewClass   (Option<Vec<Type>>,Vec<String>,String,Vec<Expr>),
 	Item       (Box<Expr>,Box<Expr>),
 	Var        (Option<Vec<String>>, String), // namespace, name
 	Arr        (Vec<Expr>),
@@ -109,13 +109,13 @@ impl Show for Expr {
 			},
 			EVal::NewClass(_, ref p, ref n, ref a) => {
 				let mut pref = String::new();
-				match *p {
-					None => pref.push_str("_::"),
-					Some(ref v) =>
-						for n in v.iter() {
-							pref.push_str(&*n);
-							pref.push_str("::");
-						}
+				if p.len() == 0 {
+					pref.push_str("_::")
+				} else {
+					for n in p.iter() {
+						pref.push_str(&*n);
+						pref.push_str("::");
+					}
 				}
 				let mut res = vec![format!("{}NEWC {}{}{}", tab, pref, n, tp)];
 				for arg in a.iter() {
@@ -223,10 +223,10 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 					let orig_c = curs;
 					curs = ans.cursor;
 					let pref = match parse_prefix(lexer, &curs) {
-						None => None,
+						None => vec![],
 						Some(v) => {
 							curs = v.cursor;
-							Some(v.val)
+							v.val
 						}
 					};
 					let ans = lex_type!(lexer, &curs, LexTP::Id);

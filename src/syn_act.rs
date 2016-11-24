@@ -21,7 +21,8 @@ pub enum ActVal<DF> {
 	Break(Option<String>), // label to loop
 	//     label          cond   actions
 	While(Option<String>, Expr, Vec<Act<DF>>),
-	//For(String,)
+	For(Option<String>,String,Expr,Expr,Vec<Act<DF>>), // for i in range(a + 1, b - 2) {}
+	Foreach(Option<String>,String,Expr,Vec<Act<DF>>),  // for i in array {}
 	// cond   then    else
 	If(Expr,Vec<Act<DF>>,Vec<Act<DF>>),
 	Try(Vec<Act<DF>>,Vec<SynCatch<DF>>), // try-catch
@@ -118,6 +119,39 @@ impl<DF : Show> Show for ActVal<DF> {
 				}
 				for cmd in act.iter() {
 					for line in cmd.show(layer + 1) {
+						res.push(line);
+					}
+				}
+				res
+			},
+			ActVal::For(ref label, ref name, ref a, ref b, ref body) => {
+				let mut res = match *label {
+					Some(ref l) => vec![format!("{}for::{} {} in range", tab, l, name)],
+					_ => vec![format!("{}for {} in range", tab, name)]
+				};
+				for line in a.show(layer + 1) {
+					res.push(line);
+				}
+				for line in b.show(layer + 1) {
+					res.push(line);
+				}
+				for act in body.iter() {
+					for line in act.show(layer + 1) {
+						res.push(line);
+					}
+				}
+				res
+			},
+			ActVal::Foreach(ref label, ref name, ref expr, ref body) => {
+				let mut res = match *label {
+					Some(ref l) => vec![format!("{}foreach::{} {}", tab, l, name)],
+					_ => vec![format!("{}foreach {}", tab, name)]
+				};
+				for line in expr.show(layer + 1) {
+					res.push(line);
+				}
+				for act in body.iter() {
+					for line in act.show(layer + 1) {
 						res.push(line);
 					}
 				}
@@ -226,7 +260,7 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
 			let sym = lex!(lexer, &ans.cursor);
 			let mut curs = ans.cursor;
 			let label = if sym.val == "::" {
-				let label = lex_type!(lexer, &curs, LexTP::Id);
+				let label = lex_type!(lexer, &sym.cursor, LexTP::Id);
 				curs = label.cursor;
 				Some(label.val)
 			} else {
@@ -238,7 +272,34 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
 			let act = try!(parse_act_list(lexer, &cond.cursor, fparse));
 			syn_ok!(make!(ActVal::While(label, cond.val, act.val)), act.cursor)
 		},
-		//"for"
+		"for" => {
+			// label
+			let sym = lex!(lexer, &ans.cursor);
+			let mut curs = ans.cursor;
+			let label = if sym.val == "::" {
+				let label = lex_type!(lexer, &sym.cursor, LexTP::Id);
+				curs = label.cursor;
+				Some(label.val)
+			} else {
+				None
+			};
+			// var name
+			let var = lex_type!(lexer, &curs, LexTP::Id);
+			curs = lex!(lexer, &var.cursor, "in");
+			// 1 expr
+			let a = try!(parse_expr(lexer, &curs));
+			let sym = lex!(lexer, &a.cursor);
+			if sym.val == ".." {
+				// it's range
+				let b = try!(parse_expr(lexer, &sym.cursor));
+				let body = try!(parse_act_list(lexer, &b.cursor, fparse));
+				syn_ok!(make!(ActVal::For(label, var.val, a.val, b.val, body.val)), body.cursor)
+			} else {
+				// it's single expr
+				let body = try!(parse_act_list(lexer, &a.cursor, fparse));
+				syn_ok!(make!(ActVal::Foreach(label, var.val, a.val, body.val)), body.cursor)
+			}
+		},
 		"break" => {
 			if is_act_end(lexer, &ans.cursor) {
 				syn_ok!(make!(ActVal::Break(None)), ans.cursor)
