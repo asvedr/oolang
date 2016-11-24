@@ -9,8 +9,8 @@ Use ::= 'use' (id '::')* id ['as' id]
         'use' (id '::')* '*'
 ModuleBody ::= DefFun                            // define function
                DefClass                          // define class
-			   'extern' 'fn' id ':' Type '=' str // FFI function
-			   'extern' 'type' id                // FFI type
+               'extern' 'fn' id ':' Type '=' str // FFI function
+               'extern' 'type' id                // FFI type
 
 //                   if singleton    template         name  if inherit
 DefClass ::= 'class' ['single']    ['<' (Type,)+ '>'] id    [':' Type]   '{' (ClassItem)* '}'
@@ -25,34 +25,34 @@ ActList ::= '{' (Action ;)* '}' // body of funs, loops, conditions
 // code action
 Action ::= Expr
            DefFun                                           // local fun definition
-		   'var' id [':' Type] ['=' Expr]                   // local var definition
-		   Expr '=' Expr                                    // assignation
-		   'return' Expr                                    // return
-		   'break' [id]                                     // break loop [by id]
-		   while ['::' id] Expr ActList                     // loop [with id]
-		   'if' Expr ActList ['else' ActList]               // condition
-		   'try' ActList ('catch' [id ':' Type] ActList)+   // try-catch
-		   'throw' Expr
+           'var' id [':' Type] ['=' Expr]                   // local var definition
+           Expr '=' Expr                                    // assignation
+           'return' Expr                                    // return
+           'break' [id]                                     // break loop [by id]
+           while ['::' id] Expr ActList                     // loop [with id]
+           'if' Expr ActList ['else' ActList]               // condition
+           'try' ActList ('catch' [id ':' Type] ActList)+   // try-catch
+           'throw' Expr
 
 Expr ::= Expr '(' (Expr,)* ')'                          // fun call
          Expr operator Expr                             // operators '+', '-', '*', '/' ...
-		 Expr '.' Expr                                  // property of object 
-		 Expr '[' Expr ']'                              // item of array
-		 'new' Type ['<' (Type,)+ '>'] '(' (Expr,)* ')' // new object
-		 Expr 'as' Type                                 // type coersing
-		 '[' (Expr,)* ']'                               // new array
-		 '{' ((Expr ':' Expr) ,)* '}'                   // new hash tbl
-		 id                                             // variable
-		 number                                         // int or float
-		 str                                            // string
-		 char                                           // char
+         Expr '.' Expr                                  // property of object 
+         Expr '[' Expr ']'                              // item of array
+         'new' Type ['<' (Type,)+ '>'] '(' (Expr,)* ')' // new object
+         Expr 'as' Type                                 // type coersing
+         '[' (Expr,)* ']'                               // new array
+         '{' ((Expr ':' Expr) ,)* '}'                   // new hash tbl
+         id                                             // variable
+         number                                         // int or float
+         str                                            // string
+         char                                           // char
 
 Type ::= 'int'
          'real'
-		 'str'
-		 'bool'
-		 'char'
-		 '()'                           // void
-		 '['Type']'                     // array of
-		 (id ::)*id ['<'(Type,)+'>']    // class
-		 'Fn' '(' (Type,)* ')' ':' Type // function
+         'str'
+         'bool'
+         'char'
+         '()'                           // void
+         '['Type']'                     // array of
+         (id ::)*id ['<'(Type,)+'>']    // class
+         'Fn' '(' (Type,)* ')' ':' Type // function
