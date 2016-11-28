@@ -41,7 +41,7 @@ fn main() : () {
 fn test() : int {
 	var a;
 	var arr = [[], ['c'], []];
-	var asc = {};
+	var asc : Asc<int, char> = {};
 	asc[0] = arr[0][0];
 	return a;
 }
