@@ -1,6 +1,9 @@
+complete regressor
+
 + lexical
 + synax
 +/- type check with hindley-milner
++/- std lib
 - compile to c
 - GC
 - FFI

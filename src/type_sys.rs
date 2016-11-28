@@ -28,6 +28,10 @@ macro_rules! type_fn {
 		Type::Fn(None, $args, Box::new($res))
 	};
 }
+#[macro_export]
+macro_rules! type_c {
+	($n:expr) => {Type::Class(vec![], $n, None)}
+}
 
 macro_rules! check_is {($_self:expr, $t:ident) => {
 	match *$_self {

@@ -3,6 +3,7 @@ use type_check_utils::*;
 use std::collections::{HashMap/*, HashSet, BTreeMap*/};
 use std::mem;
 use regressor::*;
+use preludelib::*;
 
 /*
 	Типы привязаны к выражениям. В синтаксическом дереве выражений и прочего хранятся все типы.
@@ -29,7 +30,8 @@ pub struct Checker {
 	real_op     : HashMap<String,Type>,
 	all_op      : HashMap<String,Type>,
 	bool_op     : HashMap<String,Type>,
-	packs       : HashMap<String,Pack>
+	packs       : HashMap<String,Pack>,
+	std         : Prelude
 }
 
 macro_rules! set_var_type {
@@ -55,7 +57,8 @@ impl Checker {
 			real_op     : HashMap::new(),
 			all_op      : HashMap::new(),
 			bool_op     : HashMap::new(),
-			packs       : HashMap::new()
+			packs       : HashMap::new(),
+			std         : Prelude::new()
 		};
 		macro_rules! adds {
 				($s:expr, $a:expr) => {$s.insert($a.to_string(), Type::Unk)};
@@ -79,6 +82,10 @@ impl Checker {
 	}
 	pub fn check_mod(&self, smod : &mut SynMod) -> CheckRes {
 		let mut pack = Pack::new();
+		for c in self.std.pack.cls.keys() {
+			pack.out_cls.insert(c.clone(), &self.std.pack);
+		}
+		pack.packs.insert("%std".to_string(), &self.std.pack);
 		for f in smod.funs.iter() {
 			let n = match f.name {
 				Some(ref n) => n.clone(),
@@ -187,6 +194,7 @@ impl Checker {
 						},
 						_ => {
 							// regression recovery
+							try!(self.check_type(env, tp, &act.addres));
 							if !repeated {
 								add_loc_knw!(env, name, tp, act.addres);
 							}
@@ -197,7 +205,16 @@ impl Checker {
 							Some(ref mut v) => {
 								let tp = env.get_local_var(name);
 								if !tp.is_unk() {
-									regress!(v, tp);
+									// BAD SOLUTION
+									// special case for empty array-assoc situation
+									regress!(v, tp)
+									/*match val.val {
+										EVal::Asc(item_t) if tp.is_arr() => {
+											env.replace_unk(name, )
+											regress!()
+										},
+										_ => regress!(v, tp)
+									}*/
 								}
 							},
 							_ => panic!()
@@ -491,8 +508,8 @@ impl Checker {
 						else { 
 							(*env.global).get_cls(Some(pref), name).unwrap()
 						};
-					if (*cls).params != pcnt {
-						throw!(format!("class {} expect {} params, given {}", name, (*cls).params, pcnt), &expr.addres)
+					if (*cls).params.len() != pcnt {
+						throw!(format!("class {} expect {} params, given {}", name, (*cls).params.len(), pcnt), &expr.addres)
 					}
 					if (*cls).args.len() != args.len() {
 						throw!(format!("class {} initializer expect {} args, given {}", name, (*cls).args.len(), args.len()), &expr.addres)
@@ -540,7 +557,7 @@ impl Checker {
 				}
 			},
 			EVal::Var(ref mut pref, ref name) => { // namespace, name
-				println!("GET VAR FOR {:?} {}", pref, name);
+				//println!("GET VAR FOR {:?} {}", pref, name);
 				//println!("{}", env.show());
 				try!(env.get_var(pref, name, &mut expr.kind, &expr.addres));
 				/* MUST RECUSRIVE CHECK FOR COMPONENTS */

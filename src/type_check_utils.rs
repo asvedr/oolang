@@ -14,7 +14,7 @@ pub struct TClass {
 	pub parent : Option<*const TClass>,
 	pub privs  : BTreeMap<String,*const Type>, // orig type saved in syn_class
 	pub pubs   : BTreeMap<String,*const Type>, 
-	pub params : usize,                        // count of params
+	pub params : Vec<String>,                  // count of params
 	pub args   : Vec<*const Type>              // constructor 
 }
 
@@ -71,7 +71,7 @@ impl Pack {
 	}
 	pub fn show(&self) -> String {
 		let mut out = String::new();
-		let _ = write!(out, "pack: {:?}\nusing: [", self.name);
+		let _ = write!(out, "pack: {:?}\n", self.name);
 		let _ = write!(out, "\nusing: [");
 		for name in self.packs.keys() {
 			let _ = write!(out, "{}, ", name);
@@ -301,10 +301,8 @@ impl LocEnv {
 								ok!()
 							},
 							None => unsafe {
-								//println!("LOOK FOR {} {}", name, unsafe {(*self.global).show()} );
 								match (*self.global).get_fn(None, name) {
 									Some(t) => {
-										//println!("FOUND {}", name);
 										*tp_dst = (*t).clone();
 										*pref = match (*self.global).pack_of_fn(name) {
 											Some(p) => Some(p),
@@ -313,7 +311,6 @@ impl LocEnv {
 										ok!()
 									},
 									None => {
-										//println!("NOT FOUND {}", name);
 										throw!(format!("var {} not found", name), pos)
 									}
 								}
@@ -355,17 +352,21 @@ impl LocEnv {
 		if pref.len() == 0 {
 			// PREFIX NOT EXIST OR IT'S A TEMPLATE TYPE
 			if self.templates.contains(name) {
+			// IT'S TEMPLATE
 				pref.push("%tmpl".to_string())
 			} else {
+			// IT'S IN IMPORTED SPACE
 				unsafe {
 					match (*self.global).get_cls(None, name) {
 						Some(cls) => {
 							let pcnt = match *params {Some(ref vec) => vec.len(), _ => 0};
-							if (*cls).params != pcnt {
-								throw!(format!("class {:?}{} need {} params, given {}", pref, name, (*cls).params, pcnt), pos)
+							if (*cls).params.len() != pcnt {
+								throw!(format!("class {:?}{} need {} params, given {}", pref, name, (*cls).params.len(), pcnt), pos)
 							}
 						},
-						None => throw!(format!("class {} not found", name), pos)
+						None => {
+							throw!(format!("class {} not found", name), pos)
+						}
 					}
 					match (*self.global).pack_of_cls(name) {
 						None => pref.push("%mod".to_string()),
@@ -374,14 +375,17 @@ impl LocEnv {
 				}
 			}
 		} else {
+		// IT'S IN AVAILABLE MODULES
 			unsafe {
 				match (*self.global).get_cls(Some(pref), name) {
-					None => throw!(format!("class {} not found", name), pos),
+					None => {
+						throw!(format!("class {} not found", name), pos)
+					},
 					Some(cls) => {
 						(*self.global).open_pref(pref);
 						let pcnt = match *params {Some(ref vec) => vec.len(), _ => 0};
-						if (*cls).params != pcnt {
-							throw!(format!("class {:?}{} need {} params, given {}", pref, name, (*cls).params, pcnt), pos)
+						if (*cls).params.len() != pcnt {
+							throw!(format!("class {:?}{} need {} params, given {}", pref, name, (*cls).params.len(), pcnt), pos)
 						}
 					}
 				}

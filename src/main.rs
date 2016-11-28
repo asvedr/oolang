@@ -15,6 +15,7 @@ mod syn_mod;
 mod syn_common;
 #[macro_use]
 mod type_check_utils;
+mod preludelib;
 mod regressor;
 mod type_check;
 //use std::io;

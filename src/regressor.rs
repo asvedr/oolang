@@ -65,9 +65,23 @@ pub fn regress_expr(env : &mut LocEnv, expr : &mut Expr, e_type : &Type) -> Chec
 				ref a => throw!(format!("expected {:?}, found array", a), expr.addres)
 			}
 		},
-//		EVal::Asc(ref mut items) => { // only strings, chars and int allowed for key
-//			items.
-//		},
+		EVal::Asc(ref mut pairs) => { // only strings, chars and int allowed for key
+			//expr.kind = e_type.clone();
+			match *e_type {
+				Type::Class(ref pref, ref name, ref params) => {
+					if !(pref.len() == 0 && pref[0] == "%std" && name == "Asc") {
+						let pars = match *params { Some(ref p) => p, _ => panic!() };
+						for pair in pairs.iter_mut() {
+							regress!(&mut pair.a, &pars[0]);
+							regress!(&mut pair.b, &pars[1]);
+						}
+					} else {
+						throw!(format!("expected {:?}, found asc", e_type), expr.addres)
+					}
+				},
+				_ => throw!(format!("expected {:?}, found asc", e_type), expr.addres)
+			}
+		},
 		//Prop(Box<Expr>,String),
 		_ => ()
 	}
