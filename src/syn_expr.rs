@@ -18,6 +18,7 @@ pub enum EVal {
 	Asc        (Vec<Pair<Expr,Expr>>), // only strings, chars and int allowed for key
 	Prop       (Box<Expr>,String),
 	ChangeType (Box<Expr>, Type),
+	TSelf,
 	Null
 }
 
@@ -139,6 +140,7 @@ impl Show for Expr {
 				}
 				res
 			},
+			EVal::TSelf => vec![format!("{}self", tab)],
 			EVal::Null => vec![format!("{}null", tab)]
 		}
 	}
@@ -214,6 +216,10 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 				},
 				LexTP::Char => {
 					obj = expr!(EVal::Char(ans.val.chars().next().unwrap()), curs, Type::Char);
+					curs = ans.cursor;
+				},
+				LexTP::Id if ans.val == "self" => {
+					obj = expr!(EVal::TSelf, curs);
 					curs = ans.cursor;
 				},
 				LexTP::Id if ans.val == "null" => {

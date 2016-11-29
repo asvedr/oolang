@@ -569,7 +569,7 @@ impl Checker {
 			EVal::Arr(ref mut items) => {
 				let mut item : Option<Type> = match expr.kind {
 					Type::Unk => None,
-					Type::Arr(ref v) => Some((**v).clone()),
+					Type::Arr(ref v) => Some(v[0].clone()),
 					_ => panic!()
 				};
 				for i in items.iter_mut() {
@@ -589,7 +589,7 @@ impl Checker {
 						for i in items.iter_mut() {
 							regress!(i, &t);
 						}
-						expr.kind = Type::Arr(Box::new(t));
+						expr.kind = Type::Arr(/*Box::new*/vec![t]);
 					},
 					_ => unk_count += 1
 				}
@@ -649,7 +649,21 @@ impl Checker {
 					_ => unk_count += 1
 				}
 			},
-			EVal::Prop(ref mut obj, _) => check!(obj),
+			EVal::Prop(ref mut obj, ref pname) => {
+				check!(obj);
+				if obj.kind.is_unk() {
+					unk_count += 1;
+				} else {
+					let is_self = match obj.val {
+						EVal::TSelf => true,
+						_ => false
+					};
+					match env.get_method(&obj.kind, pname, is_self) {
+						Some(f) => expr.kind = f,
+						_ => throw!(format!("method {} not found for {:?}", pname, obj.kind), expr.addres)
+					}
+				}
+			},
 			EVal::ChangeType(ref mut e, ref mut tp) => {
 				check!(e);
 				check_type!(tp);
@@ -662,7 +676,7 @@ impl Checker {
 		macro_rules! rec {($t:expr) => {try!(self.check_type(env, $t, addr))}; }
 		match *t {
 			Type::Arr(ref mut item) => {
-				rec!(&mut **item);
+				rec!(&mut item[0]);
 			},
 			Type::Class(ref mut pref, ref name, ref mut params) => {
 				match *params {

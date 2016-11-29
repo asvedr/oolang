@@ -11,7 +11,7 @@ pub enum Type {
 	Str,
 	Bool,
 	Void,
-	Arr(Box<Type>),
+	Arr(Vec<Type>), // it easily to check then use box (Box<Type>),
 	// Asc(Box<Type>,Box<Type>),
 	//    prefix       name   template
 	Class(Vec<String>,String,Option<Vec<Type>>),
@@ -71,7 +71,7 @@ impl Type {
 	}
 	pub fn arr_item(&self) -> &Type {
 		match *self {
-			Type::Arr(ref i) => i,
+			Type::Arr(ref i) => &i[0],
 			_ => panic!()
 		}
 	}
@@ -109,7 +109,7 @@ impl Type {
 	}
 	pub fn components(&self, res : &mut Vec<*const Type>) {
 		match *self {
-			Type::Arr(ref a) => res.push(&**a),
+			Type::Arr(ref a) => res.push(&a[0]),
 			Type::Class(_,_,Some(ref v)) => {
 				for t in v.iter() {
 					res.push(t)
@@ -136,7 +136,7 @@ impl fmt::Debug for Type {
 			Type::Str  => write!(f, "str"),
 			Type::Bool => write!(f, "bool"),
 			Type::Void => write!(f, "()"),
-			Type::Arr(ref val) => write!(f, "[{:?}]", val),
+			Type::Arr(ref val) => write!(f, "[{:?}]", val[0]),
 			Type::Class(ref pref, ref name, ref tmpl) => {
 				if pref.len() == 0 {
 					try!(write!(f, "_::"));
@@ -178,7 +178,7 @@ pub fn parse_type(lexer : &Lexer, curs : &Cursor) -> SynRes<Type> {
 		"["    => { // ARRAY
 			let inner = try!(parse_type(lexer, &ans.cursor));
 			let out = lex!(lexer, &inner.cursor, "]");
-			let res = Type::Arr(Box::new(inner.val));
+			let res = Type::Arr(/*Box::new*/vec![inner.val]);
 			syn_ok!(res, out);
 		},
 		"("    => { // VOID

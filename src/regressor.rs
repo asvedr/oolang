@@ -38,10 +38,10 @@ pub fn regress_expr(env : &mut LocEnv, expr : &mut Expr, e_type : &Type) -> Chec
 			// 'CAUSE OF REGRESS CALLED CONT TYPE EXACTLY UNKNOWN
 			if index.kind.is_unk() {
 				// ARRAY
-				regress!(cont, &Type::Arr(Box::new(e_type.clone())));
+				regress!(cont, &Type::Arr(/*Box::new*/vec![e_type.clone()]));
 				regress!(index, &Type::Int);
 			} else if index.kind.is_int() {
-				regress!(cont, &Type::Arr(Box::new(e_type.clone())));
+				regress!(cont, &Type::Arr(/*Box::new*/vec!(e_type.clone())));
 			} else if index.kind.is_char() || index.kind.is_str() {
 				// ASSOC
 				let tp = Type::Class(vec!["%std".to_string()], "Asc".to_string(), Some(vec![index.kind.clone(), e_type.clone()]));
@@ -59,7 +59,7 @@ pub fn regress_expr(env : &mut LocEnv, expr : &mut Expr, e_type : &Type) -> Chec
 			match *e_type {
 				Type::Arr(ref itp) => {
 					for i in items.iter_mut() {
-						try!(regress_expr(env, i, &**itp))
+						try!(regress_expr(env, i, &itp[0]))
 					}
 				},
 				ref a => throw!(format!("expected {:?}, found array", a), expr.addres)

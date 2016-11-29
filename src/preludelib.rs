@@ -39,7 +39,7 @@ impl Prelude {
 		meth!(arr, "get", type_fn!(vec![Type::Int], type_c!("a".to_string())));
 		let asc : *mut TClass = newc!("Asc", vec!["a".to_string(),"b".to_string()], vec![]);
 		meth!(asc, "len", type_fn!(vec![], Type::Int));
-		meth!(asc, "keys", type_fn!(vec![], Type::Arr(Box::new(type_c!("a".to_string())))));
+		meth!(asc, "keys", type_fn!(vec![], Type::Arr(/*Box::new*/vec![type_c!("a".to_string())])));
 		meth!(asc, "get", type_fn!(vec![type_c!("a".to_string())], type_c!("b".to_string())));
 		meth!(asc, "has_key", type_fn!(vec![type_c!("a".to_string())], Type::Bool));
 		let str_s : *mut TClass = newc!("%str", vec![], vec![]);
