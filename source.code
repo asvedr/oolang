@@ -38,18 +38,7 @@ fn main() : () {
 
 */
 
-fn test() : int {
-	var a;
-	var arr = [[], ['c'], []];
-	var asc : Asc<int, char> = {};
-	asc[0] = arr[0][0];
-	return a;
-}
-
 fn main() : () {
-	var a = 5;
-	fn clos(b : int) : int {
-		return a + b;
-	};
-	clos(3)
+	var a : Asc<str, real> = {"a" : 1.0, "b" : 2f};
+	a.get("c");
 }

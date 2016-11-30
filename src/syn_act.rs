@@ -8,7 +8,8 @@ use type_sys::*;
 pub struct SynCatch<DF> {
 	pub except : Option<Type>,
 	pub vname  : Option<String>,
-	pub act    : Vec<Act<DF>>
+	pub act    : Vec<Act<DF>>,
+	pub addres : Cursor
 }
 
 pub enum ActVal<DF> {
@@ -334,19 +335,20 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
 			loop {
 				let ans = lex!(lexer, &curs);
 				if ans.val == "catch" {
+					let addr = ans.cursor.clone();
 					curs = ans.cursor;
 					let ans = lex!(lexer, &curs);
 					if ans.val == "{" {
 						let al = try!(parse_act_list(lexer, &curs, fparse));
 						curs = al.cursor;
-						ctchs.push(SynCatch{except : None, vname : None, act : al.val});
+						ctchs.push(SynCatch{except : None, vname : None, act : al.val, addres : addr});
 					} else {
 						let ans = lex_type!(lexer, &curs, LexTP::Id);
 						curs = lex!(lexer, &ans.cursor, ":");
 						let tp = try!(parse_type(lexer, &curs));
 						let al = try!(parse_act_list(lexer, &tp.cursor, fparse));
 						curs = al.cursor;
-						ctchs.push(SynCatch{except : Some(tp.val), vname : Some(ans.val), act : al.val});
+						ctchs.push(SynCatch{except : Some(tp.val), vname : Some(ans.val), act : al.val, addres : addr});
 					}
 				} else {
 					if ctchs.len() == 0 {

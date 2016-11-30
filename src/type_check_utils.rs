@@ -278,36 +278,222 @@ impl Pack {
 	}
 }
 
-pub struct LocEnv {
+pub type VMap = BTreeMap<String, Result<*const Type, *mut Type>>;
+// Ok  (WE TRULY KNOW WHAT IT IS)
+// Err (WE CALCULATED THIS AND WE CAN MISTAKE)
+
+pub struct FunEnv {
 	pub global     : *const Pack,
-	pub local      : BTreeMap<String, Result<*const Type, *mut Type>>, // Ok  (WE TRULY KNOW WHAT IT IS)
-	pub outers     : BTreeMap<String, Result<*const Type, *mut Type>>, // Err (WE CALCULATED THIS AND WE CAN MISTAKE)
-	pub templates  : HashSet<String>,                                  // local templates
+	pub local      : VMap, 
+	pub outers     : VMap,
+	pub templates  : HashSet<String>, // local templates
 	pub ret_type   : Option<*const Type>
+}
+
+pub struct SubEnv {
+	pub parent : *mut LocEnv,
+	pub local  : VMap
+}
+
+pub enum LocEnv {
+	FunEnv(FunEnv),
+	SubEnv(SubEnv)
+}
+
+impl LocEnv {
+	pub fn new(pack : *const Pack, tmpl : &Vec<String>) -> LocEnv {
+		//LocEnv::FunEnv(FunEnv::new())
+		let mut env = FunEnv::new(pack);
+		for t in tmpl.iter() {
+			env.templates.insert(t.clone());
+		}
+		LocEnv::FunEnv(env)
+	}
+	pub fn inherit(parent : &mut LocEnv) -> LocEnv {
+		LocEnv::SubEnv(SubEnv{parent : &mut *parent, local : BTreeMap::new()})
+	}
+	pub fn pack(&self) -> &Pack {
+		let mut link : *const LocEnv = &*self;
+		unsafe {loop {
+			match *link {
+				LocEnv::FunEnv(ref fe) => return &*fe.global,
+				LocEnv::SubEnv(ref le) => link = le.parent
+			}
+		}}
+	}
+	pub fn add_outer(&mut self, out : &LocEnv) {
+		match *self {
+			LocEnv::FunEnv(ref mut loc_env) => { //le.add_outer(out),
+				let mut env : *const LocEnv = &*out;
+				unsafe { loop {
+					match *env {
+						LocEnv::FunEnv(ref fe) => {
+							for name in fe.outers.keys() {
+								loc_env.outers.insert(name.clone(), fe.outers.get(name).unwrap().clone());
+							}
+							for name in fe.local.keys() {
+								loc_env.outers.insert(name.clone(), fe.local.get(name).unwrap().clone());
+							}
+							for t in fe.templates.iter() {
+								loc_env.templates.insert(t.clone());
+							}
+						},
+						LocEnv::SubEnv(ref se) => {
+							for name in se.local.keys() {
+								loc_env.outers.insert(name.clone(), se.local.get(name).unwrap().clone());
+							}
+							env = se.parent;
+						}
+					}
+				}}
+			},
+			_ => panic!()
+			//LocEnv::SubEnv(ref mut se) => unsafe{ (*se.parent).add_outer(out) }
+		}
+	}
+	pub fn set_ret_type(&mut self, t : &Type) {
+		match *self {
+			LocEnv::FunEnv(ref mut fe) => fe.set_ret_type(t),
+			LocEnv::SubEnv(ref mut se) => unsafe{ (*se.parent).set_ret_type(t) }
+		}
+	}
+	pub fn check_ret_type(&self, t : &Type) -> bool {
+		match *self {
+			LocEnv::FunEnv(ref fe) => fe.check_ret_type(t),
+			LocEnv::SubEnv(ref se) => unsafe{ (*se.parent).check_ret_type(t) }
+		}
+	}
+	pub fn ret_type(&self) -> &Type {
+		match *self {
+			LocEnv::FunEnv(ref fe) => fe.ret_type(),
+			LocEnv::SubEnv(ref se) => unsafe{ (*se.parent).ret_type() }
+		}
+	}
+	pub fn show(&self) -> String {
+		match *self {
+			LocEnv::FunEnv(ref fe) => fe.show(),
+			LocEnv::SubEnv(ref se) => {
+				let mut s = String::new();
+				let _ = write!(s, "HAS SUB\n");
+				unsafe{ let _ = write!(s, "{}", (*se.parent).show()); }
+				let _ = write!(s, "SUB: [");
+				for k in se.local.keys() {
+					let _ = write!(s, "{},", k);
+				}
+				let _ = write!(s, "]\n");
+				return s;
+			}
+		}
+	}
+	pub fn replace_unk(&self, name : &String, tp : &Type) {
+		match *self {
+			LocEnv::FunEnv(ref fe) => fe.replace_unk(name, tp),
+			LocEnv::SubEnv(ref se) => {
+				match se.local.get(name) {
+					Some(ans) =>
+						unsafe {
+							match *ans {
+								Err(ref ptr) => **ptr = tp.clone(),
+								_ => panic!("replace_unk: var known: {}", name)
+							}
+						},
+					_ => unsafe { (*se.parent).replace_unk(name, tp) }
+				}
+			}
+		}
+	}
+	pub fn get_local_var(&self, name : &String) -> &Type {
+		match *self {
+			LocEnv::FunEnv(ref fe) => fe.get_local_var(name),
+			LocEnv::SubEnv(ref se) => {
+				match se.local.get(name) {
+					Some(v) => match *v {
+						Ok(l) => unsafe { &*l },
+						Err(l) => unsafe { &*l }
+					},
+					None => unsafe { (*se.parent).get_local_var(name) }
+				}
+			}
+		}
+	}
+	pub fn get_var(&self, pref : &mut Option<Vec<String>>, name : &String, tp_dst : &mut Type, pos : &Cursor) -> CheckRes {
+		macro_rules! clone_type { ($t:expr) => {unsafe { match *$t {Ok(ref t) => (**t).clone(), Err(ref t) => (**t).clone()}} }; }	
+		match *self {
+			LocEnv::FunEnv(ref fe) => fe.get_var(pref, name, tp_dst, pos),
+			LocEnv::SubEnv(ref se) => {
+				let pref_l : *mut Option<Vec<String>> = &mut *pref;
+				match *pref {
+					None => 
+						match se.local.get(name) {
+							Some(t) => {
+								*tp_dst = clone_type!(t);
+								*pref = Some(vec!["%loc".to_string()]);
+								ok!()
+							},
+							None => unsafe { (*se.parent).get_var(pref, name, tp_dst, pos) }
+						},
+					Some(ref mut lst) => 
+						if lst[0] == "%loc" {
+							*tp_dst = clone_type!(se.local.get(name).unwrap());
+							ok!()
+						} else {
+							unsafe { (*se.parent).get_var(&mut *pref_l, name, tp_dst, pos) }
+						}
+				}
+			}
+		}
+	}
+	pub fn check_class(&self, pref : &mut Vec<String>, name : &String, params : &Option<Vec<Type>>, pos : &Cursor) -> CheckRes {
+		match *self {
+			LocEnv::FunEnv(ref fe) => fe.check_class(pref, name, params, pos),
+			LocEnv::SubEnv(ref se) => unsafe{ (*se.parent).check_class(pref, name, params, pos) }
+		}
+	}
+	pub fn get_method(&self, cls : &Type, mname : &String, priv_too : bool) -> Option<Type> {
+		match *self {
+			LocEnv::FunEnv(ref fe) => fe.get_method(cls, mname, priv_too),
+			LocEnv::SubEnv(ref se) => unsafe { (*se.parent).get_method(cls, mname, priv_too) }
+		}
+	}
+	pub fn add_loc_var(&mut self, name : &String, tp : Result<*const Type, *mut Type>, pos : &Cursor) -> CheckRes {
+		let mut link : *mut LocEnv = &mut *self;
+		unsafe { loop {
+			match *link {
+				LocEnv::FunEnv(ref mut env) =>
+					match env.local.insert(name.clone(), tp) {
+						Some(_) => throw!(format!("local var {} already exist", name), pos),
+						_ => ok!()
+					},
+				LocEnv::SubEnv(ref env) => link = env.parent,
+			}
+		}}
+	}
 }
 
 #[macro_export]
 macro_rules! add_loc_unk {
 	($loc_e:expr, $name:expr, $tp:expr, $pos:expr) => {
-		match $loc_e.local.insert($name.clone(), Err($tp)) {
+		try!($loc_e.add_loc_var($name, Err($tp), &$pos))
+		/*match $loc_e.local.insert($name.clone(), Err($tp)) {
 			Some(_) => throw!(format!("local var {} already exist", $name), $pos),
 			_ => ()
-		}
+		}*/
 	};
 }
 #[macro_export]
 macro_rules! add_loc_knw {
 	($loc_e:expr, $name:expr, $tp:expr, $pos:expr) => {
-		match $loc_e.local.insert($name.clone(), Ok($tp)) {
+		try!($loc_e.add_loc_var($name, Ok($tp), &$pos))
+		/*match $loc_e.local.insert($name.clone(), Ok($tp)) {
 			Some(_) => throw!(format!("local var {} already exist", $name), $pos),
 			_ => ()
-		}
+		}*/
 	};
 }
 
-impl LocEnv {
-	pub fn new(pack : *const Pack) -> LocEnv {
-		LocEnv {
+impl FunEnv {
+	pub fn new(pack : *const Pack) -> FunEnv {
+		FunEnv {
 			global    : pack,
 			local     : BTreeMap::new(),
 			outers    : BTreeMap::new(),
@@ -315,7 +501,7 @@ impl LocEnv {
 			ret_type  : None
 		}
 	}
-	pub fn add_outer(&mut self, out : &LocEnv) {
+	pub fn add_outer(&mut self, out : &FunEnv) {
 		for name in out.local.keys() {
 			self.outers.insert(name.clone(), out.local.get(name).unwrap().clone());
 		}

@@ -1,4 +1,6 @@
 complete regressor
+type check for all acts
+optimise env for type check
 
 + lexical
 + synax

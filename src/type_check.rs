@@ -102,7 +102,7 @@ impl Checker {
 		ok!()
 	}
 	fn check_fn(&self, pack : &Pack, fun : &mut SynFn, out_env : Option<&LocEnv>) -> CheckAns<isize> {
-		let mut env = LocEnv::new(&*pack);
+		let mut env = LocEnv::new(&*pack, &fun.tmpl);
 		// PREPARE LOCAL ENV
 		let top_level = match out_env {
 			Some(eo) => {
@@ -111,14 +111,14 @@ impl Checker {
 			},
 			_ => true
 		};
-		for t in fun.tmpl.iter() {
-			env.templates.insert(t.clone());
-		}
+		//for t in fun.tmpl.iter() {
+		//	env.templates.insert(t.clone());
+		//}
 		// ARGS
 		for arg in fun.args.iter_mut() {
 			try!(self.check_type(&env, &mut arg.tp, &fun.addr));
 			let p : *mut Type = &mut arg.tp;
-			add_loc_knw!(env, arg.name.clone(), p, fun.addr);
+			add_loc_knw!(env, &arg.name, p, fun.addr);
 		}
 		// RET TYPE
 		try!(self.check_type(&env, &mut fun.rettp, &fun.addr));
@@ -147,6 +147,8 @@ impl Checker {
 		}
 	}
 	fn check_actions(&self, env : &mut LocEnv, src : &mut Vec<ActF>, repeated : bool) -> CheckAns<isize> {
+		// 'repeated' is a flag for non first check
+		// if it true then var won't added to env on DefVar
 		let mut unk_count = 0;
 		macro_rules! expr {($e:expr) => { unk_count += try!(self.check_expr(env, $e))}; }
 		let env_pt : *mut LocEnv = &mut *env;
@@ -238,6 +240,7 @@ impl Checker {
 					} else if var.kind != val.kind {
 						throw!(format!("assign parts incompatible: {:?} and {:?}", var.kind, val.kind), act.addres)
 					}
+					// ADD CHECK FOR WHAT CAN BE AT LEFT PART OF ASSIG
 				},
 				ActVal::Throw(ref mut e) => {
 					expr!(e);
@@ -252,10 +255,31 @@ impl Checker {
 							_ => panic!()
 						}
 					}
-					let pack : &Pack = unsafe { &(*env.global) };
+					let pack : &Pack = env.pack(); //unsafe { &(*env.global) };
 					unk_count += try!(self.check_fn(pack, &mut **df, Some(env)));
-				}
-				//ActVal::Try() => {}
+				},
+				ActVal::Try(ref mut body, ref mut catches) => {
+				// благодаря тому, что в LocEnv ссылки, а не типы, расформирование и формирование LocEnv заново не влияют на вычисление типов
+					{
+						let mut sub = LocEnv::inherit(env);
+						unk_count += try!(self.check_actions(&mut sub, body, repeated));
+					}
+					for catch in catches.iter_mut() {
+						let mut sub = LocEnv::inherit(env);
+						match catch.except {
+							Some(ref mut t) => {
+								try!(self.check_type(env, t, &catch.addres));
+								match catch.vname {
+									Some(ref name) => add_loc_knw!(sub, name, t, catch.addres),
+									_ => ()
+								}
+							},
+							_ => ()
+						}
+						unk_count += try!(self.check_actions(&mut sub, &mut catch.act, repeated));
+					}
+				},
+				// while, for, foreach, break
 				_ => ()
 			}
 		}
@@ -503,10 +527,10 @@ impl Checker {
 				unsafe {
 					let cls =
 						if pref[0] == "%mod" {
-							(*env.global).get_cls(None, name).unwrap()
+							/*(*env.global)*/env.pack().get_cls(None, name).unwrap()
 						}
 						else { 
-							(*env.global).get_cls(Some(pref), name).unwrap()
+							/*(*env.global)*/env.pack().get_cls(Some(pref), name).unwrap()
 						};
 					if (*cls).params.len() != pcnt {
 						throw!(format!("class {} expect {} params, given {}", name, (*cls).params.len(), pcnt), &expr.addres)
