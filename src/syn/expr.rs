@@ -1,6 +1,7 @@
-use syn_utils::*;
-use syn_reserr::*;
-use type_sys::*;
+use syn::utils::*;
+use syn::reserr::*;
+//use syn::lexer::*;
+use syn::type_sys::*;
 use std::str::FromStr;
 use std::mem;
 

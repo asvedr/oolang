@@ -1,4 +1,4 @@
-pub use lexer::*;
+pub use syn::lexer::*;
 
 pub struct SynAns<A> {
 	pub cursor : Cursor,

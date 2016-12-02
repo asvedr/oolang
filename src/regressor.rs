@@ -1,6 +1,6 @@
 // regress type calculation system
 
-use syn_common::*;
+use syn::*;
 use type_check_utils::*;
 use std::mem;
 

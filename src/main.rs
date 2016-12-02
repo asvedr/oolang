@@ -1,18 +1,6 @@
 #![allow(dead_code)]
-mod lexer;
 #[macro_use]
-mod syn_reserr;
-#[macro_use]
-mod type_sys;
-#[macro_use]
-mod syn_utils;
-mod syn_expr;
-mod syn_act;
-mod syn_fn;
-mod syn_class;
-mod syn_ext_c;
-mod syn_mod;
-mod syn_common;
+mod syn;
 #[macro_use]
 mod type_check_utils;
 mod preludelib;
@@ -21,7 +9,7 @@ mod type_check;
 //use std::io;
 use std::io::Read;
 use std::fs::File;
-use syn_common::*;
+use syn::*;
 use type_check::*;
 
 fn main() {

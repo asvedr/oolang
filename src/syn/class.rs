@@ -1,9 +1,9 @@
 //use syn_expr::*;
 //use syn_act::*;
-use syn_utils::*;
-use type_sys::*;
-use syn_reserr::*;
-use syn_fn::*;
+use syn::utils::*;
+use syn::type_sys::*;
+use syn::reserr::*;
+use syn::_fn::*;
 
 pub struct Class {
 	pub addres    : Cursor,

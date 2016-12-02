@@ -1,5 +1,6 @@
-use syn_reserr::*;
-use syn_utils::*;
+use syn::reserr::*;
+use syn::utils::*;
+//use syn::lexer::*;
 use std::fmt;
 
 #[derive(Clone,PartialEq)]

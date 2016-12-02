@@ -1,4 +1,4 @@
-use syn_common::*;
+use syn::*;
 use std::collections::{HashMap, HashSet, BTreeMap};
 use std::fmt::Write;
 

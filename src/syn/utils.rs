@@ -1,5 +1,6 @@
 //#[macro_use]
-use syn_reserr::*;
+use syn::reserr::*;
+//use syn::lexer::*;
 
 pub type Parser<A> = Fn(&Lexer,&Cursor) -> SynRes<A>;
 

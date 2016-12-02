@@ -1,7 +1,7 @@
-use syn_reserr::*;
-use syn_utils::*;
-use syn_expr::*;
-use type_sys::*;
+use syn::reserr::*;
+use syn::utils::*;
+use syn::expr::*;
+use syn::type_sys::*;
 //use std::fmt;
 
 // DF is non declared struct for 'def function'

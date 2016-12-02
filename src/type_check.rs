@@ -1,4 +1,4 @@
-use syn_common::*;
+use syn::*;
 use type_check_utils::*;
 use std::collections::{HashMap/*, HashSet, BTreeMap*/};
 use std::mem;

@@ -1,9 +1,9 @@
-use syn_expr::*;
-use syn_act::*;
-use syn_utils::*;
-use type_sys::*;
+use syn::expr::*;
+use syn::act::*;
+use syn::utils::*;
+use syn::type_sys::*;
 //use lexer::*;
-use syn_reserr::*;
+use syn::reserr::*;
 //use std::fmt;
 
 pub struct Arg {

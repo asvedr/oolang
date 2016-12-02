@@ -1,6 +1,6 @@
 //use syn_utils::*;
-use syn_reserr::*;
-use type_sys::*;
+use syn::reserr::*;
+use syn::type_sys::*;
 use std::fmt;
 
 pub type CType = String;

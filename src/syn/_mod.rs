@@ -1,11 +1,11 @@
 //use syn_expr::*;
 //use syn_act::*;
-use syn_utils::*;
+use syn::utils::*;
 //use type_sys::*;
-use syn_reserr::*;
-use syn_fn::*;
-use syn_class::*;
-use syn_ext_c::*;
+use syn::reserr::*;
+use syn::_fn::*;
+use syn::class::*;
+use syn::ext_c::*;
 use std::fmt;
 
 pub struct Import {
