@@ -1,5 +1,7 @@
 use syn::*;
 use type_check::utils::*;
+//use type_check::tclass::*;
+use type_check::pack::*;
 use std::collections::{HashMap/*, HashSet, BTreeMap*/};
 use std::mem;
 use type_check::regressor::*;

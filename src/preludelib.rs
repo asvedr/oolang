@@ -1,6 +1,7 @@
-use type_check::utils::*;
+use type_check::tclass::*;
+use type_check::pack::*;
 use syn::type_sys::*;
-use std::collections::{HashMap, HashSet, BTreeMap};
+use std::collections::{HashMap, BTreeMap};
 
 pub struct Prelude {
 //	tcls : Vec<TClass>,
