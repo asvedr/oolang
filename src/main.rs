@@ -2,15 +2,13 @@
 #[macro_use]
 mod syn;
 #[macro_use]
-mod type_check_utils;
-mod preludelib;
-mod regressor;
 mod type_check;
+mod preludelib;
 //use std::io;
 use std::io::Read;
 use std::fs::File;
 use syn::*;
-use type_check::*;
+use type_check::checker::*;
 
 fn main() {
 	let mut source = String::new();

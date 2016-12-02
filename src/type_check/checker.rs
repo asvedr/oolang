@@ -1,8 +1,8 @@
 use syn::*;
-use type_check_utils::*;
+use type_check::utils::*;
 use std::collections::{HashMap/*, HashSet, BTreeMap*/};
 use std::mem;
-use regressor::*;
+use type_check::regressor::*;
 use preludelib::*;
 
 /*

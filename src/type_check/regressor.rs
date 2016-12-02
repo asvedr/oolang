@@ -1,7 +1,7 @@
 // regress type calculation system
 
 use syn::*;
-use type_check_utils::*;
+use type_check::utils::*;
 use std::mem;
 
 // TODO: Prop

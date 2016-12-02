@@ -1,4 +1,4 @@
-use type_check_utils::*;
+use type_check::utils::*;
 use syn::type_sys::*;
 use std::collections::{HashMap, HashSet, BTreeMap};
 
