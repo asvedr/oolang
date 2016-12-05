@@ -18,8 +18,8 @@ pub type VMap = BTreeMap<String, Result<*const Type, *mut Type>>;
 // Err (WE CALCULATED THIS AND WE CAN MISTAKE)
 
 pub struct SubEnv {
-	pub parent : *mut LocEnv,
-	pub local  : VMap
+	parent      : *mut LocEnv,
+	local       : VMap
 }
 
 pub enum LocEnv {
@@ -87,6 +87,28 @@ impl LocEnv {
 				LocEnv::SubEnv(ref le) => link = le.parent
 			}
 		}}
+	}
+	// labels only in fun_env
+	pub fn add_loop_label(&mut self, name : &String) {
+		get_fenv_m!(self).loop_labels.push(&*name);
+	}
+	// labels only in fun_env
+	pub fn pop_loop_label(&mut self) {
+		get_fenv_m!(self).loop_labels.pop();
+	}
+	// labels only in fun_env
+	pub fn get_loop_label(&self, name : &String) -> Option<usize> {
+		// getting count of loops which must skip to stop target
+		// or 'None' if target not exist
+		let loop_labels = &get_fenv!(self).loop_labels;
+		let len = loop_labels.len();
+		for i in 0 .. len {
+			let val = unsafe { *loop_labels[len - i - 1] == *name };
+			if val {
+				return Some(i);
+			}
+		}
+		return None;
 	}
 	pub fn add_outer(&mut self, out : &LocEnv) {
 		match *self {
@@ -222,12 +244,23 @@ impl LocEnv {
 		get_fenv!(self).get_method(cls, mname, priv_too)
 	}
 	pub fn add_loc_var(&mut self, name : &String, tp : Result<*const Type, *mut Type>, pos : &Cursor) -> CheckRes {
-		let env = get_fenv_m!(self);
-		match env.local.insert(name.clone(), tp) {
+		//let env = get_fenv_m!(self);
+		let local = match *self {
+			LocEnv::FunEnv(ref mut env) => &mut env.local,
+			LocEnv::SubEnv(ref mut env) => &mut env.local
+		};
+		match local.insert(name.clone(), tp) {
 			Some(_) => throw!(format!("local var {} already exist", name), pos),
 			_ => ok!()
 		}
 	}
+	/*pub fn remove_loc_var(&mut self, name : &String) {
+		let local = match *self {
+			LocEnv::FunEnv(ref mut env) => &mut env.local,
+			LocEnv::SubEnv(ref mut env) => &mut env.local
+		};
+		local.remove(name);
+	}*/
 }
 
 #[macro_export]
@@ -302,9 +335,13 @@ pub fn find_unknown(body : &Vec<ActF>) -> &Cursor {
 					go_e!(e2);
 					go_a!(a);
 				},
-				ActVal::Foreach(_,_,ref e,ref a) => {
-					go_e!(e);
-					go_a!(a);
+				ActVal::Foreach(_,_,ref t,ref e,ref a) => {
+					if t.is_unk() {
+						return Some(&act.addres);
+					} else {
+						go_e!(e);
+						go_a!(a);
+					}
 				},
 				ActVal::If(ref e, ref a, ref b) => {
 					go_e!(e);

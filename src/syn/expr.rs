@@ -11,14 +11,15 @@ pub enum EVal {
 	Real       (f64),
 	Str        (String),
 	Char       (char),
+	Bool       (bool),
 	Call       (Option<Vec<Type>>,Box<Expr>,Vec<Expr>),
 	NewClass   (Option<Vec<Type>>,Vec<String>,String,Vec<Expr>),
-	Item       (Box<Expr>,Box<Expr>),
+	Item       (Box<Expr>,Box<Expr>),         // item of array or asc
 	Var        (Option<Vec<String>>, String), // namespace, name
-	Arr        (Vec<Expr>),
-	Asc        (Vec<Pair<Expr,Expr>>), // only strings, chars and int allowed for key
-	Prop       (Box<Expr>,String),
-	ChangeType (Box<Expr>, Type),
+	Arr        (Vec<Expr>),                   // new arr
+	Asc        (Vec<Pair<Expr,Expr>>),        // new Asc. Only strings, chars and int allowed for key
+	Prop       (Box<Expr>,String),            // geting class attrib: 'object.prop' or 'object.fun()'
+	ChangeType (Box<Expr>, Type),             // type coersing
 	TSelf,
 	Null
 }
@@ -51,6 +52,7 @@ impl Show for Expr {
 			EVal::Real(ref a) => vec![format!("{}{}{}",tab,a,tp)],
 			EVal::Str(ref a)  => vec![format!("{}\"{}\"{}",tab,a,tp)],
 			EVal::Char(ref a) => vec![format!("{}\'{}\'{}",tab,a,tp)],
+			EVal::Bool(ref a) => vec![format!("{}{}{}",tab,a,tp)],
 			EVal::Call(_,ref fun,ref args) => {
 				let mut res = vec![format!("{}CALL{}", tab, tp)/*, format!("{}FUN", tab)*/];
 				for line in fun.show(layer + 1) {
@@ -189,6 +191,14 @@ fn parse_prefix(lexer : &Lexer, curs : &Cursor) -> Option<SynAns<Vec<String>>> {
 	}
 }
 
+/* getting single elems like '1', 'a' or '[a,b,c]'
+   and getting single elems with post modifs, like
+   'fun(a,b,c)' or 'a.b' or 'arr[index]' and application of this elems.
+   this fun can parse this composition:
+   		[a,b,c][2].asc['key'](a,b,c).len()
+   but, it can't parse this:
+   		a + b
+*/
 fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 	let mut curs : Cursor = curs.clone();
 	let ans = lex!(lexer, &curs);
@@ -225,6 +235,14 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 				},
 				LexTP::Id if ans.val == "null" => {
 					obj = expr!(EVal::Null, curs);
+					curs = ans.cursor;
+				},
+				LexTP::Id if ans.val == "true"  => {
+					obj = expr!(EVal::Bool(true), curs, Type::Bool);
+					curs = ans.cursor;
+				},
+				LexTP::Id if ans.val == "false" => {
+					obj = expr!(EVal::Bool(false), curs, Type::Bool);
 					curs = ans.cursor;
 				},
 				LexTP::Id if ans.val == "new" => {
@@ -286,6 +304,7 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 					let fld = lex_type!(lexer, &ans.cursor, LexTP::Id);
 					obj = expr!(EVal::Prop(Box::new(obj), fld.val), curs);
 					curs = fld.cursor;
+				// TYPE COERSING
 				} else if ans.val == "as" {
 					let tp = try!(parse_type(lexer, &ans.cursor));
 					let tpc = tp.val.clone();
@@ -361,10 +380,13 @@ fn build(seq : &mut Vec<Result<Box<Expr>,usize>>, addr : &Vec<Cursor>) -> Expr {
 	build_local(seq, addr, 0, len)
 }
 
+// parse_operand + parse_operator
+// parse seq of [expr, operator, expr, operator, expr, ...]
+// and build it to tree
 pub fn parse_expr(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 	let mut curs : Cursor = curs.clone();
-	let mut acc  : Vec<Result<Box<Expr>,usize>> = vec![];
-	let mut addr : Vec<Cursor> = vec![];
+	let mut acc  : Vec<Result<Box<Expr>,usize>> = vec![]; // seq of src [expr, operator, ...]
+	let mut addr : Vec<Cursor> = vec![]; // cursors for all items in 'acc'
 	macro_rules! finalize{() => {{
 		let res = build(&mut acc, &addr);
 		syn_ok!(res, curs);
@@ -372,23 +394,23 @@ pub fn parse_expr(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 	loop {
 		let ans = lex!(lexer, &curs);
 		let obj;
+		// CHECK FOR '(a + b) or (a)'
 		if ans.val == "(" {
 			curs = ans.cursor;
 			let ans = try!(parse_expr(lexer, &curs));
 			addr.push(curs);
 			curs = lex!(lexer, &ans.cursor, ")");
 			obj = Box::new(ans.val);
-			//acc.push(Ok(Box::new(ans.val)));
 		} else {
 			let ans = try!(parse_operand(lexer, &curs));
-			//acc.push(Ok(Box::new(ans.val)));
 			obj = Box::new(ans.val);
 			addr.push(curs);
 			curs = ans.cursor;
 		}
-		//let ans = try!(parse_prop(lexer, curs, obj));
+		// operand found
 		acc.push(Ok(obj));
-		//curs = ans.cursor;
+		// check for operator
+		// if not exist then build what was parsed
 		match parse_operator(lexer, &curs) {
 			Err(_) => finalize!(),
 			Ok(ans) => {

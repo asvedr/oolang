@@ -16,21 +16,23 @@ type CheckRes    = Result<(),Vec<SynErr>>;
 type CheckAns<A> = Result<A,Vec<SynErr>>;
 
 pub struct FunEnv {
-	pub global     : *const Pack,
-	pub local      : VMap, 
-	pub outers     : VMap,
-	pub templates  : HashSet<String>, // local templates
-	pub ret_type   : Option<*const Type>
+	pub global      : *const Pack,
+	pub local       : VMap, 
+	pub outers      : VMap,
+	pub templates   : HashSet<String>,    // local templates
+	pub ret_type    : Option<*const Type>,
+	pub loop_labels : Vec<*const String>  // for 'break' cmd
 }
 
 impl FunEnv {
 	pub fn new(pack : *const Pack) -> FunEnv {
 		FunEnv {
-			global    : pack,
-			local     : BTreeMap::new(),
-			outers    : BTreeMap::new(),
-			templates : HashSet::new(),
-			ret_type  : None
+			global      : pack,
+			local       : BTreeMap::new(),
+			outers      : BTreeMap::new(),
+			templates   : HashSet::new(),
+			ret_type    : None,
+			loop_labels : Vec::new()
 		}
 	}
 	pub fn add_outer(&mut self, out : &FunEnv) {

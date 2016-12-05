@@ -117,6 +117,8 @@ pub fn parse_class(lexer : &Lexer, curs : &Cursor) -> SynRes<Class> {
 			break;
 			//syn_ok!(acc, ans.cursor);
 		}
+		// def fun order:      (pub|priv) [virtual] fn ...
+		// def property order: (pub|priv) <Type> <name>
 		// modif
 		let is_pub = {
 			let sym = lex_type!(lexer, &curs, LexTP::Id);

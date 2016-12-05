@@ -39,6 +39,10 @@ fn main() : () {
 */
 
 fn main() : () {
-	var a : Asc<str, real> = {"a" : 1.0, "b" : 2f};
-	a.get("c");
+	var a;
+	if true {
+		a = 1;
+	} else {
+		a = 0.2;
+	}
 }

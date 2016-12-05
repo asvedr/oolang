@@ -11,7 +11,9 @@ use std::fmt;
 pub struct Import {
 	pub path   : Vec<String>,
 	pub alias  : Option<String>
-//	pub getall : bool
+	/* if None then 'use mod::submod::*' all names to current namespace
+	   else 'import mod::submod as name' or 'import mod::name' using mod-name to get items
+	*/
 }
 
 impl fmt::Debug for Import {
@@ -81,6 +83,7 @@ impl Show for SynMod {
 	}
 }
 
+// public fun without taking lex rest. only Mod or ParseError
 pub fn parse_mod(lexer : &Lexer) -> Result<SynMod,Vec<SynErr>> {
 	let curs = Cursor::new();
 	match parse_mod_syn(lexer, &curs) {
@@ -89,6 +92,7 @@ pub fn parse_mod(lexer : &Lexer) -> Result<SynMod,Vec<SynErr>> {
 	}
 }
 
+// private fun, parse mod
 fn parse_mod_syn(lexer : &Lexer, curs : &Cursor) -> SynRes<SynMod> {
 	let mut imps = vec![];
 	let mut funs = vec![];
@@ -108,7 +112,6 @@ fn parse_mod_syn(lexer : &Lexer, curs : &Cursor) -> SynRes<SynMod> {
 						let cls = try!(parse_class(lexer, &curs));
 						clss.push(cls.val);
 						curs = cls.cursor;
-						//println!("AFTER CLASS: {:?}", curs);
 					},
 					"use"    => {
 						let imp = try!(parse_import(lexer, &curs));
@@ -120,7 +123,7 @@ fn parse_mod_syn(lexer : &Lexer, curs : &Cursor) -> SynRes<SynMod> {
 						funs.push(fnc.val);
 						curs = fnc.cursor;
 					},
-					"extern" => {
+					"extern" => { // getting C fun or C type. FFI for C
 						let sym = lex!(lexer, &ans.cursor);
 						if sym.val == "fn" {
 							let cfun = try!(parse_c_fn(lexer, &ans.cursor));
@@ -134,8 +137,8 @@ fn parse_mod_syn(lexer : &Lexer, curs : &Cursor) -> SynRes<SynMod> {
 							syn_throw!(format!("after 'extern' must be 'fn' or 'type', found '{}'", sym.val), curs);
 						}
 					},
-					"c_type" => panic!(),
-					"c_func" => panic!(),
+					//"c_type" => panic!(),
+					//"c_func" => panic!(),
 					_ => syn_throw!(format!("unexpected expression on toplevel: '{}'", ans.val), curs)
 				}
 		}

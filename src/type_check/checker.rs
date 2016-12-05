@@ -36,6 +36,18 @@ pub struct Checker {
 	std         : Prelude
 }
 
+/*
+	using checker:
+		let checker = Checker::new()
+		...
+		checker.add_pack(pack) // filling env
+		...
+		checker.check_mod(module-to-check) // it return Ok(()) or Err(type-check-error)
+		// .check_mod setting prefixes to names in expr, calculating types for implicitly and setting it clearly.
+		checker.add_pack(make_pack(module-to-check)) // adding mod to env
+		// checking next modules
+*/
+
 macro_rules! set_var_type {
 	($env:expr, $exp:expr, $tp:expr) => {
 		if $exp.kind.is_unk() {
@@ -82,6 +94,7 @@ impl Checker {
 		adds!(res.bool_op,     "||");
 		res
 	}
+	// this is only one public fun for checking
 	pub fn check_mod(&self, smod : &mut SynMod) -> CheckRes {
 		let mut pack = Pack::new();
 		for c in self.std.pack.cls.keys() {
@@ -113,9 +126,6 @@ impl Checker {
 			},
 			_ => true
 		};
-		//for t in fun.tmpl.iter() {
-		//	env.templates.insert(t.clone());
-		//}
 		// ARGS
 		for arg in fun.args.iter_mut() {
 			try!(self.check_type(&env, &mut arg.tp, &fun.addr));
@@ -153,9 +163,13 @@ impl Checker {
 		// if it true then var won't added to env on DefVar
 		let mut unk_count = 0;
 		macro_rules! expr {($e:expr) => { unk_count += try!(self.check_expr(env, $e))}; }
+		macro_rules! actions {($e:expr, $a:expr) => { unk_count += try!(self.check_actions($e, $a, false)) }; }
 		let env_pt : *mut LocEnv = &mut *env;
 		let env_ln : &mut LocEnv = unsafe{ mem::transmute(env_pt) };
-		macro_rules! regress {($e:expr, $t:expr) => {try!(regress_expr(env_ln, $e, $t))}; }
+		macro_rules! regress {
+			($e:expr, $t:expr) => {try!(regress_expr(env_ln, $e, $t))};
+			($env:expr, $e:expr, $t:expr) => {try!(regress_expr($env, $e, $t))};
+		}
 		for act in src.iter_mut() {
 			match act.val {
 				ActVal::Expr(ref mut e) => /*act.exist_unk =*/ expr!(e),
@@ -174,6 +188,17 @@ impl Checker {
 							if !env.check_ret_type(&Type::Void) {
 								throw!(format!("expect type {:?}, found void", env.ret_type()), act.addres)
 							}
+					}
+				},
+				ActVal::If(ref mut cond, ref mut th_act, ref mut el_act) => {
+					expr!(cond);
+					{
+						let mut sub = LocEnv::inherit(env);
+						actions!(&mut sub, th_act);
+					}
+					{
+						let mut sub = LocEnv::inherit(env);
+						actions!(&mut sub, el_act);
 					}
 				},
 				ActVal::DVar(ref name, ref mut tp, ref mut val) => {
@@ -245,8 +270,9 @@ impl Checker {
 					// ADD CHECK FOR WHAT CAN BE AT LEFT PART OF ASSIG
 				},
 				ActVal::Throw(ref mut e) => {
+					// CAN RETURN ANY CLASS BUT CAN'T RETURN A PRIMITIVE
 					expr!(e);
-					if !e.kind.is_class() {
+					if !e.kind.is_class() || e.kind.is_arr() {
 						throw!(format!("expr must be a class"), e.addres)
 					}
 				},
@@ -257,14 +283,16 @@ impl Checker {
 							_ => panic!()
 						}
 					}
-					let pack : &Pack = env.pack(); //unsafe { &(*env.global) };
+					let pack : &Pack = env.pack();
 					unk_count += try!(self.check_fn(pack, &mut **df, Some(env)));
 				},
 				ActVal::Try(ref mut body, ref mut catches) => {
 				// благодаря тому, что в LocEnv ссылки, а не типы, расформирование и формирование LocEnv заново не влияют на вычисление типов
+				// окружение текущей функции остается, но локальное для блоков здесь формируется заново при каждом проходе 
 					{
 						let mut sub = LocEnv::inherit(env);
-						unk_count += try!(self.check_actions(&mut sub, body, repeated));
+						actions!(&mut sub, body);
+						//unk_count += try!(self.check_actions(&mut sub, body, false/*repeated*/));
 					}
 					for catch in catches.iter_mut() {
 						let mut sub = LocEnv::inherit(env);
@@ -278,11 +306,95 @@ impl Checker {
 							},
 							_ => ()
 						}
-						unk_count += try!(self.check_actions(&mut sub, &mut catch.act, repeated));
+						actions!(&mut sub, &mut catch.act);
+						//unk_count += try!(self.check_actions(&mut sub, &mut catch.act, false/*repeated*/));
 					}
 				},
-				// while, for, foreach, break
-				_ => ()
+				ActVal::While(ref lname, ref mut cond, ref mut body) => {
+					// adding label if exist
+					match *lname {
+						Some(ref name) => env.add_loop_label(name),
+						_ => ()
+					}
+					// checking cond
+					expr!(cond);
+					// checking body
+					{
+						let mut sub = LocEnv::inherit(env);
+						actions!(&mut sub, body);
+					}
+					// pop label if it was
+					match *lname {
+						Some(_) => env.pop_loop_label(),
+						_ => ()
+					}
+				},
+				ActVal::For(ref lname, ref vname, ref mut val_from, ref mut val_to, ref mut body) => {
+					match *lname {
+						Some(ref name) => env.add_loop_label(name),
+						_ => ()
+					}
+					expr!(val_from);
+					expr!(val_to);
+					{
+						let mut sub = LocEnv::inherit(env);
+						// type for env
+						let int_vt = Type::Int;
+						add_loc_knw!(sub, vname, &int_vt, act.addres);
+						actions!(&mut sub, body);
+					}
+					match *lname {
+						Some(_) => env.pop_loop_label(),
+						_ => ()
+					}
+				},
+				ActVal::Foreach(ref lname, ref vname, ref mut vt, ref mut cont, ref mut body) => {
+					match *lname {
+						Some(ref name) => env.add_loop_label(name),
+						_ => ()
+					}
+					{
+						let mut sub = LocEnv::inherit(env);
+						expr!(cont);
+						match cont.kind {
+							Type::Arr(ref mut item) => {
+								if vt.is_unk() {
+									*vt = item[0].clone();
+									add_loc_unk!(sub, vname, &mut item[0], act.addres);
+								} else if *vt != item[0] {
+									throw!(format!("foreach var expected {:?}, found {:?}", item, vt), act.addres);
+								} else {
+									add_loc_knw!(sub, vname, &item[0], act.addres);
+								}
+							},
+							Type::Unk => {
+								if vt.is_unk() {
+									add_loc_unk!(sub, vname, &mut *vt, act.addres);
+								} else {
+									regress!(&mut sub, cont, vt);
+									//try!(regress_expr(sub, cont, vt))
+									add_loc_knw!(sub, vname, &mut *vt, act.addres);
+								}
+							},
+							_ => throw!("you can foreach only through array", cont.addres)
+						}
+						actions!(&mut sub, body);
+					}
+					match *lname {
+						Some(_) => env.pop_loop_label(),
+						_ => ()
+					}
+				},
+				ActVal::Break(ref lname, ref mut cnt) =>
+					match *lname {
+						Some(ref name) => 
+							match env.get_loop_label(name) {
+								Some(n) => *cnt = n,
+								_ => *cnt = 0
+							},
+						_ => *cnt = 0
+					}
+				//_ => ()
 			}
 		}
 		Ok(unk_count)

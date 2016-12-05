@@ -15,38 +15,15 @@ pub struct Arg {
 
 pub struct SynFn {
 	pub name        : Option<String>,
-	pub tmpl        : Tmpl,
+	pub tmpl        : Tmpl,   // if fun has no tmpl then []
 	pub args        : Vec<Arg>,
-	pub rettp       : Type,
-	pub body        : Vec<Act<SynFn>>,
-	pub addr        : Cursor,
-	pub can_be_clos : bool, // if has names args or option args then can't be used as closure
-	pub has_named   : bool,
-	pub ftype       : Type
+	pub rettp       : Type,   // return type
+	pub body        : Vec<Act<SynFn>>, 
+	pub addr        : Cursor, // fun start addres
+	pub can_be_clos : bool,   // if has names args or option args then can't be used as closure
+	pub has_named   : bool,   // does fun has named args
+	pub ftype       : Type    // Fn(args) -> res
 }
-/*
-impl SynFn {
-	pub fn type_of(&mut self) -> &Type {
-		match self.ftype {
-			Some(ref t) => t,
-			_ => {
-				let mut atypes = vec![];
-				for a in self.args.iter() {
-					atypes.push(a.tp.clone());
-				}
-				if self.tmpl.len() == 0 {
-					self.ftype = Some(Type::Fn(None, atypes, Box::new(self.rettp.clone())))
-				} else {
-					self.ftype = Some(Type::Fn(Some(self.tmpl.clone()), atypes, Box::new(self.rettp.clone())))
-				}
-				match self.ftype {
-					Some(ref t) => t,
-					_ => panic!()
-				}
-			}
-		}
-	}
-}*/
 
 impl Show for Arg {
 	fn show(&self, layer : usize) -> Vec<String> {
