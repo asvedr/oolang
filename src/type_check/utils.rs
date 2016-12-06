@@ -1,6 +1,6 @@
 use syn::*;
 use type_check::pack::*;
-//use type_check::tclass::*;
+use type_check::tclass::*;
 use type_check::fun_env::*;
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -68,9 +68,9 @@ macro_rules! get_fenv_m {
 }
 
 impl LocEnv {
-	pub fn new(pack : *const Pack, tmpl : &Vec<String>) -> LocEnv {
+	pub fn new(pack : *const Pack, tmpl : &Vec<String>, _self : Option<Type>) -> LocEnv {
 		//LocEnv::FunEnv(FunEnv::new())
-		let mut env = FunEnv::new(pack);
+		let mut env = FunEnv::new(pack, _self);
 		for t in tmpl.iter() {
 			env.templates.insert(t.clone());
 		}
@@ -78,6 +78,9 @@ impl LocEnv {
 	}
 	pub fn inherit(parent : &mut LocEnv) -> LocEnv {
 		LocEnv::SubEnv(SubEnv{parent : &mut *parent, local : BTreeMap::new()})
+	}
+	pub fn self_val(&self) -> &Option<Type> {
+		return &get_fenv!(self).self_val;
 	}
 	pub fn pack(&self) -> &Pack {
 		let mut link : *const LocEnv = &*self;

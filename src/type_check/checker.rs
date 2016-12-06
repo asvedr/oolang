@@ -1,6 +1,6 @@
 use syn::*;
 use type_check::utils::*;
-//use type_check::tclass::*;
+use type_check::tclass::*;
 use type_check::pack::*;
 use std::collections::{HashMap/*, HashSet, BTreeMap*/};
 use std::mem;
@@ -111,13 +111,25 @@ impl Checker {
 				_ => ()
 			}
 		}
+		// TODO CLASS CHECK
+		/*
+		for c in smod.classes.iter() {
+			let n = match 
+		}
+		for c in smod.classes.iter_mut() {
+			try!(self.check_class(&pack, c));
+		}
+		*/
 		for f in smod.funs.iter_mut() {
-			try!(self.check_fn(&pack, f, None));
+			try!(self.check_fn(&pack, f, None, None));
 		}
 		ok!()
 	}
-	fn check_fn(&self, pack : &Pack, fun : &mut SynFn, out_env : Option<&LocEnv>) -> CheckAns<isize> {
-		let mut env = LocEnv::new(&*pack, &fun.tmpl);
+	/*fn check_class(&self, pack : &Pacl, class : &mut Class) -> CheckRes {
+		
+	}*/
+	fn check_fn(&self, pack : &Pack, fun : &mut SynFn, out_env : Option<&LocEnv>, _self : Option<Type>) -> CheckAns<isize> {
+		let mut env = LocEnv::new(&*pack, &fun.tmpl, _self);
 		// PREPARE LOCAL ENV
 		let top_level = match out_env {
 			Some(eo) => {
@@ -284,7 +296,8 @@ impl Checker {
 						}
 					}
 					let pack : &Pack = env.pack();
-					unk_count += try!(self.check_fn(pack, &mut **df, Some(env)));
+					let _self = env.self_val().clone();
+					unk_count += try!(self.check_fn(pack, &mut **df, Some(env), _self));
 				},
 				ActVal::Try(ref mut body, ref mut catches) => {
 				// благодаря тому, что в LocEnv ссылки, а не типы, расформирование и формирование LocEnv заново не влияют на вычисление типов
@@ -806,6 +819,11 @@ impl Checker {
 				check!(e);
 				check_type!(tp);
 			}
+			EVal::TSelf =>
+				match *env.self_val() {
+					Some(ref tp) => expr.kind = tp.clone(),
+					_ => throw!("using 'self' out of class", expr.addres)
+				},
 			_ => ()
 		}
 		return Ok(unk_count);

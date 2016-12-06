@@ -19,20 +19,22 @@ pub struct FunEnv {
 	pub global      : *const Pack,
 	pub local       : VMap, 
 	pub outers      : VMap,
-	pub templates   : HashSet<String>,    // local templates
+	pub templates   : HashSet<String>,      // local templates
 	pub ret_type    : Option<*const Type>,
-	pub loop_labels : Vec<*const String>  // for 'break' cmd
+	pub loop_labels : Vec<*const String>,   // for 'break' cmd
+	pub self_val    : Option<Type> // if you check method, then Class in this val. if it's global fun then None
 }
 
 impl FunEnv {
-	pub fn new(pack : *const Pack) -> FunEnv {
+	pub fn new(pack : *const Pack, _self : Option<Type>) -> FunEnv {
 		FunEnv {
 			global      : pack,
 			local       : BTreeMap::new(),
 			outers      : BTreeMap::new(),
 			templates   : HashSet::new(),
 			ret_type    : None,
-			loop_labels : Vec::new()
+			loop_labels : Vec::new(),
+			self_val    : _self
 		}
 	}
 	pub fn add_outer(&mut self, out : &FunEnv) {

@@ -13,14 +13,20 @@ pub struct Class {
 	pub name      : String,
 	pub priv_fn   : Vec<Method>,//SynFn>,
 	pub pub_fn    : Vec<Method>,//SynFn>,
-	pub priv_prop : Vec<Pair<String,Type>>,
-	pub pub_prop  : Vec<Pair<String,Type>>
+	pub priv_prop : Vec<Prop>,//Pair<String,Type>>,
+	pub pub_prop  : Vec<Prop> //Pair<String,Type>>
 }
 
 pub struct Method {
 	pub is_virt : bool,
 	pub func    : SynFn,
 	pub ftype   : Type // fill in type check
+}
+
+pub struct Prop {
+	pub name   : String,
+	pub ptype  : Type,
+	pub addres : Cursor
 }
 
 impl Show for Class {
@@ -33,10 +39,10 @@ impl Show for Class {
 		let mut res = vec![head];
 		tab.push(' ');
 		for p in self.priv_prop.iter() {
-			res.push(format!("{}PRIV {} : {:?}", tab, p.a, p.b));
+			res.push(format!("{}PRIV {} : {:?}", tab, p.name, p.ptype));
 		}
 		for p in self.pub_prop.iter() {
-			res.push(format!("{}PUBL {} : {:?}", tab, p.a, p.b));
+			res.push(format!("{}PUBL {} : {:?}", tab, p.name, p.ptype));
 		}
 		for f in self.priv_fn.iter() {
 			if f.is_virt {
@@ -120,6 +126,7 @@ pub fn parse_class(lexer : &Lexer, curs : &Cursor) -> SynRes<Class> {
 		// def fun order:      (pub|priv) [virtual] fn ...
 		// def property order: (pub|priv) <Type> <name>
 		// modif
+		let start = curs.clone();
 		let is_pub = {
 			let sym = lex_type!(lexer, &curs, LexTP::Id);
 			if sym.val == "pub" {
@@ -155,9 +162,9 @@ pub fn parse_class(lexer : &Lexer, curs : &Cursor) -> SynRes<Class> {
 			curs = lex!(lexer, &fname.cursor, ":");
 			let tp = try!(parse_type(lexer, &curs));
 			if is_pub {
-				pub_prop.push(Pair{a : fname.val, b : tp.val});
+				pub_prop.push(Prop{name : fname.val, ptype : tp.val, addres : start});
 			} else {
-				priv_prop.push(Pair{a : fname.val, b : tp.val});
+				priv_prop.push(Prop{name : fname.val, ptype : tp.val, addres : start});
 			}
 			curs = tp.cursor;
 		}

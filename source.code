@@ -39,10 +39,5 @@ fn main() : () {
 */
 
 fn main() : () {
-	var a;
-	if true {
-		a = 1;
-	} else {
-		a = 0.2;
-	}
+	return self;
 }
