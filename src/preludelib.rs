@@ -26,7 +26,7 @@ impl Prelude {
 			&fns[fns.len() - 1]
 		}}; }
 		macro_rules! newc {($name:expr, $p:expr, $acnt:expr) => {{
-			let c = TClass{parent : None, privs : BTreeMap::new(), pubs : BTreeMap::new(), params : $p, args : $acnt};
+			let c = TClass{source : None, parent : None, privs : BTreeMap::new(), pubs : BTreeMap::new(), params : $p, args : $acnt};
 			//let lnk : *mut TClass = &mut clss[clss.len() - 1];
 			pack.cls.insert($name.to_string(), c);
 			pack.cls.get_mut($name).unwrap()
@@ -47,6 +47,8 @@ impl Prelude {
 		meth!(str_s, "len", type_fn!(vec![], Type::Int));
 		meth!(str_s, "get", type_fn!(vec![Type::Int], Type::Char));
 		meth!(str_s, "set", type_fn!(vec![Type::Int,Type::Char], Type::Void));
+		let except : *mut TClass = newc!("Exception", vec![], vec![Type::Str]);
+		meth!(except, "param", type_fn!(vec![], Type::Str));
 		}
 		Prelude {
 //			tcls : clss,

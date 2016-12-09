@@ -1,4 +1,5 @@
 use syn::type_sys::*;
+use syn::reserr::*;
 use type_check::tclass::*;
 use std::fmt::Write;
 use std::collections::{HashMap, BTreeMap};
@@ -25,14 +26,21 @@ macro_rules! get_obj {
 	($_self:expr, $pref:expr, $name:expr, $map:ident, $out_map:ident) => {unsafe {
 		match $pref {
 			Some(pref) => {
-				let pack = pack_of!($_self, pref);
-				match pack {
-					Some(ptr) =>
-						match (*ptr).$map.get($name) {
-							Some(ans) => Some(&*ans),
-							None => None
-						},
-					None => None
+				if pref[0] == "%mod" {
+					match $_self.$map.get($name) {
+						Some(ans) => Some(&*ans),
+						_ => None
+					}
+				} else {
+					let pack = pack_of!($_self, pref);
+					match pack {
+						Some(ptr) =>
+							match (*ptr).$map.get($name) {
+								Some(ans) => Some(&*ans),
+								None => None
+							},
+						_ => None
+					}
 				}
 			},
 			None =>
@@ -113,5 +121,54 @@ impl Pack {
 	}
 	pub fn pack_of_cls(&self, name : &String) -> Option<Vec<String>> { // Some(pack) or None[it mean then class is in self module]
 		find_import!(self, name, cls, out_cls)
+	}
+	pub fn check_class(&self, pref : &mut Vec<String>, name : &String, params : &Option<Vec<Type>>, pos : &Cursor) -> Result<(), Vec<SynErr>> {
+		// .get_cls, .open_pref
+		// GET OBJ
+		let cls = if pref.len() == 0 {
+			match self.get_cls(None, name) {
+				None => {
+					println!("3!");
+					syn_throw!(format!("class {} not found", name), pos)
+				},
+				Some(cls) => cls
+			}
+		} else if pref[0] == "%tmpl" {
+			// OUT OF MAIN BRANCH.
+			// CHECK FOR ZERO PARAMS AND RETURN
+			match *params {
+				Some(_) => syn_throw!("template has more then 0 params", pos),
+				_ => return Ok(())
+			}
+		} else {
+			match self.get_cls(Some(pref), name) {
+				None => {
+					println!("4!");
+					syn_throw!(format!("class {:?}{} not found", pref, name), pos)
+				},
+				Some(cls) => cls
+			}
+		};
+		// CHECK COUNT
+		let cnt1 = match *params {
+			Some(ref v) => v.len(),
+			_ => 0
+		};
+		let cnt2 = unsafe { (*cls).params.len() };
+		if cnt1 != cnt2 {
+			syn_throw!(format!("incorrect params count. Expect {}, found {}", cnt2, cnt1), pos)
+		}
+		// CHANGE PREF
+		if pref.len() == 0 {
+			match self.pack_of_cls(name) {
+				Some(p) => *pref = p,
+				_ => pref.push("%mod".to_string())
+			}
+		} else if pref[0] == "%mod" {
+			// ok
+		} else {
+			self.open_pref(pref)
+		}
+		Ok(())
 	}
 }

@@ -18,7 +18,8 @@ pub enum EVal {
 	Var        (Option<Vec<String>>, String), // namespace, name
 	Arr        (Vec<Expr>),                   // new arr
 	Asc        (Vec<Pair<Expr,Expr>>),        // new Asc. Only strings, chars and int allowed for key
-	Prop       (Box<Expr>,String),            // geting class attrib: 'object.prop' or 'object.fun()'
+	//          obj       pname  is_meth
+	Prop       (Box<Expr>,String,bool),       // geting class attrib: 'object.prop' or 'object.fun()'
 	ChangeType (Box<Expr>, Type),             // type coersing
 	TSelf,
 	Null
@@ -129,8 +130,8 @@ impl Show for Expr {
 				}
 				res
 			},
-			EVal::Prop(ref obj, ref fld) => {
-				let mut res = vec![format!("{}PROP {}{}", tab, fld, tp)];
+			EVal::Prop(ref obj, ref fld, ref is_m) => {
+				let mut res = vec![format!("{}PROP {}{}({})", tab, fld, tp, if *is_m {"meth"} else {"prop"})];
 				for line in obj.show(layer + 1) {
 					res.push(line)
 				}
@@ -143,8 +144,8 @@ impl Show for Expr {
 				}
 				res
 			},
-			EVal::TSelf => vec![format!("{}self", tab)],
-			EVal::Null => vec![format!("{}null", tab)]
+			EVal::TSelf => vec![format!("{}self{}", tab, tp)],
+			EVal::Null => vec![format!("{}null{}", tab, tp)]
 		}
 	}
 }
@@ -248,6 +249,7 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 				LexTP::Id if ans.val == "new" => {
 					let orig_c = curs;
 					curs = ans.cursor;
+					// PREFIX
 					let pref = match parse_prefix(lexer, &curs) {
 						None => vec![],
 						Some(v) => {
@@ -255,13 +257,26 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 							v.val
 						}
 					};
+					// NAME
 					let ans = lex_type!(lexer, &curs, LexTP::Id);
 					let name = ans.val;
 					curs = ans.cursor;
+					// TMPL
+					let tmpl = {
+						let ans = lex!(lexer, &curs);
+						if ans.val == "<" {
+							let tmpl = parse_list(lexer, &curs, &parse_type, "<", ">")?;
+							curs = tmpl.cursor;
+							Some(tmpl.val)
+						} else {
+							None
+						}
+					};
+					// ARGS
 					let args = try!(parse_list(lexer, &curs, &parse_expr, "(", ")"));
 					curs = args.cursor;
 					let args = args.val;
-					obj = expr!(EVal::NewClass(None,pref,name,args), orig_c);
+					obj = expr!(EVal::NewClass(tmpl,pref,name,args), orig_c);
 				},
 				LexTP::Id   => {
 					obj  = expr!(EVal::Var(None, ans.val), curs);
@@ -302,7 +317,7 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 				// FIELD
 				} else if ans.val == "." {
 					let fld = lex_type!(lexer, &ans.cursor, LexTP::Id);
-					obj = expr!(EVal::Prop(Box::new(obj), fld.val), curs);
+					obj = expr!(EVal::Prop(Box::new(obj), fld.val, false), curs);
 					curs = fld.cursor;
 				// TYPE COERSING
 				} else if ans.val == "as" {

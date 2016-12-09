@@ -1,6 +1,6 @@
-complete regressor
-check class
-type check for all acts
+- fix get_method
+- add method-prop flag on 
+
 optimise env for type check
 
 + lexical

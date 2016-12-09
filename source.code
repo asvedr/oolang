@@ -1,43 +1,55 @@
+fn arr<A>(a : A) : [A] {
+	return []
+}
+
 /*
-use Std::Io;
-use Std::AllFrom::*;
-use Std::Alias as Ali;
-
-extern type POSIX
-extern fn c_call : Fn(POSIX, str) : () = "c_call_ex"
-
-class single Main : Std::Object {
-	pub a : real;
-	pub b : Geometry::Point<int>;
-	pub fn curry_add(a : int) : Fn(int):int {
-		fn closure(b : /*int*/real) : int {
-			return a + b;
-		};
-		return closure
+class Point {
+	pub x : real;
+	pub y : real;
+	pub fn add(p : Point) : Point {
+		return new Point(self.x + p.x, self.y + p.y);
 	};
-	priv fn add(p : int) : () {
-		self.a = self.a + p;
+	pub fn mul(a : real) : Point {
+		return new Point(self.x * a, self.y * a);
+	};
+	pub fn init(x : real, y : real) : () {
+		self.x = x;
+		self.y = y;
 	}
 }
-
-fn apply<A>(a : A, b : A, f : Fn(A,A): A) : A {
-	f(a,b)
-}
-
-
-fn main() : () {
-	var store = Store() as Parent;
-	try {
-		store.show_all();
-	} catch a : Exception {
-		print("int code", a)
-	} catch {
-		print("catch all")
-	}
-}
-
 */
 
-fn main() : () {
-	return self;
+class Pass { pub fn init():(){} }
+
+class<A> Node {
+	pub next : Node<A>;
+	pub val  : A;
+	pub fn init(h : A, t : Node<A>) : () {
+		self.next = t;
+		self.val = h;
+	}
 }
+
+
+class<A> Stack {
+	priv head : Node<A>;
+	priv _len  : int;
+	pub fn len() : int {
+		return self._len;
+	};
+	pub fn push(item : A) : () {
+		self._len = self._len + 1;
+		self.head = new Node<A>(item, self.head);
+	};
+	pub fn pop() : A {
+		if self.head == null {
+			throw new Exception("NULL")
+		} else {
+			self._len = self._len - 1;
+			var hd = self.head;
+			self.head = hd.next;
+			return hd.val;
+		}
+	}
+}
+

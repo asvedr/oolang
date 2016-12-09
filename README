@@ -46,6 +46,8 @@ Expr ::= Expr '(' (Expr,)* ')'                          // fun call
          number                                         // int or float
          str                                            // string
          char                                           // char
+		 'null'
+		 'self'
 
 Type ::= 'int'
          'real'

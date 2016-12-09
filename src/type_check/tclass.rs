@@ -3,30 +3,45 @@ use syn::class::*;
 use syn::reserr::*;
 use std::collections::BTreeMap;
 
+pub struct Parent {
+	class  : *const TClass,
+	params : Option<*const Vec<Type>>
+}
+
+impl Parent {
+	pub fn new(cls : *const TClass, pars : Option<*const Vec<Type>>) -> Parent {
+		Parent {
+			class  : cls,
+			params : pars
+		}
+	}
+}
+
 pub struct TClass {
-	pub parent : Option<*const TClass>,
+	pub source : Option<*const Class>,
+	pub parent : Option</* *const TClass*/Parent>,
 	pub privs  : BTreeMap<String,*const Type>, // orig type saved in syn_class
 	pub pubs   : BTreeMap<String,*const Type>, 
 	pub params : Vec<String>,                  // template
-	pub args   : Vec<*const Type>              // constructor 
+	pub args   : Vec<Type>                     // constructor 
 }
 
 impl TClass {
-	pub fn from_syn(cls : &Class, parent : Option<*const TClass>) -> Result<TClass,Vec<SynErr>> {
+	pub fn from_syn(cls : &Class, parent : Option<Parent>) -> Result<TClass,Vec<SynErr>> {
 		let mut privs : BTreeMap<String, *const Type> = BTreeMap::new();
 		let mut pubs  : BTreeMap<String, *const Type> = BTreeMap::new();
 		macro_rules! make {($par:expr) => {{
-			let fname = format!("init");
-			match privs.get(&fname) {
-				Some(_) => syn_throw!("initializer must be pub", cls.addres),
-				_ => {
-					let args = match pubs.get(&fname) {
+		//	let fname = format!("init");
+		//	match privs.get(&fname) {
+		//		Some(_) => syn_throw!("initializer must be pub", cls.addres),
+		//		_ => {
+					/* let args = match pubs.get(&fname) {
 						Some(t) => {
 							match **t {
 								Type::Fn(_,ref args_src,ref ret) => {
-									let mut args : Vec<*const Type> = vec![];
+									let mut args : Vec<Type> = vec![];
 									for a in args_src.iter() {
-										args.push(&*a);
+										args.push(a.clone());
 									}
 									if ret.is_void() {
 										// ok
@@ -36,24 +51,25 @@ impl TClass {
 									}
 								},
 								_ =>
-									syn_throw!("initializer must be function", cls.addres)
+									syn_throw!(format!("initializer must be function, but it {:?}", **t), cls.addres)
 							}
 						},
 						_ => {
 							// ok
-							vec![]
+							Vec::new()
 						}
-					};
+					}; */
 					// returning value
 					return Ok(TClass {
+						source : Some(&*cls),
 						parent : $par,
 						privs  : privs,
 						pubs   : pubs,
 						params : cls.template.clone(),
-						args   : args
+						args   : vec![]//args
 					});
-				}
-			}
+		//		}
+		//	}
 		}}; }
 		macro_rules! foreach_part{
 			($seq_src:ident, $seq_dst:expr, $getter:ident, $parent:expr, $addr:expr, $name:expr) => {
@@ -95,10 +111,10 @@ impl TClass {
 		unsafe {
 			match parent {
 				Some(par) => {
-					foreach_part!(priv_prop, privs, ptype, par, get_prop_addr, get_prop_name);
-					foreach_part!(pub_prop, pubs, ptype, par, get_prop_addr, get_prop_name);
-					foreach_part!(priv_fn, privs, ftype, par, get_meth_addr, get_meth_name);
-					foreach_part!(pub_fn, pubs, ftype, par, get_meth_addr, get_meth_name);
+					foreach_part!(priv_prop, privs, ptype, par.class, get_prop_addr, get_prop_name);
+					foreach_part!(pub_prop, pubs, ptype, par.class, get_prop_addr, get_prop_name);
+					foreach_part!(priv_fn, privs, ftype, par.class, get_meth_addr, get_meth_name);
+					foreach_part!(pub_fn, pubs, ftype, par.class, get_meth_addr, get_meth_name);
 					make!(Some(par))
 				},
 				None => {
@@ -111,6 +127,45 @@ impl TClass {
 			}
 		}
 	}
+	pub unsafe fn check_initializer(&mut self) -> Result<(),Vec<SynErr>> {	
+		let fname = format!("init");
+		let cls : &Class = match self.source {
+			Some(ptr) => &*ptr,
+			_ => panic!()
+		};
+		match self.privs.get(&fname) {
+			Some(_) => syn_throw!("initializer must be pub", cls.addres),
+			_ => {
+				let args = match self.pubs.get(&fname) {
+					Some(t) => {
+						match **t {
+							Type::Fn(_,ref args_src,ref ret) => {
+								let mut args : Vec<Type> = vec![];
+								for a in args_src.iter() {
+									args.push(a.clone());
+								}
+								if ret.is_void() {
+									// ok
+									args
+								} else {
+									syn_throw!("initializer must be void", cls.addres)
+								}
+							},
+							_ =>
+								syn_throw!(format!("initializer must be function, but it {:?}", **t), cls.addres)
+						}
+					},
+					_ => {
+						// ok
+						Vec::new()
+					}
+				};
+				// setting args
+				self.args = args;
+				Ok(())
+			}
+		}
+	}
 	fn exist_prop(&self, name : &String) -> bool {
 		let mut lnk : *const TClass = &*self;
 		unsafe { loop {
@@ -118,7 +173,7 @@ impl TClass {
 				return true
 			} else {
 				match (*lnk).parent {
-					Some(par) => lnk = par,
+					Some(ref par) => lnk = par.class,
 					_ => return false
 				}
 			}
@@ -133,7 +188,7 @@ impl TClass {
 						Some(lnk) => *lnk,
 						None =>
 							match self.parent {
-								Some(lnk) => return (*lnk).look_in_all(name, tmpl),
+								Some(ref lnk) => return (*lnk.class).look_in_all(name, tmpl),
 								None => return None
 							}
 					}
@@ -150,7 +205,7 @@ impl TClass {
 				Some(lnk) => *lnk,
 				None =>
 					match self.parent {
-						Some(lnk) => return (*lnk).look_in_pub(name, tmpl),
+						Some(ref lnk) => return (*lnk.class).look_in_pub(name, tmpl),
 						None => return None
 					}
 			};

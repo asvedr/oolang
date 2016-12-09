@@ -22,11 +22,11 @@ pub struct FunEnv {
 	pub templates   : HashSet<String>,      // local templates
 	pub ret_type    : Option<*const Type>,
 	pub loop_labels : Vec<*const String>,   // for 'break' cmd
-	pub self_val    : Option<Type> // if you check method, then Class in this val. if it's global fun then None
+	pub self_val    : Option<*const Type> // if you check method, then Class in this val. if it's global fun then None
 }
 
 impl FunEnv {
-	pub fn new(pack : *const Pack, _self : Option<Type>) -> FunEnv {
+	pub fn new(pack : *const Pack, _self : Option<*const Type>) -> FunEnv {
 		FunEnv {
 			global      : pack,
 			local       : BTreeMap::new(),
@@ -119,19 +119,19 @@ impl FunEnv {
 		macro_rules! LOCAL   { () => { Some(vec![("%loc").to_string()]) }; }
 		macro_rules! OUTER   { () => { Some(vec![("%out").to_string()]) }; }
 		macro_rules! THISMOD { () => { Some(vec![("%mod").to_string()]) }; }
-		macro_rules! clone_type { ($t:expr) => {unsafe { match *$t {Ok(ref t) => (**t).clone(), Err(ref t) => (**t).clone()}} }; }
+		macro_rules! clone_type { ($t:expr) => {match *$t {Ok(ref t) => (**t).clone(), Err(ref t) => (**t).clone()} }; }
 		match *pref {
 			None => {
 				match self.local.get(name) {
 					Some(t) => {
-						*tp_dst = clone_type!(t);
+						*tp_dst = unsafe{ clone_type!(t) };
 						*pref = LOCAL!();
 						ok!()
 					},
 					None =>
 						match self.outers.get(name) {
 							Some(t) => {
-								*tp_dst = clone_type!(t);
+								*tp_dst = unsafe{ clone_type!(t) };
 								*pref = OUTER!();
 								ok!()
 							},
@@ -200,6 +200,7 @@ impl FunEnv {
 							}
 						},
 						None => {
+							println!("!1");
 							throw!(format!("class {} not found", name), pos)
 						}
 					}
@@ -214,6 +215,7 @@ impl FunEnv {
 			unsafe {
 				match (*self.global).get_cls(Some(pref), name) {
 					None => {
+						println!("!2");
 						throw!(format!("class {} not found", name), pos)
 					},
 					Some(cls) => {
@@ -228,12 +230,27 @@ impl FunEnv {
 		}
 		ok!()
 	}
+	/*pub fn get_class(&self, pref : &Vec<String>, name : &String) -> *const TClass {
+		unsafe {
+			if pref.len() == 0 || pref[0] == "%mod" {
+				match (*self.global).get_cls(None, name) {
+					Some(cls) => cls,
+					_ => panic!()
+				}
+			} else {
+				match (*self.global).get_cls(Some(pref), cname) {
+					Some(cls) => cls,
+					_ => panic!()
+				}
+			}
+		}
+	}*/
 	pub fn get_method(&self, cls : &Type, mname : &String, priv_too : bool) -> Option<Type> {
 		unsafe {
 			match *cls {
 				Type::Class(ref pref, ref cname, ref params) => {
 					let cls : *const TClass =
-						if pref.len() == 0 {
+						if pref.len() == 0 || pref[0] == "%mod" {
 							// PREFIX NOT EXIST OR IT'S A TEMPLATE TYPE
 							if self.templates.contains(cname) {
 								return None

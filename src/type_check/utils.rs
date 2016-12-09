@@ -1,6 +1,6 @@
 use syn::*;
 use type_check::pack::*;
-use type_check::tclass::*;
+//use type_check::tclass::*;
 use type_check::fun_env::*;
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -68,7 +68,7 @@ macro_rules! get_fenv_m {
 }
 
 impl LocEnv {
-	pub fn new(pack : *const Pack, tmpl : &Vec<String>, _self : Option<Type>) -> LocEnv {
+	pub fn new(pack : *const Pack, tmpl : &Vec<String>, _self : Option<*const Type>) -> LocEnv {
 		//LocEnv::FunEnv(FunEnv::new())
 		let mut env = FunEnv::new(pack, _self);
 		for t in tmpl.iter() {
@@ -79,8 +79,8 @@ impl LocEnv {
 	pub fn inherit(parent : &mut LocEnv) -> LocEnv {
 		LocEnv::SubEnv(SubEnv{parent : &mut *parent, local : BTreeMap::new()})
 	}
-	pub fn self_val(&self) -> &Option<Type> {
-		return &get_fenv!(self).self_val;
+	pub fn self_val(&self) -> Option<*const Type> {
+		get_fenv!(self).self_val.clone()
 	}
 	pub fn pack(&self) -> &Pack {
 		let mut link : *const LocEnv = &*self;
@@ -215,7 +215,7 @@ impl LocEnv {
 			match *lnk {
 				LocEnv::FunEnv(ref fe) => return fe.get_var(pref, name, tp_dst, pos),
 				LocEnv::SubEnv(ref se) => {
-					let pref_l : *mut Option<Vec<String>> = &mut *pref;
+					//let pref_l : *mut Option<Vec<String>> = &mut *pref;
 					match *pref {
 						None => 
 							match se.local.get(name) {
@@ -243,6 +243,9 @@ impl LocEnv {
 	pub fn check_class(&self, pref : &mut Vec<String>, name : &String, params : &Option<Vec<Type>>, pos : &Cursor) -> CheckRes {
 		get_fenv!(self).check_class(pref, name, params, pos)
 	}
+	//pub fn get_class(&self, pref : &Vec<String>, name : &String) -> *const TClass {
+	//	get_fenv!(self).get_class(pref, name)
+	//}
 	pub fn get_method(&self, cls : &Type, mname : &String, priv_too : bool) -> Option<Type> {
 		get_fenv!(self).get_method(cls, mname, priv_too)
 	}
@@ -311,7 +314,7 @@ pub fn find_unknown(body : &Vec<ActF>) -> &Cursor {
 						go_e!(&pair.b);
 					}
 				},
-				EVal::Prop(ref a, _) => go_e!(a),
+				EVal::Prop(ref a, _, _) => go_e!(a),
 				EVal::ChangeType(ref a, _) => go_e!(a),
 				_ => ()
 			}

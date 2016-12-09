@@ -101,34 +101,162 @@ impl Checker {
 			pack.out_cls.insert(c.clone(), &self.std.pack);
 		}
 		pack.packs.insert("%std".to_string(), &self.std.pack);
-		for f in smod.funs.iter() {
+		// ADD FUNS TO ENV
+		for f in smod.funs.iter_mut() {
+			// GETTING NAME
 			let n = match f.name {
 				Some(ref n) => n.clone(),
 				_ => panic!()
 			};
+			// CHECK TMPL
+			let tl = f.tmpl.len();
+			if tl > 0 {
+				for i in 0 .. tl {
+					for j in i+1 .. tl {
+						if f.tmpl[i] == f.tmpl[j] {
+							throw!(format!("template {} used more then once", f.tmpl[i]), f.addr)
+						}
+					}
+				}
+			}
+			// FIX TYPE
+			self.check_type_pack(&pack, &f.tmpl, &mut f.ftype, &f.addr)?;
+			// ADD TO ENV
 			match pack.fns.insert(n, f.ftype.clone()) {
 				Some(_) => throw!("fun with this name already exist in this module", f.addr),
 				_ => ()
 			}
 		}
-		// TODO CLASS CHECK
-		/*
-		for c in smod.classes.iter() {
-			let n = match 
-		}
+		// ADD CLASSES TO ENV
 		for c in smod.classes.iter_mut() {
-			try!(self.check_class(&pack, c));
+			// CHECK TEMPLATE
+			//println!("CALL FOR {}", c.name);
+			let tlen = c.template.len();
+			for i in 0 .. tlen {
+				for j in i+1 .. tlen {
+					if c.template[i] == c.template[j] {
+						throw!(format!("using '{}' in template more then once", c.template[i]), c.addres)
+					}
+				}
+			}
+			// CHECK PARENT
+			let par = match c.parent {
+				Some(ref mut tp) =>
+					match *tp {
+						Type::Class(ref mut pref, ref name, ref mut pars) => {
+							let p_ref : Option<*const Vec<Type>> =
+								match *pars {
+									Some(ref mut vec) => {
+										for par in vec.iter_mut() {
+											self.check_type_pack(&pack, &c.template, par, &c.addres)?
+										}
+										Some(&*vec)
+									},
+									_ => None
+								};
+							pack.check_class(pref, name, pars, &c.addres)?;
+							let cls =
+								if pref[0] == "%mod" {
+									pack.get_cls(None, name)
+								} else {
+									pack.get_cls(Some(pref), name)
+								};
+							let cls = cls.unwrap();
+							Some(Parent::new(cls, p_ref))
+						},
+						_ => throw!(format!("can't inherit from {:?}", tp), c.addres)
+					},
+				_ => None
+			};
+			// GETTING 'TClass'
+			let tcls = TClass::from_syn(c, par)?;
+			// ADDING TO ENV
+			//println!("ADD TO ENV {}", c.name);
+			match pack.cls.insert(c.name.clone(), tcls) {
+				Some(_) => throw!(format!("class with name {} already exist", c.name), c.addres),
+				_ => ()
+			}
+			// FIX INITIALIZER
+			for meth in c.pub_fn.iter_mut() {
+				let f = match meth.func.name {Some(ref n) => n == "init", _ => false};
+				if f {
+					self.check_type_pack(&pack, &c.template, &mut meth.func.ftype, &meth.func.addr)?;
+					meth.ftype = meth.func.ftype.clone();
+					break;
+				}
+			}
+			match pack.cls.get_mut(&c.name) {
+				Some(tcl) => {
+					unsafe { tcl.check_initializer()? }
+					//println!("INIT PARAMS FOR {}: {:?}", tcl.args)
+				},
+				_ => ()
+			}
 		}
-		*/
+		// CHECK CLASSES
+		for c in smod.classes.iter_mut() {
+			self.check_class(&pack, c)?;
+		}
+		// CHECK FUNS
 		for f in smod.funs.iter_mut() {
-			try!(self.check_fn(&pack, f, None, None));
+			self.check_fn(&pack, f, None, None)?;
 		}
 		ok!()
 	}
-	/*fn check_class(&self, pack : &Pacl, class : &mut Class) -> CheckRes {
+	fn check_class(&self, pack : &Pack, class : &mut Class) -> CheckRes {
+		let self_t : Type = {
+			let tmpl : Option<Vec<Type>>;
+			if class.template.len() > 0 {
+				let mut t : Vec<Type> = vec![];
+				for tp in class.template.iter() {
+					t.push(Type::Class(vec!["%tmpl".to_string()], tp.clone(), None))
+				}
+				tmpl = Some(t)
+			} else {
+				tmpl = None
+			}
+			Type::Class(vec!["%mod".to_string()], class.name.clone(), tmpl)
+		};
+		let tmpl : &Vec<String> = &class.template;
+		// priv_prop, pub_prop, priv_fn, pub_fn
+		// CHECK PROPS TYPE
+		for prop in class.priv_prop.iter_mut() {
+			self.check_type_pack(&pack, tmpl, &mut prop.ptype, &prop.addres)?
+		}
+		for prop in class.pub_prop.iter_mut() {
+			self.check_type_pack(&pack, tmpl, &mut prop.ptype, &prop.addres)?
+		}
+		// CHECK METHODS
+		macro_rules! precheck_meth {($m:expr) => {{
+			// GETTING NAME
+			/*let n = match $m.func.name {
+				Some(ref n) => n.clone(),
+				_ => panic!()
+			};*/
+			// FIX TYPE
+			self.check_type_pack(&pack, &tmpl, &mut $m.func.ftype, &$m.func.addr)?;
+			// FIX TMPL
+			$m.func.tmpl = tmpl.clone();
+			$m.ftype = $m.func.ftype.clone();
+		}}; }
+		for m in class.priv_fn.iter_mut() {
+			precheck_meth!(m);
+		}
+		for m in class.pub_fn.iter_mut() {
+			precheck_meth!(m);
+		}
+		for m in class.priv_fn.iter_mut() {
+			self.check_fn(&pack, &mut m.func, None, Some(&self_t))?;
+		}
+		for m in class.pub_fn.iter_mut() {
+			self.check_fn(&pack, &mut m.func, None, Some(&self_t))?;
+		}
+		// FINALIZING
+		// CHECK ATTRIBS. SINGLETON, INITIALIZER
 		
-	}*/
-	fn check_fn(&self, pack : &Pack, fun : &mut SynFn, out_env : Option<&LocEnv>, _self : Option<Type>) -> CheckAns<isize> {
+		ok!()
+	}
+	fn check_fn(&self, pack : &Pack, fun : &mut SynFn, out_env : Option<&LocEnv>, _self : Option<*const Type>) -> CheckAns<isize> {
 		let mut env = LocEnv::new(&*pack, &fun.tmpl, _self);
 		// PREPARE LOCAL ENV
 		let top_level = match out_env {
@@ -285,7 +413,8 @@ impl Checker {
 					// CAN RETURN ANY CLASS BUT CAN'T RETURN A PRIMITIVE
 					expr!(e);
 					if !e.kind.is_class() || e.kind.is_arr() {
-						throw!(format!("expr must be a class"), e.addres)
+						e.print();
+						throw!(format!("expr must be a class, but it's {:?}", e.kind), e.addres)
 					}
 				},
 				ActVal::DFun(ref mut df) => {
@@ -296,7 +425,7 @@ impl Checker {
 						}
 					}
 					let pack : &Pack = env.pack();
-					let _self = env.self_val().clone();
+					let _self = env.self_val();
 					unk_count += try!(self.check_fn(pack, &mut **df, Some(env), _self));
 				},
 				ActVal::Try(ref mut body, ref mut catches) => {
@@ -668,12 +797,13 @@ impl Checker {
 					for i in 0 .. args.len() {
 						if args[i].kind.is_unk() {
 							// REGRESS CALL
-							regress!(&mut args[i], &*(*cls).args[i]);
-						} else if *(*cls).args[i] != args[i].kind {
-							throw!(format!("expected {:?}, found {:?}", *(*cls).args[i], args[i].kind), &args[i].addres)
+							regress!(&mut args[i], &(*cls).args[i]);
+						} else if (*cls).args[i] != args[i].kind {
+							throw!(format!("expected {:?}, found {:?}", (*cls).args[i], args[i].kind), &args[i].addres)
 						}
 					}
 				}
+				expr.kind = Type::Class(pref.clone(), name.clone(), tmpl.clone())
 			},
 			EVal::Item(ref mut a, ref mut i) => {
 				check!(a);
@@ -800,7 +930,7 @@ impl Checker {
 					_ => unk_count += 1
 				}
 			},
-			EVal::Prop(ref mut obj, ref pname) => {
+			EVal::Prop(ref mut obj, ref pname, ref mut m_flag) => {
 				check!(obj);
 				if obj.kind.is_unk() {
 					unk_count += 1;
@@ -811,7 +941,7 @@ impl Checker {
 					};
 					match env.get_method(&obj.kind, pname, is_self) {
 						Some(f) => expr.kind = f,
-						_ => throw!(format!("method {} not found for {:?}", pname, obj.kind), expr.addres)
+						_ => throw!(format!("property {} not found for {:?}", pname, obj.kind), expr.addres)
 					}
 				}
 			},
@@ -820,16 +950,59 @@ impl Checker {
 				check_type!(tp);
 			}
 			EVal::TSelf =>
-				match *env.self_val() {
-					Some(ref tp) => expr.kind = tp.clone(),
+				match env.self_val() {
+					Some(tp) => unsafe { expr.kind = (*tp).clone() },
 					_ => throw!("using 'self' out of class", expr.addres)
 				},
 			_ => ()
 		}
 		return Ok(unk_count);
 	}
+	fn check_type_pack(&self, pack : &Pack, tmpl : &Vec<String>, t : &mut Type, addr : &Cursor) -> CheckRes {
+		macro_rules! rec {($t:expr) => {self.check_type_pack(pack, tmpl, $t, addr)?}; }
+		match *t {
+			Type::Arr(ref mut item) => {
+				rec!(&mut item[0]);
+			},
+			Type::Class(ref mut pref, ref name, ref mut params) => {
+				match *params {
+					Some(ref mut params) =>
+						for t in params.iter_mut() {
+							rec!(t);
+						},
+					_ =>
+						// CHECK FOR TEMPLATE
+						if pref.len() == 0 {
+							for name1 in tmpl.iter() {
+								if name == name1 {
+									// TEMPLATE FOUND
+									pref.push("%tmpl".to_string());
+									return Ok(())
+								}
+							}
+						}
+				}
+				pack.check_class(pref, name, params, addr)?;
+			}
+			Type::Fn(_, ref mut args, ref mut res) => {
+				/*match *tmpl {
+					Some(ref tmpl) =>
+						for t in tmpl.iter() {
+							rec!(t);
+						},
+					_ => ()
+				}*/
+				for t in args.iter_mut() {
+					rec!(t);
+				}
+				rec!(&mut **res);
+			},
+			_ => ()
+		}
+		Ok(())
+	}
 	fn check_type(&self, env : &LocEnv, t : &mut Type, addr : &Cursor) -> CheckRes {
-		macro_rules! rec {($t:expr) => {try!(self.check_type(env, $t, addr))}; }
+		macro_rules! rec {($t:expr) => {self.check_type(env, $t, addr)?}; }
 		match *t {
 			Type::Arr(ref mut item) => {
 				rec!(&mut item[0]);

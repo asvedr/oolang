@@ -46,4 +46,9 @@ macro_rules! pair_parser {
 
 pub trait Show {
 	fn show(&self, usize) -> Vec<String>;
+	fn print(&self) {
+		for line in self.show(0) {
+			println!("{}",line);
+		}
+	}
 }
