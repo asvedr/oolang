@@ -1,3 +1,6 @@
+#ifndef VECTOR_H
+#define VECTOR_H
+
 #include "gc.h"
 
 typedef struct {
@@ -12,3 +15,5 @@ Var vectorPush(Var,Var);
 Var vectorPop(Var);
 Var vectorGet(Var,Var); 
 Var vectorPut(Var,Var,Var); 
+
+#endif

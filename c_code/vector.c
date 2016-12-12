@@ -1,8 +1,10 @@
 #include <stdlib.h>
+#include "debug.h"
 #include "vector.h"
 
 static void destructor(void *data) {
 	Vector *vec = data;
+	debugLog("dest call for vec len: %d\n", vec -> size);
 	for(int i=0; i<vec -> size; ++i) {
 		DECLINK(vec -> data[i]);
 	}
@@ -39,7 +41,7 @@ Var vectorResize(Var v, Var sz) {
 			DECLINK(vec -> data[i]);
 		vec -> data = realloc(vec -> data, sizeof(Var) * size);
 	}
-	return VNULL;
+	VNULL;
 }
 
 Var vectorLen(Var v) {
@@ -57,7 +59,7 @@ Var vectorPush(Var v, Var a) {
 	vec -> data[vec -> size] = a;
 	vec -> size += 1;
 	INCLINK(a);
-	return VNULL;
+	VNULL;
 }
 
 Var vectorPop(Var v) {
@@ -83,5 +85,5 @@ Var vectorPut(Var v, Var ind, Var val) {
 	DECLINK(vec -> data[VINT(ind)]);
 	INCLINK(val);
 	vec -> data[VINT(ind)] = val;
-	return VNULL;
+	VNULL;
 }

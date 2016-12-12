@@ -38,7 +38,7 @@ typedef struct {
 	var = val;\
 }
 
-#define VAL(v) (v.link)
+#define VAL(v) (v.link -> data)
 #define VINT(v) (v.inum)
 #define VREAL(v) (v.fnum)
 
@@ -58,7 +58,13 @@ GCObject* newVarGC(Destructor);
 	var.fnum = n;\
 }
 
-extern Var VNULL;
+//extern Var VNULL;
+#define VNULL {\
+	Var out;\
+	out.obj = 0;\
+	out.inum = 0;\
+	return out;\
+}
 
 void initGC();
 void callGCSoft();

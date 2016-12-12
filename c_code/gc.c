@@ -3,7 +3,7 @@
 #include "gc.h"
 
 #define DEF_SOFT_INC       3//10
-#define DEF_MAX_AGE        2//5
+#define DEF_MAX_AGE        3//5
 #define DEF_HARD_INC       3//10
 #define DEF_HARD_CALL_FREQ 5//100
 
@@ -27,10 +27,10 @@ static int        hardSpaceLen;
 
 static int        softCalls; // var for autocall hardGC
 
-Var VNULL;
+//Var VNULL;
 
 void initGC() {
-	NEWINT(VNULL, 0);
+//	NEWINT(VNULL, 0);
 	softSpace    = malloc(sizeof(GCVar) * DEF_SOFT_INC);
 	softSpaceLen = DEF_SOFT_INC;
 	softVarCount = 0;
@@ -134,8 +134,10 @@ GCObject* newVarGC(Destructor dest) {
 	}
 	GCObject *var = malloc(sizeof(GCObject));
 	var -> destructor = dest;
+	var -> refCount = 0;
 	softSpace[softVarCount].var = var;
 	softSpace[softVarCount].age = 0;
+	softVarCount += 1;
 	return var;
 }
 
