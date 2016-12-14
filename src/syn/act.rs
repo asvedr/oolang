@@ -297,6 +297,7 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
 				let ans = try!(parse_type(lexer, &ans.cursor));
 				curs = ans.cursor;
 				tp = ans.val;
+				curs = lex!(lexer, &curs, "in");
 			} else if ans.val == "in" {
 				//curs = lex!(lexer, &var.cursor, "in");
 				curs = var.cursor;

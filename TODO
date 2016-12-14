@@ -5,8 +5,8 @@ optimise env for type check
 
 + lexical
 + synax
-+/- type check with hindley-milner
++ type check
 +/- std lib
-- compile to c
-- GC
++/- compile to c
++/- GC
 - FFI

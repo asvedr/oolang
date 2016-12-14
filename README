@@ -24,14 +24,16 @@ Arg ::= ['~'] id ['=' Expr] ':' Type
 ActList ::= '{' (Action ;)* '}' // body of funs, loops, conditions
 // code action
 Action ::= Expr
-           DefFun                                           // local fun definition
-           'var' id [':' Type] ['=' Expr]                   // local var definition
-           Expr '=' Expr                                    // assignation
-           'return' Expr                                    // return
-           'break' [id]                                     // break loop [by id]
-           while ['::' id] Expr ActList                     // loop [with id]
-           'if' Expr ActList ['else' ActList]               // condition
-           'try' ActList ('catch' [id ':' Type] ActList)+   // try-catch
+           DefFun                                                  // local fun definition
+           'var' id [':' Type] ['=' Expr]                          // local var definition
+           Expr '=' Expr                                           // assignation
+           'return' Expr                                           // return
+           'break' [id]                                            // break loop [by id]
+           'while' ['::' id] Expr ActList                          // loop [with id]
+		   'for' ['::' id] id [':' Type] 'in' Expr ActList         // foreach loop
+		   'for' ['::' id] id [':' Type] 'in' Expr .. Expr ActList // 'for i in 0 .. 10 \n print(i)'
+           'if' Expr ActList ['else' ActList]                      // condition
+           'try' ActList ('catch' [id ':' Type] ActList)+          // try-catch
            'throw' Expr
 
 Expr ::= Expr '(' (Expr,)* ')'                          // fun call
