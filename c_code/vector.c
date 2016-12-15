@@ -19,9 +19,10 @@ Var vectorNew(Var vsize) {
 	if(size == 0)
 		vec -> data = NULL;
 	else
-		vec -> data = malloc(sizeof(Var) * size);
-	for(int i=0; i<size; ++i)
-		NEWINT(vec -> data[i], 0);
+		vec -> data = calloc(sizeof(Var), size);
+//		vec -> data = malloc(sizeof(Var) * size);
+//	for(int i=0; i<size; ++i)
+//		NEWINT(vec -> data[i], 0);
 	Var var;
 	NEWOBJ(var, (void*)vec, destructor);
 	return var;

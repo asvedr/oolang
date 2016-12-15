@@ -4,13 +4,6 @@
 #include "vstr.h"
 
 /*
-Var simpvec() {
-	Var vec = vectorNew;
-	INCLINK(vec);
-	vectorPush(vec, 
-}
-*/
-
 void showStat(){
 	int cs, ch, ls, lh;
 	statusGC(&cs, &ch, &ls, &lh);
@@ -59,3 +52,4 @@ int main() {
 
 	showStat();
 }
+*/

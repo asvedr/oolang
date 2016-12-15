@@ -1,6 +1,6 @@
 CC=gcc -O0 -g 
 
-all: clear gc.o vector.o vstr.o test
+all: clear gc.o vector.o vstr.o func.o class.o test
 
 clear:
 	rm *.o || true
