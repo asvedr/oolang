@@ -16,7 +16,7 @@ static void destructor(void *data) {
 	free(s);
 }
 
-Var strNew(Var vsize) {
+void strNew(Var* _,FunRes* res, Var vsize) {
 	Str *str = malloc(sizeof(Str));
 	int size = VINT(vsize);
 	str -> size = size;
@@ -28,10 +28,10 @@ Var strNew(Var vsize) {
 		str -> data[i] = '\0';
 	Var var;
 	NEWOBJ(var, (void*)str, destructor);
-	return var;
+	RETURN(res, var);
 }
 
-Var strFromRaw(char* seq, int size) {
+void strFromRaw(Var* _,FunRes* res, char* seq, int size) {
 	Str *str = malloc(sizeof(Str));
 	str -> size = size;
 	if(size == 0)
@@ -42,10 +42,10 @@ Var strFromRaw(char* seq, int size) {
 		str -> data[i] = seq[i];
 	Var var;
 	NEWOBJ(var, (void*)str, destructor);
-	return var;
+	RETURN(res, var);
 }
 
-Var strFromCStr(char* seq) {
+void strFromCStr(Var* _,FunRes* res, char* seq) {
 	int size = strlen(seq);
 	Str *str = malloc(sizeof(Str));
 	str -> size = size;
@@ -57,9 +57,10 @@ Var strFromCStr(char* seq) {
 		str -> data[i] = seq[i];
 	Var var;
 	NEWOBJ(var, (void*)str, destructor);
-	return var;
+	RETURN(res, var);
 }
 
+#ifdef DEBUG
 void strPrint(Var s) {
 	Str *str = (Str*)VAL(s);
 	static char out[256];
@@ -70,16 +71,21 @@ void strPrint(Var s) {
 	out[i] = '\0';
 	printf(">> %s\n", out);
 }
+#endif
 
-Var strLen(Var v) {
+void strLen(Var* self,FunRes* res/*, Var v*/) {
 	Var out;
-	NEWINT(out, ((Str*)VAL(v)) -> size);
-	return out;
+	//CHECKNULL(res, v);
+	NEWINT(out, ((Str*)VAL(*self)) -> size);
+	RETURN(res, out);
 }
 
-Var strResize(Var s,Var sz) {
-	Str* str = (Str*)VAL(s);
+void strResize(Var* self,FunRes* res, /*Var s,*/Var sz) {
+	//CHECKNULL(res, s);
+	Str* str = (Str*)VAL(*self);
 	int size = VINT(sz);
+	if(size < 0)
+		THROW(res, INDEXERR);
 	if(str -> size < size) {
 		// JUST ADD NULLS
 		str -> data = realloc(str -> data, sizeof(char) * size);
@@ -89,47 +95,59 @@ Var strResize(Var s,Var sz) {
 		// RESIZE
 		str -> data = realloc(str -> data, sizeof(Var) * size);
 	}
-	VNULL;
+	RETURNNULL(res);
 }
 
-Var strGet(Var s, Var ind) {
+void strGet(Var* self,FunRes* res, /*Var s,*/ Var ind) {
 	// TODO: CHECK OUT THROW
-	Str* str = (Str*)VAL(s);
+	//CHECKNULL(res, s);
+	Str* str = (Str*)VAL(*self);
+	int index = VINT(ind);
+	if(index < 0 || index >= str -> size)
+		THROW(res, INDEXERR);
 	Var out;
-	NEWINT(out, str -> data[VINT(ind)]);
-	return out;
+	NEWINT(out, str -> data[index]);
+	RETURN(res, out);
 }
 
-Var strPut(Var s, Var ind, Var val) {
+void strPut(Var* self,FunRes* res, /*Var s,*/ Var ind, Var val) {
 	// TODO: CHECK OUT THROW
-	Str* str = (Str*)VAL(s);
-	str -> data[VINT(ind)] = (char)VINT(val);
-	VNULL;
+	//CHECKNULL(res, s);
+	Str* str = (Str*)VAL(*self);
+	int index = VINT(ind);
+	if(index < 0 || index >= str -> size)
+		THROW(res, INDEXERR);
+	str -> data[index] = (char)VINT(val);
+	RETURNNULL(res);
 }
 
-Var strSub(Var s, Var vfrom, Var vto) {
+void strSub(Var* self,FunRes* res, /*Var s,*/ Var vfrom, Var vto) {
 	// TODO: CHECK OUT THROW
-	Str* str = (Str*)VAL(s);
+	//CHECKNULL(res, s);
+	Str* str = (Str*)VAL(*self);
 	int from = VINT(vfrom);
 	int to = VINT(vto);
 	int size = to - from;
-	
-	Str* res = malloc(sizeof(Str));
-	res -> size = size;
+	if(from < 0 || from >= str -> size || to < from || to > str -> size)
+		THROW(res, INDEXERR);
+	Str* out = malloc(sizeof(Str));
+	out -> size = size;
 	if(size == 0)
-		res -> data = NULL;
+		out -> data = NULL;
 	else
-		res -> data = malloc(sizeof(char) * size);
+		out -> data = malloc(sizeof(char) * size);
 	for(int i=0; i<size; ++i)
-		res -> data[i] = str -> data[from + i];
+		out -> data[i] = str -> data[from + i];
 	
-	Var out;
-	NEWOBJ(out, res, destructor);
-	return out;
+	Var outv;
+	NEWOBJ(outv, out, destructor);
+	RETURN(res, outv);
 }
 
-Var strConc(Var a, Var b) {
-	Str* str = (Str*)VAL(a);
+void strConc(Var* self,FunRes* res, /*Var a,*/ Var b) {
+	//CHECKNULL(res, a);
+	CHECKNULL(res, b);
+	Str* str = (Str*)VAL(*self);
 	Str* add = (Str*)VAL(b);
 	int pt = str -> size;
 	str -> data = realloc(str -> data, sizeof(char) * (str -> size + add -> size));
@@ -137,5 +155,5 @@ Var strConc(Var a, Var b) {
 	for(int i=0; i<add -> size; ++i) {
 		str -> data[pt + i] = add -> data[i];
 	}
-	VNULL;
+	RETURNNULL(res);
 }

@@ -23,22 +23,22 @@ typedef struct {
 } Var;
 
 #define INCLINK(var) {\
-	if(var.obj) {\
-		var.link -> refCount += 1;\
+	if((var).obj) {\
+		(var).link -> refCount += 1;\
 	}\
 }
 #define DECLINK(var) {\
-	if(var.obj) {\
-		var.link -> refCount -= 1;\
+	if((var).obj) {\
+		(var).link -> refCount -= 1;\
 	}\
 }
 #define ASSIGN(var,val) {\
-	DECLINK(var);\
-	INCLINK(val);\
-	var = val;\
+	DECLINK((var));\
+	INCLINK((val));\
+	(var) = (val);\
 }
 
-#define VAL(v) (v.link -> data)
+#define VAL(v) ((v).link -> data)
 #define VINT(v) (v.inum)
 #define VREAL(v) (v.fnum)
 

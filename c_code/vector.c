@@ -12,7 +12,7 @@ static void destructor(void *data) {
 	free(vec);
 }
 
-Var vectorNew(Var vsize) {
+void vectorNew(Var* _, FunRes* res, Var vsize) {
 	Vector *vec = malloc(sizeof(Vector));
 	int size = VINT(vsize);
 	vec -> size = size;
@@ -20,17 +20,17 @@ Var vectorNew(Var vsize) {
 		vec -> data = NULL;
 	else
 		vec -> data = calloc(sizeof(Var), size);
-//		vec -> data = malloc(sizeof(Var) * size);
-//	for(int i=0; i<size; ++i)
-//		NEWINT(vec -> data[i], 0);
 	Var var;
 	NEWOBJ(var, (void*)vec, destructor);
-	return var;
+	RETURN(res, var);
 }
 
-Var vectorResize(Var v, Var sz) {
-	Vector* vec = (Vector*)VAL(v);
+void vectorResize(Var* self, FunRes* res, /*Var v,*/ Var sz) {
+	//CHECKNULL(res, v);
+	Vector* vec = (Vector*)VAL(*self);
 	int size = VINT(sz);
+	if(size < 0)
+		THROW(res, INDEXERR);
 	if(vec -> size < size) {
 		// JUST ADD NULLS
 		vec -> data = realloc(vec -> data, sizeof(Var) * size);
@@ -42,17 +42,19 @@ Var vectorResize(Var v, Var sz) {
 			DECLINK(vec -> data[i]);
 		vec -> data = realloc(vec -> data, sizeof(Var) * size);
 	}
-	VNULL;
+	RETURNNULL(res);
 }
 
-Var vectorLen(Var v) {
+void vectorLen(Var* self, FunRes* res/*, Var v*/) {
+	//CHECKNULL(res, v);
 	Var out;
-	NEWINT(out, ((Vector*)VAL(v)) -> size);
-	return out;
+	NEWINT(out, ((Vector*)VAL(*self)) -> size);
+	RETURN(res,out);
 }
 
-Var vectorPush(Var v, Var a) {
-	Vector* vec = (Vector*)VAL(v);
+void vectorPush(Var* self, FunRes* res, /*Var v,*/ Var a) {
+	//CHECKNULL(res, v);
+	Vector* vec = (Vector*)VAL(*self);
 	if(vec -> size > 0)
 		vec -> data = realloc(vec -> data, sizeof(Var) * (vec -> size + 1));
 	else
@@ -60,31 +62,44 @@ Var vectorPush(Var v, Var a) {
 	vec -> data[vec -> size] = a;
 	vec -> size += 1;
 	INCLINK(a);
-	VNULL;
+	RETURNNULL(res);
 }
 
-Var vectorPop(Var v) {
-	// TODO: CHECK OUT THROW
+void vectorPop(Var* self, FunRes* res/*, Var v*/) {
+	// TODO: CHECK OUT THROW: OK
+	//CHECKNULL(res, v);
 	Var out;
-	Vector* vec = (Vector*)VAL(v);
+	Vector* vec = (Vector*)VAL(*self);
+	if(vec -> size == 0) {
+		THROW(res, EMPTYVECERR);
+	}
 	out = vec -> data[vec -> size - 1];
 	vec -> size --;
 	vec -> data = realloc(vec -> data, vec -> size);
 	DECLINK(out);
-	return out;
+	RETURN(res, out);
 }
 
-Var vectorGet(Var v, Var ind) {
+void vectorGet(Var* self, FunRes* res, /*Var v,*/ Var ind) {
 	// TODO: CHECK OUT THROW
-	Vector* vec = (Vector*)VAL(v);
-	return vec -> data[VINT(ind)];
+	//CHECKNULL(res, v);
+	Vector* vec = (Vector*)VAL(*self);
+	int index = VINT(ind);
+	if(index < 0 || index >= vec -> size)
+		THROW(res, INDEXERR)
+	else
+		RETURN(res, vec -> data[index]);
 }
 
-Var vectorPut(Var v, Var ind, Var val) {
+void vectorPut(Var* self, FunRes* res, /*Var v,*/ Var ind, Var val) {
 	// TODO: CHECK OUT THROW
-	Vector* vec = (Vector*)VAL(v);
-	DECLINK(vec -> data[VINT(ind)]);
-	INCLINK(val);
-	vec -> data[VINT(ind)] = val;
-	VNULL;
+	//CHECKNULL(res, v);
+	Vector* vec = (Vector*)VAL(*self);
+	int index = VINT(ind);
+	if(index < 0 || index >= vec -> size)
+		THROW(res, INDEXERR)
+	else {
+		ASSIGN(vec -> data[index], val);
+		RETURNNULL(res);
+	}
 }

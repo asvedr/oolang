@@ -2,14 +2,49 @@
 #define FUNC_H
 
 #include "gc.h"
+#include "errors.h"
 
-typedef Var(*CFun0)(Var*);
-typedef Var(*CFun1)(Var*,Var);
-typedef Var(*CFun2)(Var*,Var,Var);
-typedef Var(*CFun3)(Var*,Var,Var,Var);
-typedef Var(*CFun4)(Var*,Var,Var,Var,Var);
-typedef Var(*CFun5)(Var*,Var,Var,Var,Var,Var);
-typedef Var(*CFunM)(Var*, ...);
+typedef struct {
+	Var           val;
+	unsigned int  errKey; // 0: no err, >0: code of exception
+} FunRes;
+
+//#define RETURN(ptr, val) {/*ptr -> errKey = 0; */ASSIGN((ptr -> val), (val)); return }
+#define RETURN(ptr, _val) {\
+	DECLINK(ptr -> val);\
+	INCLINK(_val);\
+	ptr -> val = _val;\
+}
+#define RETURNNULL(ptr) {/*ptr -> errKey = 0; */return; }
+#define THROWP(ptr, code, val) {ptr -> errKey = code; ASG(ptr -> val, val); return; }
+#define THROW(ptr, code) {ptr -> errKey = code; return; }
+#define NEWFRES(name) FunRes name; NEWINT(name.val, 0); name -> errKey = 0;
+#define CHECKNULL(ptr, _val) if(!_val.obj) THROW(ptr, NULLPTRERR)
+
+/*
+	void funTemplate(args) {
+		Var vars, ...;
+		simpleCall (fres, args');
+		
+		exCall(fres, args')
+		if(fres.errFlag)
+			goto TRACE;
+
+		return res;
+		TRACE:
+		DECLINK(vars, ...);
+		*FunRes = *inheritFunRes;
+	}
+*/
+
+//                   env,   res,  args ...
+typedef void(*CFun0)(Var*,FunRes*);
+typedef void(*CFun1)(Var*,FunRes*,Var);
+typedef void(*CFun2)(Var*,FunRes*,Var,Var);
+typedef void(*CFun3)(Var*,FunRes*,Var,Var,Var);
+typedef void(*CFun4)(Var*,FunRes*,Var,Var,Var,Var);
+typedef void(*CFun5)(Var*,FunRes*,Var,Var,Var,Var,Var);
+typedef void(*CFunM)(Var*,FunRes*,...);
 
 typedef struct {
 	Var  *env; // environment of func. array of vars. can be NULL

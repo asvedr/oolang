@@ -2,18 +2,19 @@
 #define VECTOR_H
 
 #include "gc.h"
+#include "func.h"
 
 typedef struct {
 	Var* data;
 	int size;
 } Vector;
 
-Var vectorNew(Var);
-Var vectorResize(Var,Var);
-Var vectorLen(Var);
-Var vectorPush(Var,Var);
-Var vectorPop(Var);
-Var vectorGet(Var,Var); 
-Var vectorPut(Var,Var,Var); 
+void vectorNew(Var*,FunRes*,Var);
+void vectorResize(Var*,FunRes*,/*Var,*/Var);
+void vectorLen(Var*,FunRes* /*,Var*/);
+void vectorPush(Var*,FunRes* /*,Var*/,Var);
+void vectorPop(Var*,FunRes* /*,Var*/);
+void vectorGet(Var*,FunRes* /*,Var*/,Var); 
+void vectorPut(Var*,FunRes* /*,Var*/,Var,Var);
 
 #endif
