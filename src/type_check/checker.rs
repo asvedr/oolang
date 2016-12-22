@@ -408,6 +408,17 @@ impl Checker {
 						throw!(format!("assign parts incompatible: {:?} and {:?}", var.kind, val.kind), act.addres)
 					}
 					// ADD CHECK FOR WHAT CAN BE AT LEFT PART OF ASSIG
+					match var.val {
+						EVal::Var(_,_) => (),
+						EVal::Item(_,_) => (),
+						EVal::Attr(_,_,ref is_m) =>
+							if *is_m {
+								throw!("can't use assigment for method", var.addres)
+							},
+						_ => {
+							throw!("can't use assigment for this expr", var.addres)
+						}
+					}
 				},
 				ActVal::Throw(ref mut e) => {
 					// CAN RETURN ANY CLASS BUT CAN'T RETURN A PRIMITIVE
@@ -930,7 +941,7 @@ impl Checker {
 					_ => unk_count += 1
 				}
 			},
-			EVal::Prop(ref mut obj, ref pname, ref mut m_flag) => {
+			EVal::Attr(ref mut obj, ref pname, ref mut m_flag) => {
 				check!(obj);
 				if obj.kind.is_unk() {
 					unk_count += 1;
@@ -939,8 +950,11 @@ impl Checker {
 						EVal::TSelf => true,
 						_ => false
 					};
-					match env.get_method(&obj.kind, pname, is_self) {
-						Some(f) => expr.kind = f,
+					match env.get_attrib(&obj.kind, pname, is_self) {
+						Some( (tp,is_m) ) => {
+							expr.kind = tp;
+							*m_flag = is_m;
+						},
 						_ => throw!(format!("property {} not found for {:?}", pname, obj.kind), expr.addres)
 					}
 				}

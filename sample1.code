@@ -1,0 +1,13 @@
+class single Main {
+	pub a : real;
+	pub b : Geometry::Point<int>;
+	pub fn curry_add(a : int) : Fn(int):int {
+		fn closure(b : /*int*/real) : int {
+			return a + b;
+		};
+		return closure
+	};
+	priv fn add(p : int) : () {
+		self.a = self.a + p;
+	}
+}

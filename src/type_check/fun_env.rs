@@ -245,7 +245,8 @@ impl FunEnv {
 			}
 		}
 	}*/
-	pub fn get_method(&self, cls : &Type, mname : &String, priv_too : bool) -> Option<Type> {
+	// return Option<(methodType, isMethod)>
+	pub fn get_attrib(&self, cls : &Type, mname : &String, priv_too : bool) -> Option<(Type,bool)> {
 		unsafe {
 			match *cls {
 				Type::Class(ref pref, ref cname, ref params) => {
@@ -274,11 +275,13 @@ impl FunEnv {
 					};
 					let m = if priv_too { (*cls).look_in_all(mname, params) } else { (*cls).look_in_pub(mname, params) };
 					match m {
-						Some(res) =>
+						Some(res) => {
+							let flag = (*cls).is_method(mname);
 							match res {
-								Ok(lnk) => return Some((*lnk).clone()),
-								Err(t) => return Some(t)
-							},
+								Ok(lnk) => return Some( ((*lnk).clone(), flag) ),
+								Err(t) => return Some( (t, flag) )
+							}
+						},
 						None => return None
 					}
 				},
@@ -287,11 +290,13 @@ impl FunEnv {
 					let cls = match (*self.global).get_cls(None, &cname) { Some(c) => c, _ => panic!() };
 					let m = if priv_too { (*cls).look_in_all(mname, Some(params)) } else { (*cls).look_in_pub(mname, Some(params)) };
 					match m {
-						Some(res) =>
+						Some(res) => {
+							let flag = (*cls).is_method(mname);
 							match res {
-								Ok(lnk) => return Some((*lnk).clone()),
-								Err(t) => return Some(t)
-							},
+								Ok(lnk) => return Some( ((*lnk).clone(), flag) ),
+								Err(t) => return Some( (t,flag) )
+							}
+						},
 						None => return None
 					}
 				},

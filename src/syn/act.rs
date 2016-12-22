@@ -386,7 +386,7 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
 				match expr.val.val {
 					EVal::Var(_, _)  => (),
 					EVal::Item(_, _) => (),
-					EVal::Prop(_, _, _) => (),
+					EVal::Attr(_, _, _) => (),
 					_ => syn_throw!(format!("assig allow only for vars, arr/asc items or obj props"), expr.cursor)
 				}
 				let val = try!(parse_expr(lexer, &sym.cursor));

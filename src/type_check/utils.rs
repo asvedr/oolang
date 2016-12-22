@@ -246,8 +246,8 @@ impl LocEnv {
 	//pub fn get_class(&self, pref : &Vec<String>, name : &String) -> *const TClass {
 	//	get_fenv!(self).get_class(pref, name)
 	//}
-	pub fn get_method(&self, cls : &Type, mname : &String, priv_too : bool) -> Option<Type> {
-		get_fenv!(self).get_method(cls, mname, priv_too)
+	pub fn get_attrib(&self, cls : &Type, mname : &String, priv_too : bool) -> Option< (Type,bool) > {
+		get_fenv!(self).get_attrib(cls, mname, priv_too)
 	}
 	pub fn add_loc_var(&mut self, name : &String, tp : Result<*const Type, *mut Type>, pos : &Cursor) -> CheckRes {
 		//let env = get_fenv_m!(self);
@@ -314,7 +314,7 @@ pub fn find_unknown(body : &Vec<ActF>) -> &Cursor {
 						go_e!(&pair.b);
 					}
 				},
-				EVal::Prop(ref a, _, _) => go_e!(a),
+				EVal::Attr(ref a, _, _) => go_e!(a),
 				EVal::ChangeType(ref a, _) => go_e!(a),
 				_ => ()
 			}

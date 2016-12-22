@@ -17,19 +17,39 @@ impl Parent {
 	}
 }
 
+pub struct Attr {
+	pub _type     : *const Type,
+	pub is_method : bool
+}
+
+impl Attr {
+	pub fn method(t : *const Type) -> Attr {
+		Attr{
+			_type : t,
+			is_method : true
+		}
+	}
+	pub fn prop(t : *const Type) -> Attr {
+		Attr {
+			_type : t,
+			is_method : false
+		}
+	}
+}
+
 pub struct TClass {
 	pub source : Option<*const Class>,
 	pub parent : Option</* *const TClass*/Parent>,
-	pub privs  : BTreeMap<String,*const Type>, // orig type saved in syn_class
-	pub pubs   : BTreeMap<String,*const Type>, 
+	pub privs  : BTreeMap<String,Attr>, // orig type saved in syn_class
+	pub pubs   : BTreeMap<String,Attr>, 
 	pub params : Vec<String>,                  // template
 	pub args   : Vec<Type>                     // constructor 
 }
 
 impl TClass {
 	pub fn from_syn(cls : &Class, parent : Option<Parent>) -> Result<TClass,Vec<SynErr>> {
-		let mut privs : BTreeMap<String, *const Type> = BTreeMap::new();
-		let mut pubs  : BTreeMap<String, *const Type> = BTreeMap::new();
+		let mut privs : BTreeMap<String, Attr> = BTreeMap::new();
+		let mut pubs  : BTreeMap<String, Attr> = BTreeMap::new();
 		macro_rules! make {($par:expr) => {{
 		//	let fname = format!("init");
 		//	match privs.get(&fname) {
@@ -72,21 +92,21 @@ impl TClass {
 		//	}
 		}}; }
 		macro_rules! foreach_part{
-			($seq_src:ident, $seq_dst:expr, $getter:ident, $parent:expr, $addr:expr, $name:expr) => {
+			($seq_src:ident, $seq_dst:expr, $getter:ident, $parent:expr, $addr:expr, $name:expr, $cns:expr) => {
 				for prop in cls.$seq_src.iter() {
-					if (*$parent).exist_prop($name(prop)) {
+					if (*$parent).exist_attr($name(prop)) {
 						syn_throw!("this prop exist in parent", $addr(prop))
 					} else {
-						match $seq_dst.insert($name(prop).clone(), &prop.$getter) {
+						match $seq_dst.insert($name(prop).clone(), $cns(&prop.$getter)) {
 							Some(_) => syn_throw!(format!("this prop already exist"), $addr(prop)),
 							_ => ()
 						}
 					}
 				}
 			};
-			($seq_src:ident, $seq_dst:expr, $getter:ident, $addr:expr, $name:expr) => {
+			($seq_src:ident, $seq_dst:expr, $getter:ident, $addr:expr, $name:expr, $cns:expr) => {
 				for prop in cls.$seq_src.iter() {
-					match $seq_dst.insert($name(prop).clone(), &prop.$getter) {
+					match $seq_dst.insert($name(prop).clone(), $cns(&prop.$getter)) {
 						Some(_) => syn_throw!(format!("this prop already exist"), $addr(&prop)),
 						_ => ()
 					}
@@ -111,17 +131,17 @@ impl TClass {
 		unsafe {
 			match parent {
 				Some(par) => {
-					foreach_part!(priv_prop, privs, ptype, par.class, get_prop_addr, get_prop_name);
-					foreach_part!(pub_prop, pubs, ptype, par.class, get_prop_addr, get_prop_name);
-					foreach_part!(priv_fn, privs, ftype, par.class, get_meth_addr, get_meth_name);
-					foreach_part!(pub_fn, pubs, ftype, par.class, get_meth_addr, get_meth_name);
+					foreach_part!(priv_prop, privs, ptype, par.class, get_prop_addr, get_prop_name, Attr::prop);
+					foreach_part!(pub_prop, pubs, ptype, par.class, get_prop_addr, get_prop_name, Attr::prop);
+					foreach_part!(priv_fn, privs, ftype, par.class, get_meth_addr, get_meth_name, Attr::method);
+					foreach_part!(pub_fn, pubs, ftype, par.class, get_meth_addr, get_meth_name, Attr::method);
 					make!(Some(par))
 				},
 				None => {
-					foreach_part!(priv_prop, privs, ptype, get_prop_addr, get_prop_name);
-					foreach_part!(pub_prop, pubs, ptype, get_prop_addr, get_prop_name);
-					foreach_part!(priv_fn, privs, ftype, get_meth_addr, get_meth_name);
-					foreach_part!(pub_fn, pubs, ftype, get_meth_addr, get_meth_name);
+					foreach_part!(priv_prop, privs, ptype, get_prop_addr, get_prop_name, Attr::prop);
+					foreach_part!(pub_prop, pubs, ptype, get_prop_addr, get_prop_name, Attr::prop);
+					foreach_part!(priv_fn, privs, ftype, get_meth_addr, get_meth_name, Attr::method);
+					foreach_part!(pub_fn, pubs, ftype, get_meth_addr, get_meth_name, Attr::method);
 					make!(None)
 				}
 			}
@@ -138,7 +158,7 @@ impl TClass {
 			_ => {
 				let args = match self.pubs.get(&fname) {
 					Some(t) => {
-						match **t {
+						match *(t._type) {
 							Type::Fn(_,ref args_src,ref ret) => {
 								let mut args : Vec<Type> = vec![];
 								for a in args_src.iter() {
@@ -152,7 +172,7 @@ impl TClass {
 								}
 							},
 							_ =>
-								syn_throw!(format!("initializer must be function, but it {:?}", **t), cls.addres)
+								syn_throw!(format!("initializer must be function, but it {:?}", *(t._type)), cls.addres)
 						}
 					},
 					_ => {
@@ -166,7 +186,7 @@ impl TClass {
 			}
 		}
 	}
-	fn exist_prop(&self, name : &String) -> bool {
+	fn exist_attr(&self, name : &String) -> bool {
 		let mut lnk : *const TClass = &*self;
 		unsafe { loop {
 			if (*lnk).privs.contains_key(name) || (*lnk).pubs.contains_key(name) {
@@ -180,12 +200,13 @@ impl TClass {
 		}}
 	}
 	pub fn look_in_all(&self, name : &String, tmpl : Option<&Vec<Type>>) -> Option<Result<*const Type, Type>> {
+		// TODO: rec to loop
 		unsafe {
 			let lnk = match self.pubs.get(name) {
-				Some(lnk) => *lnk,
+				Some(lnk) => lnk._type,
 				None =>
 					match self.privs.get(name) {
-						Some(lnk) => *lnk,
+						Some(lnk) => lnk._type,
 						None =>
 							match self.parent {
 								Some(ref lnk) => return (*lnk.class).look_in_all(name, tmpl),
@@ -200,9 +221,10 @@ impl TClass {
 		}
 	}
 	pub fn look_in_pub(&self, name : &String, tmpl : Option<&Vec<Type>>) -> Option<Result<*const Type, Type>> {
+		// TODO: rec to loop
 		unsafe {
 			let lnk = match self.pubs.get(name) {
-				Some(lnk) => *lnk,
+				Some(lnk) => lnk._type,
 				None =>
 					match self.parent {
 						Some(ref lnk) => return (*lnk.class).look_in_pub(name, tmpl),
@@ -212,6 +234,26 @@ impl TClass {
 			match tmpl {
 				Some(vec) => Some(self.replace_type(&*lnk, vec, true)),
 				_ => Some(Ok(lnk))
+			}
+		}
+	}
+	// true if attr is method, false if prop. there is no check for existing here
+	pub fn is_method(&self, name : &String) -> bool {
+		unsafe {
+			let mut lnk : *const TClass = &*self;
+			loop {
+				match (*lnk).pubs.get(name) {
+					Some(p) => return p.is_method,
+					_ =>
+						match (*lnk).privs.get(name) {
+							Some(p) => return p.is_method,
+							_ =>
+								match (*lnk).parent {
+									Some(ref par) => lnk = par.class,
+									_ => panic!()
+								}
+						}
+				}
 			}
 		}
 	}

@@ -19,7 +19,7 @@ pub enum EVal {
 	Arr        (Vec<Expr>),                   // new arr
 	Asc        (Vec<Pair<Expr,Expr>>),        // new Asc. Only strings, chars and int allowed for key
 	//          obj       pname  is_meth
-	Prop       (Box<Expr>,String,bool),       // geting class attrib: 'object.prop' or 'object.fun()'
+	Attr       (Box<Expr>,String,bool),       // geting class attrib: 'object.prop' or 'object.fun()'
 	ChangeType (Box<Expr>, Type),             // type coersing
 	TSelf,
 	Null
@@ -130,8 +130,8 @@ impl Show for Expr {
 				}
 				res
 			},
-			EVal::Prop(ref obj, ref fld, ref is_m) => {
-				let mut res = vec![format!("{}PROP {}{}({})", tab, fld, tp, if *is_m {"meth"} else {"prop"})];
+			EVal::Attr(ref obj, ref fld, ref is_m) => {
+				let mut res = vec![format!("{}ATTR {}{}({})", tab, fld, tp, if *is_m {"meth"} else {"prop"})];
 				for line in obj.show(layer + 1) {
 					res.push(line)
 				}
@@ -317,7 +317,7 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 				// FIELD
 				} else if ans.val == "." {
 					let fld = lex_type!(lexer, &ans.cursor, LexTP::Id);
-					obj = expr!(EVal::Prop(Box::new(obj), fld.val, false), curs);
+					obj = expr!(EVal::Attr(Box::new(obj), fld.val, false), curs);
 					curs = fld.cursor;
 				// TYPE COERSING
 				} else if ans.val == "as" {

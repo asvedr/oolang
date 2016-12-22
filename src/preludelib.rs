@@ -32,7 +32,7 @@ impl Prelude {
 			pack.cls.get_mut($name).unwrap()
 		}}; }
 		macro_rules! meth {($cls:expr, $name:expr, $t:expr) => {{
-			unsafe { (*$cls).pubs.insert($name.to_string(), newf!($t) ); }
+			unsafe { (*$cls).pubs.insert($name.to_string(), Attr::method(newf!($t))); }
 		}};}
 		{
 		let arr : *mut TClass = newc!("%arr", vec!["a".to_string()], vec![]);
