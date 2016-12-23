@@ -6,6 +6,7 @@ pub mod reserr;
 pub mod utils;
 #[macro_use]
 pub mod type_sys;
+pub mod compile_flags;
 pub mod expr;
 pub mod act;
 pub mod _fn;

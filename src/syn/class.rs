@@ -4,6 +4,7 @@ use syn::utils::*;
 use syn::type_sys::*;
 use syn::reserr::*;
 use syn::_fn::*;
+use syn::compile_flags::*;
 
 pub struct Class {
 	pub addres    : Cursor,
@@ -118,11 +119,31 @@ pub fn parse_class(lexer : &Lexer, curs : &Cursor) -> SynRes<Class> {
 	let mut pub_prop  = vec![];
 
 	loop {
-		let ans = lex!(lexer, &curs);
+		let mut ans = lex!(lexer, &curs);
 		if ans.val == "}" {
 			break;
 			//syn_ok!(acc, ans.cursor);
 		}
+		// compile attribs
+		let mut c_attribs = vec![];
+		loop {
+			if ans.val == "#" {
+				let flag = parse_comp_flag(lexer, &curs)?;
+				c_attribs.push(flag.val);
+				curs = flag.cursor;
+				ans = lex!(lexer, &curs);
+			} else {
+				break
+			}
+		}
+		macro_rules! attr_to_fn {($fun:expr) => {
+			for attr in c_attribs {
+				if attr == CompFlag::NoExcept {
+					$fun.no_except = true;
+				}
+			}
+		};}
+
 		// def fun order:      (pub|priv) [virtual] fn ...
 		// def property order: (pub|priv) <Type> <name>
 		// modif
@@ -142,7 +163,8 @@ pub fn parse_class(lexer : &Lexer, curs : &Cursor) -> SynRes<Class> {
 		// data
 		let sym = lex!(lexer, &curs);
 		if sym.val == "fn" {
-			let meth = try!(parse_fn_full(lexer, &curs));
+			let mut meth = try!(parse_fn_full(lexer, &curs));
+			attr_to_fn!(meth.val);
 			if is_pub {
 				pub_fn.push(Method{is_virt : false, func : meth.val, ftype : Type::Unk});
 			} else {
@@ -150,7 +172,8 @@ pub fn parse_class(lexer : &Lexer, curs : &Cursor) -> SynRes<Class> {
 			}
 			curs = meth.cursor;
 		} else if sym.val == "virtual" {
-			let meth = try!(parse_fn_full(lexer, &sym.cursor));
+			let mut meth = try!(parse_fn_full(lexer, &sym.cursor));
+			attr_to_fn!(meth.val);
 			if is_pub {
 				pub_fn.push(Method{is_virt : true, func : meth.val, ftype : Type::Unk});
 			} else {

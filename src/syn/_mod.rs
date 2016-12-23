@@ -6,6 +6,7 @@ use syn::reserr::*;
 use syn::_fn::*;
 use syn::class::*;
 use syn::ext_c::*;
+use syn::compile_flags::*;
 use std::fmt;
 
 pub struct Import {
@@ -101,6 +102,7 @@ fn parse_mod_syn(lexer : &Lexer, curs : &Cursor) -> SynRes<SynMod> {
 	let mut ctps = vec![];
 
 	let mut curs = curs.clone();
+	let mut attribs = vec![];
 
 	loop {
 		match lexer.lex(&curs) {
@@ -112,30 +114,58 @@ fn parse_mod_syn(lexer : &Lexer, curs : &Cursor) -> SynRes<SynMod> {
 						let cls = try!(parse_class(lexer, &curs));
 						clss.push(cls.val);
 						curs = cls.cursor;
+						attribs.clear();
 					},
 					"use"    => {
 						let imp = try!(parse_import(lexer, &curs));
 						imps.push(imp.val);
 						curs = imp.cursor;
+						attribs.clear();
 					}
 					"fn"     => {
-						let fnc = try!(parse_fn_full(lexer, &curs));
+						let mut fnc = try!(parse_fn_full(lexer, &curs));
+						for a in attribs {
+							if a == CompFlag::NoExcept {
+								fnc.val.no_except = true;
+							}
+						}
+						attribs = vec![];
 						funs.push(fnc.val);
 						curs = fnc.cursor;
 					},
 					"extern" => { // getting C fun or C type. FFI for C
 						let sym = lex!(lexer, &ans.cursor);
 						if sym.val == "fn" {
-							let cfun = try!(parse_c_fn(lexer, &ans.cursor));
+							let mut cfun = try!(parse_c_fn(lexer, &ans.cursor));
+							for a in attribs {
+								if a == CompFlag::NoExcept {
+									cfun.val.no_except = true;
+								}
+							}
+							attribs = vec![];
 							cfns.push(cfun.val);
 							curs = cfun.cursor;
 						} else if sym.val == "type" {
 							let ctype = try!(parse_c_type(lexer, &ans.cursor));
 							ctps.push(ctype.val);
 							curs = ctype.cursor;
+							attribs.clear();
 						} else {
 							syn_throw!(format!("after 'extern' must be 'fn' or 'type', found '{}'", sym.val), curs);
 						}
+					},
+					"#" => {
+						let flag = parse_comp_flag(lexer, &curs)?;
+						attribs.push(flag.val);
+						curs = flag.cursor;
+						/*if flag.val == CompFlag::NoExcept {
+							let mut fnc = parse_fn_full(lexer, &flag.cursor)?;
+							fnc.val.no_except = true;
+							funs.push(fnc.val);
+							curs = fnc.cursor;
+						} else {
+							syn_throw!(format!("unexpected flag: {:?}", flag.val), curs)
+						}*/
 					},
 					//"c_type" => panic!(),
 					//"c_func" => panic!(),

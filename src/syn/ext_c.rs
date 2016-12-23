@@ -6,14 +6,18 @@ use std::fmt;
 pub type CType = String;
 
 pub struct CFun {
-	pub name   : String,
-	pub cname  : String,
-	pub ftype  : Type,
-	pub addres : Cursor
+	pub name      : String,
+	pub cname     : String,
+	pub ftype     : Type,
+	pub addres    : Cursor,
+	pub no_except : bool
 }
 
 impl fmt::Debug for CFun {
 	fn fmt(&self, f : &mut fmt::Formatter) -> fmt::Result {
+		if self.no_except {
+			write!(f, "#NoExcept ")?
+		}
 		write!(f, "CFUN {}:( {:?} ) = {}", self.name, self.ftype, self.cname)
 	}
 }
@@ -38,10 +42,11 @@ pub fn parse_c_fn(lexer : &Lexer, curs : &Cursor) -> SynRes<CFun> {
 	let curs  = lex!(lexer, &tp.cursor, "=");
 	let cname = lex_type!(lexer, &curs, LexTP::Str);
 	let cfun  = CFun{
-		addres : addr,
-		name   : name.val,
-		cname  : cname.val,
-		ftype  : tp.val
+		addres    : addr,
+		name      : name.val,
+		cname     : cname.val,
+		ftype     : tp.val,
+		no_except : false
 	};
 	syn_ok!(cfun, cname.cursor);
 }

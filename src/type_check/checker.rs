@@ -451,7 +451,7 @@ impl Checker {
 					for name in df.outers.iter() {
 						let mut pref = None;
 						let mut tp = Type::Unk;
-						env.get_var(&mut pref, name, &mut tp, &df.addr);
+						let _ = env.get_var(&mut pref, name, &mut tp, &df.addr);
 						if match pref{Some(ref p) => p[0] == "%out", _ => false} {
 							env.fun_env_mut().used_outers.insert(name.clone());
 						}

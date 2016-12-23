@@ -23,7 +23,8 @@ pub struct SynFn {
 	pub addr        : Cursor,          // fun start addres
 	pub can_be_clos : bool,            // if has names args or option args then can't be used as closure
 	pub has_named   : bool,            // does fun has named args
-	pub ftype       : Type             // Fn(args) -> res
+	pub ftype       : Type,            // Fn(args) -> res
+	pub no_except   : bool             // force optimization flag #noexcept
 }
 
 impl Show for Arg {
@@ -55,11 +56,15 @@ impl Show for SynFn {
 			Some(ref n) => &**n,
 			_ => "%lambda"
 		};
-		let mut res = if self.tmpl.len() > 0 {
-			vec![format!("{}func {} tmpl:{:?} allowclos:{} type:{:?}", tab, name, self.tmpl, self.can_be_clos, self.rettp)]
+		let mut res = Vec::new();
+		if self.no_except {
+			res.push(format!("{}#NoExcept", tab));
+		}
+		if self.tmpl.len() > 0 {
+			res.push(format!("{}func {} tmpl:{:?} allowclos:{} type:{:?}", tab, name, self.tmpl, self.can_be_clos, self.rettp));
 		} else {
-			vec![format!("{}func {} allowclos:{} type:{:?}", tab, name, self.can_be_clos, self.rettp)]
-		};
+			res.push(format!("{}func {} allowclos:{} type:{:?}", tab, name, self.can_be_clos, self.rettp));
+		}
 		tab.push(' ');
 		res.push(format!("{}OTRS: {:?}", tab, self.outers));
 		res.push(format!("{}ARGS", tab));
@@ -162,7 +167,8 @@ pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 		can_be_clos : can_be_clos,
 		has_named   : has_named,
 		ftype       : ftype,
-		outers      : Vec::new()
+		outers      : Vec::new(),
+		no_except   : false
 	};
 	syn_ok!(res, body.cursor)
 }
