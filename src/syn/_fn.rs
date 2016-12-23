@@ -15,14 +15,15 @@ pub struct Arg {
 
 pub struct SynFn {
 	pub name        : Option<String>,
-	pub tmpl        : Tmpl,   // if fun has no tmpl then []
+	pub tmpl        : Tmpl,            // if fun has no tmpl then []
+	pub outers      : Vec<String>,
 	pub args        : Vec<Arg>,
-	pub rettp       : Type,   // return type
+	pub rettp       : Type,            // return type
 	pub body        : Vec<Act<SynFn>>, 
-	pub addr        : Cursor, // fun start addres
-	pub can_be_clos : bool,   // if has names args or option args then can't be used as closure
-	pub has_named   : bool,   // does fun has named args
-	pub ftype       : Type    // Fn(args) -> res
+	pub addr        : Cursor,          // fun start addres
+	pub can_be_clos : bool,            // if has names args or option args then can't be used as closure
+	pub has_named   : bool,            // does fun has named args
+	pub ftype       : Type             // Fn(args) -> res
 }
 
 impl Show for Arg {
@@ -60,6 +61,7 @@ impl Show for SynFn {
 			vec![format!("{}func {} allowclos:{} type:{:?}", tab, name, self.can_be_clos, self.rettp)]
 		};
 		tab.push(' ');
+		res.push(format!("{}OTRS: {:?}", tab, self.outers));
 		res.push(format!("{}ARGS", tab));
 		for arg in self.args.iter() {
 			for line in arg.show(layer + 2) {
@@ -159,7 +161,8 @@ pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 		addr        : orig,
 		can_be_clos : can_be_clos,
 		has_named   : has_named,
-		ftype       : ftype
+		ftype       : ftype,
+		outers      : Vec::new()
 	};
 	syn_ok!(res, body.cursor)
 }

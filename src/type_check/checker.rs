@@ -100,6 +100,9 @@ impl Checker {
 		for c in self.std.pack.cls.keys() {
 			pack.out_cls.insert(c.clone(), &self.std.pack);
 		}
+		for f in self.std.pack.fns.keys() {
+			pack.out_fns.insert(f.clone(), &self.std.pack);
+		}
 		pack.packs.insert("%std".to_string(), &self.std.pack);
 		// ADD FUNS TO ENV
 		for f in smod.funs.iter_mut() {
@@ -295,7 +298,12 @@ impl Checker {
 				}
 			}
 		} else {
-			self.check_actions(&mut env, &mut fun.body, false)
+			let cnt = try!(self.check_actions(&mut env, &mut fun.body, false));
+			//fun.outers =
+			for n in env.fun_env().used_outers.iter() {
+				fun.outers.push(n.clone());
+			}
+			return Ok(cnt)
 		}
 	}
 	fn check_actions(&self, env : &mut LocEnv, src : &mut Vec<ActF>, repeated : bool) -> CheckAns<isize> {
@@ -435,9 +443,19 @@ impl Checker {
 							_ => panic!()
 						}
 					}
-					let pack : &Pack = env.pack();
-					let _self = env.self_val();
-					unk_count += try!(self.check_fn(pack, &mut **df, Some(env), _self));
+					{
+						let pack : &Pack = env.pack();
+						let _self = env.self_val();
+						unk_count += try!(self.check_fn(pack, &mut **df, Some(env), _self));
+					}
+					for name in df.outers.iter() {
+						let mut pref = None;
+						let mut tp = Type::Unk;
+						env.get_var(&mut pref, name, &mut tp, &df.addr);
+						if match pref{Some(ref p) => p[0] == "%out", _ => false} {
+							env.fun_env_mut().used_outers.insert(name.clone());
+						}
+					}
 				},
 				ActVal::Try(ref mut body, ref mut catches) => {
 				// благодаря тому, что в LocEnv ссылки, а не типы, расформирование и формирование LocEnv заново не влияют на вычисление типов
@@ -852,6 +870,9 @@ impl Checker {
 				//println!("GET VAR FOR {:?} {}", pref, name);
 				//println!("{}", env.show());
 				try!(env.get_var(pref, name, &mut expr.kind, &expr.addres));
+				if match *pref{Some(ref p) => p[0] == "%out", _ => false} {
+					env.fun_env_mut().used_outers.insert(name.clone());
+				}
 				/* MUST RECUSRIVE CHECK FOR COMPONENTS */
 				match expr.kind {
 					Type::Unk => return Ok(1),

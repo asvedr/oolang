@@ -260,6 +260,12 @@ impl LocEnv {
 			_ => ok!()
 		}
 	}
+	pub fn fun_env(&self) -> &FunEnv {
+		get_fenv!(self)
+	}
+	pub fn fun_env_mut(&mut self) -> &mut FunEnv {
+		get_fenv_m!(self)
+	}
 	/*pub fn remove_loc_var(&mut self, name : &String) {
 		let local = match *self {
 			LocEnv::FunEnv(ref mut env) => &mut env.local,

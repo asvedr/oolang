@@ -208,7 +208,7 @@ pub fn parse_act_list<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) 
 		} else if ans.val == ";" {
 			curs = ans.cursor;
 		} else {
-			syn_throw!(format!("expected ';' or '{}'", "{"), curs)
+			syn_throw!(format!("expected ';' or '{}', found: {}", "{", ans.val), curs)
 		}
 	}
 }

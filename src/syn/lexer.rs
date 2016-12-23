@@ -104,12 +104,13 @@ struct Machine {
 	state : State, // current state
 	key   : LexTP, // name of machine
 	func  : Box<Fn(char,&Lexer,&mut State) -> ()>, // looker
-	reader: Option<Box<Fn(&str) -> Result<String,String>>> // finalizer for building
+	reader: Option<Box<Fn(&str) -> Result<String,String>>>, // finalizer for building
+	len   : usize
 }
 
 macro_rules! mach { // macro for build machine
-	($fun:ident, $lt:ident) => { Machine{state : State{fin : false, err : false, num : 0}, func : Box::new($fun), key : LexTP::$lt, reader : None} };
-	($fun:expr, $lt:ident, $r:expr) => { Machine{state : State{fin : false, err : false, num : 0}, func : Box::new($fun), key : LexTP::$lt, reader : Some(Box::new($r))} };
+	($fun:ident, $lt:ident) => { Machine{state : State{fin : false, err : false, num : 0}, func : Box::new($fun), key : LexTP::$lt, reader : None, len : 0} };
+	($fun:expr, $lt:ident, $r:expr) => { Machine{state : State{fin : false, err : false, num : 0}, func : Box::new($fun), key : LexTP::$lt, reader : Some(Box::new($r)), len : 0} };
 }
 
 #[allow(mutable_transmutes)]
@@ -156,7 +157,7 @@ impl Lexer {
 		let mut comm_line  = false; // for '//'
 		let mut prev_slash = false; // flag for symbol '\' enter for comment
 		let mut prev_star  = false; // flag for symbol '*' exit for comment
-		let machines : Vec<Machine> = vec![
+		let mut machines : Vec<Machine> = vec![
 			mach!(id, Id), mach!(numi, Int), mach!(numr, Real, read_float), mach!(stra, Str, read_str), mach!(chara, Char, read_char),
 			mach!(br, Br), mach!(opr, Opr), mach!(dectp, DecType), mach!(namesp, NSpace),
 			mach!(rangesp, Dot), mach!(dot, Dot)//, mach!(comma, Comma)
@@ -169,6 +170,9 @@ impl Lexer {
 				None => lexerr!(line, column, format!("from line:{} column:{} bad lexem:'{}'", curs.line, curs.column, acc)),
 				Some(i) => {
 					let mach : &Machine = &machines[i];
+					for _ in 0 .. acc.len() - mach.len {
+						acc.pop();
+					}
 					let res = match mach.reader {
 						Some(ref f) =>
 							match f(&*acc) {
@@ -242,9 +246,11 @@ impl Lexer {
 				let mut first_fin = None; // first machine which final on current symbol
 				let mut all_err = true; // flag for all machines fail
 				for i in 0 .. machines.len() {
-					let f = &*machines[i].func;
 					if !machines[i].state.err {
-						unsafe {f(sym, &self, mem::transmute(&machines[i].state))};
+						{
+							let f = &*machines[i].func;
+							unsafe {f(sym, &self, mem::transmute(&machines[i].state))};
+						}
 						if !machines[i].state.err {
 							if machines[i].state.fin {
 								match first_fin {
@@ -252,6 +258,7 @@ impl Lexer {
 									_    => ()
 								}
 							}
+							machines[i].len += 1;
 							all_err = false;
 						}
 					}

@@ -204,6 +204,7 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 	let mut curs : Cursor = curs.clone();
 	let ans = lex!(lexer, &curs);
 	let mut obj;
+	//println!("PARSE OPER");
 	match parse_prefix(&lexer, &curs) {
 		Some(pans) => {
 			let prefix = pans.val;
@@ -214,9 +215,17 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 		},
 		None =>
 			match ans.kind {
+				LexTP::Br if ans.val == "(" => {
+					let expr = try!(parse_expr(lexer, &ans.cursor));
+					curs = lex!(lexer, &expr.cursor, ")");
+					obj = expr.val;
+				},
 				LexTP::Int  => {
+					//println!("INT");
+					//println!("VAL: '{}'", ans.val);
 					obj = expr!(EVal::Int(i64::from_str(&*ans.val).unwrap()), curs, Type::Int);
 					curs = ans.cursor;
+					//println!("INTOK");
 				},
 				LexTP::Real => {
 					obj = expr!(EVal::Real(f64::from_str(&*ans.val).unwrap()), curs, Type::Real);
@@ -407,7 +416,8 @@ pub fn parse_expr(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 		syn_ok!(res, curs);
 	}};}
 	loop {
-		let ans = lex!(lexer, &curs);
+		let obj = parse_operand(lexer, &curs)?;
+		/* let ans = lex!(lexer, &curs);
 		let obj;
 		// CHECK FOR '(a + b) or (a)'
 		if ans.val == "(" {
@@ -421,9 +431,11 @@ pub fn parse_expr(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 			obj = Box::new(ans.val);
 			addr.push(curs);
 			curs = ans.cursor;
-		}
+		} */
 		// operand found
-		acc.push(Ok(obj));
+		acc.push(Ok(Box::new(obj.val)));
+		addr.push(curs);
+		curs = obj.cursor;
 		// check for operator
 		// if not exist then build what was parsed
 		match parse_operator(lexer, &curs) {

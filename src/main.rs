@@ -4,6 +4,7 @@ mod syn;
 #[macro_use]
 mod type_check;
 mod preludelib;
+mod bytecode;
 //use std::io;
 use std::io::Read;
 use std::fs::File;
@@ -37,11 +38,7 @@ fn main() {
 					println!("TCHECK ERR ON line: {} column: {}", e[0].line + 1, e[0].column + 1);
 					println!("{}", e[0].mess);
 				},
-				_ => {
-					for line in m.show(0) {
-						println!("{}", line);
-					}
-				}
+				_ => m.print()
 			}
 		},
 		Err(vec) => {

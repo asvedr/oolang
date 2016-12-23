@@ -21,7 +21,7 @@ impl Prelude {
 			cls     : HashMap::new(),
 			fns     : BTreeMap::new()
 		};
-		macro_rules! newf {($t:expr) => {{
+		macro_rules! newf_loc {($t:expr) => {{
 			fns.push($t);
 			&fns[fns.len() - 1]
 		}}; }
@@ -31,8 +31,11 @@ impl Prelude {
 			pack.cls.insert($name.to_string(), c);
 			pack.cls.get_mut($name).unwrap()
 		}}; }
+		macro_rules! newf {($name:expr, $t:expr) => {{
+			pack.fns.insert($name.to_string(), $t);
+		}};}
 		macro_rules! meth {($cls:expr, $name:expr, $t:expr) => {{
-			unsafe { (*$cls).pubs.insert($name.to_string(), Attr::method(newf!($t))); }
+			unsafe { (*$cls).pubs.insert($name.to_string(), Attr::method(newf_loc!($t))); }
 		}};}
 		{
 		let arr : *mut TClass = newc!("%arr", vec!["a".to_string()], vec![]);
@@ -49,6 +52,8 @@ impl Prelude {
 		meth!(str_s, "set", type_fn!(vec![Type::Int,Type::Char], Type::Void));
 		let except : *mut TClass = newc!("Exception", vec![], vec![Type::Str]);
 		meth!(except, "param", type_fn!(vec![], Type::Str));
+		newf!("print",  type_fn!(vec![Type::Str], Type::Void));
+		newf!("readln", type_fn!(vec![], Type::Str));
 		}
 		Prelude {
 //			tcls : clss,

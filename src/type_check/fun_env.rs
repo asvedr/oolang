@@ -19,10 +19,11 @@ pub struct FunEnv {
 	pub global      : *const Pack,
 	pub local       : VMap, 
 	pub outers      : VMap,
+	pub used_outers : HashSet<String>,
 	pub templates   : HashSet<String>,      // local templates
 	pub ret_type    : Option<*const Type>,
 	pub loop_labels : Vec<*const String>,   // for 'break' cmd
-	pub self_val    : Option<*const Type> // if you check method, then Class in this val. if it's global fun then None
+	pub self_val    : Option<*const Type>   // if you check method, then Class in this val. if it's global fun then None
 }
 
 impl FunEnv {
@@ -34,6 +35,7 @@ impl FunEnv {
 			templates   : HashSet::new(),
 			ret_type    : None,
 			loop_labels : Vec::new(),
+			used_outers : HashSet::new(),
 			self_val    : _self
 		}
 	}
