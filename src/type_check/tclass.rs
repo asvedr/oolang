@@ -123,10 +123,7 @@ impl TClass {
 			&p.name
 		}
 		fn get_meth_name(p : &Method) -> &String {
-			match p.func.name {
-				Some(ref n) => n,
-				_ => panic!()
-			}
+			&p.func.name
 		}
 		unsafe {
 			match parent {

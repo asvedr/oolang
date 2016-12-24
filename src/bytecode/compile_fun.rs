@@ -1,11 +1,21 @@
-use func::*;
-use cmd::*;
-use registers::*;
-/*
-pub fn compile(fun : &SynFn, dst : &mut Vec<CodeFn>, ) {
-	
+use bytecode::func::*;
+use bytecode::cmd::*;
+use bytecode::registers::*;
+use std::collections::HashMap;
+use syn::*;
+use std::fmt::Write;
+
+pub fn compile(fun : &SynFn/*, dst : &mut Vec<CodeFn>, */) {
+	let mut env = Env{
+		out   : HashMap::new(),
+		args  : HashMap::new(),
+		loc_i : HashMap::new(),
+		loc_r : HashMap::new(),
+		loc_v : HashMap::new()
+	};
+	make_env(fun, &mut env);
+	env.print()
 }
-*/
 
 struct Env {
 	out   : HashMap<String,u8>,
@@ -15,40 +25,46 @@ struct Env {
 	loc_v : HashMap<String,u8>
 }
 
-fn make_env(fun : &SynFn) -> Env {
-	macro_rules! map {() => {HashMap::new()}; }
-	let mut env = Env{out : map!(), args : map!(), loc_i : map!(), loc_r : map!(), loc_v : map!()};
-	for i in 0 .. fun.args.len() {
-		env.args.insert(fun.args[i].name, i);
+impl Show for Env {
+	fn show(&self, _ : usize) -> Vec<String> {
+		let mut res = vec![];
+		macro_rules! go {($name:expr, $store:ident) => {{
+			let mut line = String::new();
+			let _ = write!(line, "{}: {}", $name, '{');
+			for name in self.$store.keys() {
+				let _ = write!(line, "{}:{}, ", name, self.$store.get(name).unwrap());
+			}
+			let _ = write!(line, "{}", '}');
+			res.push(line);
+		}};}
+		go!("OUTERS", out);
+		go!("ARGS", args);
+		go!("LOC INT",  loc_i);
+		go!("LOC REAL", loc_r);
+		go!("LOC VAR",  loc_v);
+		res
 	}
-	fn act(src : &ActF, dst : &mut Env) {
-		match src.val {
-			ActVal::Expr(ref e)  => expr(e, dst),
-			ActVal::DFun(ref df) => env.loc_v.insert(df.name, env.loc_v.len()),
-			ActVal::
-		}
-	}
-	for a in fun.body.iter() {
-		act(a, &mut env);
-	}
-	return env;
 }
 
 fn make_env(fun : &SynFn, env : &mut Env) {
 	for i in 0 .. fun.args.len() {
-		env.args.insert(fun.args[i].name.clone(), i);
+		env.args.insert(fun.args[i].name.clone(), i as u8);
 	}
-	macro_rules! add {($store:expr, $name:expr) => {
-		if ! $store.contain_key($name) {
-			$store.insert($name.clone(), $store.len())
-		}
-	};}
-	fn act(act : &ActF, env : &mut Env) {
-		match act.val {
-			ActVal::DVar(ref name, ref tp) => {
+	for i in 0 .. fun.outers.len() {
+		env.out.insert(fun.outers[i].clone(), i as u8);
+	}
+	fn act(action : &ActF, env : &mut Env) {
+		macro_rules! add {($store:expr, $name:expr) => {
+			if ! $store.contains_key($name) {
+				let len = $store.len() as u8;
+				$store.insert($name.clone(), len + 1);
+			}
+		};}
+		match action.val {
+			ActVal::DVar(ref name, ref tp, _) => {
 				if tp.is_int() || tp.is_char() || tp.is_bool() {
 					add!(env.loc_i, name)
-				} else tp.is_real() {
+				} else if tp.is_real() {
 					add!(env.loc_r, name)
 				} else {
 					add!(env.loc_v, name)
@@ -59,22 +75,24 @@ fn make_env(fun : &SynFn, env : &mut Env) {
 				for a in acts.iter() {
 					act(a, env)
 				},
-			ActVal::For(_, ref name, _, _, ref acts) =>
+			ActVal::For(_, ref name, _, _, ref acts) => {
 				add!(env.loc_i, name);
 				for a in acts.iter() {
 					act(a, env)
-				},
-			ActVal::Foreach(_, ref name, ref tp, _, ref acts) =>
+				}
+			},
+			ActVal::Foreach(_, ref name, ref tp, _, ref acts) => {
 				if tp.is_int() || tp.is_char() || tp.is_bool() {
 					add!(env.loc_i, name)
-				} else tp.is_real() {
+				} else if tp.is_real() {
 					add!(env.loc_r, name)
 				} else {
 					add!(env.loc_v, name)
 				}
 				for a in acts.iter() {
 					act(a, env)
-				},
+				}
+			},
 			ActVal::If(_, ref acts1, ref acts2) => {
 				for a in acts1.iter() {
 					act(a, env)
@@ -83,12 +101,26 @@ fn make_env(fun : &SynFn, env : &mut Env) {
 					act(a, env)
 				}
 			},
-			ActVal::Try(ref act, ref ctch) => {
+			ActVal::Try(ref acts, ref ctch) => {
 				for a in acts.iter() {
 					act(a, env)
 				}
 				for c in ctch.iter() {
-					
+					match c.vname {
+						Some(ref v) => {
+							if c.vtype.is_int() || c.vtype.is_bool() || c.vtype.is_char() {
+								add!(env.loc_i, v);
+							} else if c.vtype.is_real() {
+								add!(env.loc_r, v);
+							} else {
+								add!(env.loc_v, v);
+							}
+						},
+						_ => ()
+					}
+					for a in c.act.iter() {
+						act(a, env)
+					}
 				}
 			},
 			_ => ()

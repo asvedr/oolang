@@ -110,10 +110,7 @@ impl Checker {
 		// ADD FUNS TO ENV
 		for f in smod.funs.iter_mut() {
 			// GETTING NAME
-			let n = match f.name {
-				Some(ref n) => n.clone(),
-				_ => panic!()
-			};
+			let n = f.name.clone();
 			// CHECK TMPL
 			let tl = f.tmpl.len();
 			if tl > 0 {
@@ -184,7 +181,7 @@ impl Checker {
 			}
 			// FIX INITIALIZER
 			for meth in c.pub_fn.iter_mut() {
-				let f = match meth.func.name {Some(ref n) => n == "init", _ => false};
+				let f = meth.func.name == "init";
 				if f {
 					self.check_type_pack(&pack, &c.template, &mut meth.func.ftype, &meth.func.addr)?;
 					meth.ftype = meth.func.ftype.clone();
@@ -487,10 +484,7 @@ impl Checker {
 				},
 				ActVal::DFun(ref mut df) => {
 					if !repeated {
-						match df.name {
-							Some(ref name) => add_loc_knw!(env, name, &df.ftype, df.addr),
-							_ => panic!()
-						}
+						add_loc_knw!(env, &df.name, &df.ftype, df.addr);
 					}
 					{
 						let pack : &Pack = env.pack();

@@ -14,7 +14,7 @@ pub struct Arg {
 }
 
 pub struct SynFn {
-	pub name        : Option<String>,
+	pub name        : String,
 	pub tmpl        : Tmpl,            // if fun has no tmpl then []
 	pub args        : Vec<Arg>,
 	pub rettp       : Type,            // return type
@@ -53,10 +53,7 @@ impl Show for SynFn {
 		for _ in 0 .. layer {
 			tab.push(' ');
 		}
-		let name : &str = match self.name {
-			Some(ref n) => &**n,
-			_ => "%lambda"
-		};
+		let name : &String = &self.name;
 		let mut res = Vec::new();
 		if self.no_except {
 			res.push(format!("{}#NoExcept", tab));
@@ -159,7 +156,7 @@ pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 			Type::Fn(Some(tmpl.clone()), atypes, Box::new(tp.val.clone()))
 		};
 	let res = SynFn {
-		name        : Some(name.val),
+		name        : name.val,
 		tmpl        : tmpl,
 		args        : args.val,
 		rettp       : tp.val,

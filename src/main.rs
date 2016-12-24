@@ -10,6 +10,7 @@ use std::io::Read;
 use std::fs::File;
 use syn::*;
 use type_check::checker::*;
+use bytecode::*;
 
 fn main() {
 	let mut source = String::new();
@@ -28,18 +29,18 @@ fn main() {
 	//let curs = Cursor::new();
 	match parse_mod(&lxr) {
 		Ok(mut m) => {
-			/*for line in m.show(0) {
-				println!("{}", line);
-			}*/
-			println!("CHECK");
-			let ch = Checker::new();
-			match ch.check_mod(&mut m) {
-				Err(e) => {
-					println!("TCHECK ERR ON line: {} column: {}", e[0].line + 1, e[0].column + 1);
-					println!("{}", e[0].mess);
-				},
-				_ => m.print()
+			{
+				let ch = Checker::new();
+				match ch.check_mod(&mut m) {
+					Err(e) => {
+						println!("TCHECK ERR ON line: {} column: {}", e[0].line + 1, e[0].column + 1);
+						println!("{}", e[0].mess);
+						return;
+					},
+					_ => ()
+				}
 			}
+			compile_fun::compile(&m.funs[0]);
 		},
 		Err(vec) => {
 			for e in vec {
