@@ -72,10 +72,12 @@ macro_rules! find_import {
 pub struct Pack {
 	pub name    : Vec<String>,
 	pub packs   : HashMap<String,*const Pack>,  // imports
-	pub out_cls : HashMap<String,*const Pack>, // imports *
+	pub out_cls : HashMap<String,*const Pack>,  // imports *
 	pub out_fns : BTreeMap<String,*const Pack>, // imports *
+	pub out_exc : BTreeMap<String,*const Pack>, // imports *
 	pub cls     : HashMap<String,TClass>,
-	pub fns     : BTreeMap<String,Type>
+	pub fns     : BTreeMap<String,Type>,
+	pub excepts : BTreeMap<String,Option<Type>>
 }
 
 impl Pack {
@@ -85,8 +87,10 @@ impl Pack {
 			packs   : HashMap::new(),
 			out_cls : HashMap::new(),
 			out_fns : BTreeMap::new(),
+			out_exc : BTreeMap::new(),
 			cls     : HashMap::new(),
-			fns     : BTreeMap::new()
+			fns     : BTreeMap::new(),
+			excepts : BTreeMap::new()
 		}
 	}
 	pub fn show(&self) -> String {
@@ -96,7 +100,11 @@ impl Pack {
 		for name in self.packs.keys() {
 			let _ = write!(out, "{}, ", name);
 		}
-		let _ = write!(out, "]\nfns:\n");
+		let _ = write!(out, "]\nexcepts:\n");
+		for e in self.excepts.keys() {
+			let _ = write!(out, "DEF EX {} {:?}\n", e, self.excepts.get(e).unwrap());
+		}
+		let _ = write!(out, "fns:\n");
 		for name in self.fns.keys() {
 			let _ = write!(out, "\t{} : {:?}\n", name, self.fns.get(name).unwrap());
 		}
@@ -104,6 +112,9 @@ impl Pack {
 	}
 	pub fn get_cls(&self, pref : Option<&Vec<String>>, name : &String) -> Option<*const TClass> {
 		get_obj!(self, pref, name, cls, out_cls)
+	}
+	pub fn get_exception(&self, pref : Option<&Vec<String>>, name : &String) -> Option<*const Option<Type>> {
+		get_obj!(self, pref, name, excepts, out_exc)
 	}
 	pub fn get_fn(&self, pref : Option<&Vec<String>>, name : &String) -> Option<*const Type> {
 		get_obj!(self, pref, name, fns, out_fns)
@@ -127,10 +138,7 @@ impl Pack {
 		// GET OBJ
 		let cls = if pref.len() == 0 {
 			match self.get_cls(None, name) {
-				None => {
-					println!("3!");
-					syn_throw!(format!("class {} not found", name), pos)
-				},
+				None => syn_throw!(format!("class {} not found", name), pos),
 				Some(cls) => cls
 			}
 		} else if pref[0] == "%tmpl" {

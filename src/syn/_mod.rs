@@ -7,6 +7,7 @@ use syn::_fn::*;
 use syn::class::*;
 use syn::ext_c::*;
 use syn::compile_flags::*;
+use syn::except::*;
 use std::fmt;
 
 pub struct Import {
@@ -42,6 +43,7 @@ pub struct SynMod {
 	pub imports : Vec<Import>,
 	pub funs    : Vec<SynFn>,
 	pub classes : Vec<Class>,
+	pub excepts : Vec<DefExcept>,
 	pub c_fns   : Vec<CFun>,
 	pub c_types : Vec<CType>
 }
@@ -66,6 +68,10 @@ impl Show for SynMod {
 		}
 		for f in self.c_fns.iter() {
 			res.push(format!("{:?}", f));
+		}
+		res.push(format!("{}EXCEPTIONS", tab));
+		for e in self.excepts.iter() {
+			res.push(format!("{:?}", e))
 		}
 		res.push(format!("{}CLASSES", tab));
 		for cls in self.classes.iter() {
@@ -100,6 +106,7 @@ fn parse_mod_syn(lexer : &Lexer, curs : &Cursor) -> SynRes<SynMod> {
 	let mut clss = vec![];
 	let mut cfns = vec![];
 	let mut ctps = vec![];
+	let mut excs = vec![];
 
 	let mut curs = curs.clone();
 	let mut attribs = vec![];
@@ -107,7 +114,7 @@ fn parse_mod_syn(lexer : &Lexer, curs : &Cursor) -> SynRes<SynMod> {
 	loop {
 		match lexer.lex(&curs) {
 			Err(_) =>
-				syn_ok!(SynMod{imports : imps, funs : funs, classes : clss, c_fns : cfns, c_types : ctps}, curs),
+				syn_ok!(SynMod{imports : imps, funs : funs, classes : clss, c_fns : cfns, c_types : ctps, excepts : excs}, curs),
 			Ok(ans) =>
 				match &*ans.val {
 					"class"  => {
@@ -153,6 +160,11 @@ fn parse_mod_syn(lexer : &Lexer, curs : &Cursor) -> SynRes<SynMod> {
 						} else {
 							syn_throw!(format!("after 'extern' must be 'fn' or 'type', found '{}'", sym.val), curs);
 						}
+					},
+					"exception" => {
+						let exc = parse_except(lexer, &curs)?;
+						excs.push(exc.val);
+						curs = exc.cursor;
 					},
 					"#" => {
 						let flag = parse_comp_flag(lexer, &curs)?;

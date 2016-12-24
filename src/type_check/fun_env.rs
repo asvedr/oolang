@@ -185,6 +185,40 @@ impl FunEnv {
 			}
 		}
 	}
+	pub fn check_exception(&self, pref : &mut Vec<String>, name : &String, pos : &Cursor) -> CheckAns<&Option<Type>> {
+		unsafe {
+			if pref.len() == 0 {
+				match (*self.global).excepts.get(name) {
+					Some(arg) => {
+						pref.push("%mod".to_string());
+						return Ok(arg);
+					},
+					None => {
+						match (*self.global).out_exc.get(name) {
+							Some(pack) => {
+								*pref = (**pack).name.clone();
+								match (**pack).excepts.get(name) {
+									Some(arg) => return Ok(arg),
+									None => panic!()
+								}
+							},
+							_ => throw!(format!("exception {} not found", name), pos)
+						}
+					}
+				}
+			} else {
+				match (*self.global).get_exception(Some(pref), name) {
+					None => {
+						throw!(format!("exception {:?}::{} not found", pref, name), pos)
+					},
+					Some(arg) => {
+						(*self.global).open_pref(pref);
+						return Ok(&*arg);
+					}
+				}
+			}
+		}
+	}
 	pub fn check_class(&self, pref : &mut Vec<String>, name : &String, params : &Option<Vec<Type>>, pos : &Cursor) -> CheckRes {
 		if pref.len() == 0 {
 			// PREFIX NOT EXIST OR IT'S A TEMPLATE TYPE
@@ -217,7 +251,6 @@ impl FunEnv {
 			unsafe {
 				match (*self.global).get_cls(Some(pref), name) {
 					None => {
-						println!("!2");
 						throw!(format!("class {} not found", name), pos)
 					},
 					Some(cls) => {

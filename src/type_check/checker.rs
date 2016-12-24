@@ -103,6 +103,9 @@ impl Checker {
 		for f in self.std.pack.fns.keys() {
 			pack.out_fns.insert(f.clone(), &self.std.pack);
 		}
+		for e in self.std.pack.excepts.keys() {
+			pack.out_exc.insert(e.clone(), &self.std.pack);
+		}
 		pack.packs.insert("%std".to_string(), &self.std.pack);
 		// ADD FUNS TO ENV
 		for f in smod.funs.iter_mut() {
@@ -194,6 +197,23 @@ impl Checker {
 					//println!("INIT PARAMS FOR {}: {:?}", tcl.args)
 				},
 				_ => ()
+			}
+		}
+		// CHEKC EXCEPTS ADD EXCEPTS TO ENV
+		let tmpl_plug = Vec::new();
+		for e in smod.excepts.iter_mut() {
+			if pack.excepts.contains_key(&e.name) {
+				throw!(format!("exception {} already exist", e.name), e.addr);
+			} else {
+				match e.arg {
+					Some(ref mut tp) => {
+						self.check_type_pack(&pack, &tmpl_plug, tp, &e.addr)?;
+						pack.excepts.insert(e.name.clone(), Some(tp.clone()));
+					},
+					_ => {
+						pack.excepts.insert(e.name.clone(), None);
+					}
+				}
 			}
 		}
 		// CHECK CLASSES
@@ -294,15 +314,23 @@ impl Checker {
 					}
 				} else {
 					// TYPING OK
+					// NOT NEED fun.outers TOP LEVEL HAS NULL
+					/*for n in env.fun_env().local.keys() {
+						fun.locals.push(n.clone());
+					}*/
 					return Ok(0)
 				}
 			}
 		} else {
 			let cnt = try!(self.check_actions(&mut env, &mut fun.body, false));
 			//fun.outers =
-			for n in env.fun_env().used_outers.iter() {
+			let fenv = env.fun_env();
+			for n in fenv.used_outers.iter() {
 				fun.outers.push(n.clone());
 			}
+			/*for n in fenv.local.iter() {
+				fun.locals.push(n.clone());
+			}*/
 			return Ok(cnt)
 		}
 	}
@@ -310,7 +338,7 @@ impl Checker {
 		// 'repeated' is a flag for non first check
 		// if it true then var won't added to env on DefVar
 		let mut unk_count = 0;
-		macro_rules! expr {($e:expr) => { unk_count += try!(self.check_expr(env, $e))}; }
+		macro_rules! expr {($e:expr) => { unk_count += self.check_expr(env, $e)?}; }
 		macro_rules! actions {($e:expr, $a:expr) => { unk_count += try!(self.check_actions($e, $a, false)) }; }
 		let env_pt : *mut LocEnv = &mut *env;
 		let env_ln : &mut LocEnv = unsafe{ mem::transmute(env_pt) };
@@ -428,12 +456,33 @@ impl Checker {
 						}
 					}
 				},
-				ActVal::Throw(ref mut e) => {
+				ActVal::Throw(ref mut pref, ref mut key, ref mut e) => {
 					// CAN RETURN ANY CLASS BUT CAN'T RETURN A PRIMITIVE
-					expr!(e);
-					if !e.kind.is_class() || e.kind.is_arr() {
-						e.print();
-						throw!(format!("expr must be a class, but it's {:?}", e.kind), e.addres)
+					match *e {
+						Some(ref mut e) => expr!(e),
+						_ => ()
+					}
+					let param = env.fun_env().check_exception(pref, key, &act.addres)?;
+					match *e {
+						Some(ref mut e) => {
+							//expr!(e);
+							match *param {
+								Some(ref t) =>
+									if e.kind.is_unk() {
+										regress!(e, t);
+									} else if e.kind == *t {
+										()
+									} else {
+										throw!(format!("exception excpect param {:?}, but found {:?}", t, e.kind), e.addres)
+									},
+								_ =>
+									throw!(format!("exception excpect no params, but found {:?}", e.kind), e.addres)
+							}
+						},
+						_ => match *param {
+							Some(ref t) => throw!(format!("exception expect param {:?}, but has none", t), act.addres),
+							_ => ()
+						}
 					}
 				},
 				ActVal::DFun(ref mut df) => {
@@ -466,19 +515,26 @@ impl Checker {
 						//unk_count += try!(self.check_actions(&mut sub, body, false/*repeated*/));
 					}
 					for catch in catches.iter_mut() {
+						// CHECK PARAMS
+						if catch.ekey.len() > 0 {
+							let earg = env.fun_env().check_exception(&mut catch.epref, &catch.ekey, &catch.addres)?;
+							match catch.vname {
+								Some(_) =>
+									match *earg {
+										Some(ref t) => catch.vtype = t.clone(),
+										_ => throw!(format!("exception {} had no params", catch.ekey), catch.addres)
+									},
+								_ => ()
+							}
+						}
 						let mut sub = LocEnv::inherit(env);
-						match catch.except {
-							Some(ref mut t) => {
-								try!(self.check_type(env, t, &catch.addres));
-								match catch.vname {
-									Some(ref name) => add_loc_knw!(sub, name, t, catch.addres),
-									_ => ()
-								}
-							},
+						// UPDATE ENV IF NEEDED
+						match catch.vname {
+							Some(ref name) => add_loc_knw!(sub, name, &catch.vtype, catch.addres),
 							_ => ()
 						}
+						// DO WITH SUB
 						actions!(&mut sub, &mut catch.act);
-						//unk_count += try!(self.check_actions(&mut sub, &mut catch.act, false/*repeated*/));
 					}
 				},
 				ActVal::While(ref lname, ref mut cond, ref mut body) => {

@@ -6,8 +6,10 @@ use syn::type_sys::*;
 
 // DF is non declared struct for 'def function'
 pub struct SynCatch<DF> {
-	pub except : Option<Type>,
+	pub epref  : Vec<String>,
+	pub ekey   : String,
 	pub vname  : Option<String>,
+	pub vtype  : Type,
 	pub act    : Vec<Act<DF>>,
 	pub addres : Cursor
 }
@@ -30,7 +32,7 @@ pub enum ActVal<DF> {
 	// cond   then    else
 	If(Expr,Vec<Act<DF>>,Vec<Act<DF>>),
 	Try(Vec<Act<DF>>,Vec<SynCatch<DF>>), // try-catch
-	Throw(Expr)
+	Throw(Vec<String>,String,Option<Expr>)
 }
 
 pub struct Act<DF> {
@@ -170,7 +172,7 @@ impl<DF : Show> Show for ActVal<DF> {
 					}
 				}
 				for ctch in ctchs.iter() {
-					res.push(format!("{}CATCH {:?}:{:?}", tab, ctch.except, ctch.vname));
+					res.push(format!("{}CATCH {:?}::{} {:?}:{:?}", tab, ctch.epref, ctch.ekey, ctch.vname, ctch.vtype));
 					for act in ctch.act.iter() {
 						for line in act.show(layer + 1) {
 							res.push(line);
@@ -179,10 +181,14 @@ impl<DF : Show> Show for ActVal<DF> {
 				}
 				res
 			},
-			ActVal::Throw(ref e) => {
-				let mut res = vec![format!("{}THROW", tab)];
-				for line in e.show(layer + 1) {
-					res.push(line);
+			ActVal::Throw(ref p, ref n, ref e) => {
+				let mut res = vec![format!("{}THROW {:?}::{}", tab, p, n)];
+				match *e {
+					Some(ref e) =>
+						for line in e.show(layer + 1) {
+							res.push(line);
+						},
+					_ => ()
 				}
 				res
 			}
@@ -218,6 +224,25 @@ fn is_act_end(lexer : &Lexer, curs : &Cursor) -> bool {
 	match lexer.lex(curs) {
 		Ok(ans) => ans.val == ";" || ans.val == "}",
 		_ => true
+	}
+}
+
+fn parse_e_name(lexer : &Lexer, curs : &Cursor) -> SynRes<(Vec<String>, String)> {
+	let mut acc  = vec![];
+	let mut name = String::new();
+	let sym = lex_type!(lexer, curs, LexTP::Id);
+	name = sym.val;
+	let mut curs = sym.cursor;
+	loop {
+		let sym = lex!(lexer, &curs);
+		if sym.val == "::" {
+			acc.push(name);
+			let sym = lex_type!(lexer, &curs, LexTP::Id);
+			curs = sym.cursor;
+			name = sym.val;
+		} else {
+			syn_ok!( (acc, name), curs);
+		}
 	}
 }
 
@@ -353,16 +378,32 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
 					curs = ans.cursor;
 					let ans = lex!(lexer, &curs);
 					if ans.val == "{" {
-						let al = try!(parse_act_list(lexer, &curs, fparse));
+						let al = parse_act_list(lexer, &curs, fparse)?;
 						curs = al.cursor;
-						ctchs.push(SynCatch{except : None, vname : None, act : al.val, addres : addr});
+						ctchs.push(SynCatch{ekey : String::new(), epref : vec![], vtype : Type::Unk, vname : None, act : al.val, addres : addr});
 					} else {
-						let ans = lex_type!(lexer, &curs, LexTP::Id);
-						curs = lex!(lexer, &ans.cursor, ":");
-						let tp = try!(parse_type(lexer, &curs));
-						let al = try!(parse_act_list(lexer, &tp.cursor, fparse));
+						// ans - EXCEPTON NAME
+						//let key = lex_type!(lexer, &curs, LexTP::Id);
+						let ename = parse_e_name(lexer, &curs)?;
+						let (pref,name) = ename.val;
+						curs = ename.cursor;
+						let ecrs = curs.clone();
+						//let tp = try!(parse_type(lexer, &curs));
+						let sym = lex!(lexer, &curs);
+						let var;
+						if sym.kind == LexTP::Id {
+							var = Some(sym.val);
+							curs = sym.cursor;
+						} else if sym.val == "{" {
+							var = None;
+							//curs = key.cursor;
+						} else {
+							syn_throw!(format!("excepcted var name of '{}', found '{}'", '{', sym.val), ecrs);
+						}
+						let al = parse_act_list(lexer, &curs, fparse)?;
 						curs = al.cursor;
-						ctchs.push(SynCatch{except : Some(tp.val), vname : Some(ans.val), act : al.val, addres : addr});
+						ctchs.push(SynCatch{ekey : name, epref : pref, vname : var, vtype : Type::Unk, act : al.val, addres : addr});
+						//ctchs.push(SynCatch{except : Some(tp.val), vname : Some(ans.val), act : al.val, addres : addr});
 					}
 				} else {
 					if ctchs.len() == 0 {
@@ -374,8 +415,16 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
 			}
 		},
 		"throw" => {
-			let expr = try!(parse_expr(lexer, &ans.cursor));
-			syn_ok!(make!(ActVal::Throw(expr.val)), expr.cursor);
+			//let name = lex_type!(lexer, &ans.cursor, LexTP::Id);
+			let ename = parse_e_name(lexer, &ans.cursor)?;
+			let (pref,name) = ename.val;
+			let sym = lex!(lexer, &ename.cursor);
+			if sym.val == ";" || sym.val == "}" {
+				syn_ok!(make!(ActVal::Throw(pref, name, None)), ename.cursor)
+			} else {
+				let expr = try!(parse_expr(lexer, &ename.cursor));
+				syn_ok!(make!(ActVal::Throw(pref, name, Some(expr.val))), expr.cursor);
+			}
 		},
 		/* EXPR */
 		_ => {

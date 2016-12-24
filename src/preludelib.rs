@@ -14,17 +14,23 @@ impl Prelude {
 		let mut fns  = vec![];
 		//let mut clss = vec![];
 		let mut pack = Pack {
-			name    : vec![format!("%std")],
-			packs   : HashMap::new(),
-			out_cls : HashMap::new(),
-			out_fns : BTreeMap::new(),
-			cls     : HashMap::new(),
-			fns     : BTreeMap::new()
+			name     : vec![format!("%std")],
+			packs    : HashMap::new(),
+			out_cls  : HashMap::new(),
+			out_fns  : BTreeMap::new(),
+			cls      : HashMap::new(),
+			fns      : BTreeMap::new(),
+			out_exc  : BTreeMap::new(),
+			excepts  : BTreeMap::new()
 		};
 		macro_rules! newf_loc {($t:expr) => {{
 			fns.push($t);
 			&fns[fns.len() - 1]
 		}}; }
+		macro_rules! newe {
+			($n:expr, $arg:expr) => {pack.excepts.insert($n.to_string(), Some($arg))};
+			($n:expr) => {pack.excepts.insert($n.to_string(), None)};
+		}
 		macro_rules! newc {($name:expr, $p:expr, $acnt:expr) => {{
 			let c = TClass{source : None, parent : None, privs : BTreeMap::new(), pubs : BTreeMap::new(), params : $p, args : $acnt};
 			//let lnk : *mut TClass = &mut clss[clss.len() - 1];
@@ -54,6 +60,8 @@ impl Prelude {
 		meth!(except, "param", type_fn!(vec![], Type::Str));
 		newf!("print",  type_fn!(vec![Type::Str], Type::Void));
 		newf!("readln", type_fn!(vec![], Type::Str));
+		newe!("IndexError");
+		newe!("NullPtr");
 		}
 		Prelude {
 //			tcls : clss,

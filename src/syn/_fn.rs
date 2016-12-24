@@ -16,7 +16,6 @@ pub struct Arg {
 pub struct SynFn {
 	pub name        : Option<String>,
 	pub tmpl        : Tmpl,            // if fun has no tmpl then []
-	pub outers      : Vec<String>,
 	pub args        : Vec<Arg>,
 	pub rettp       : Type,            // return type
 	pub body        : Vec<Act<SynFn>>, 
@@ -24,6 +23,8 @@ pub struct SynFn {
 	pub can_be_clos : bool,            // if has names args or option args then can't be used as closure
 	pub has_named   : bool,            // does fun has named args
 	pub ftype       : Type,            // Fn(args) -> res
+	// COMPILE TIME
+	pub outers      : Vec<String>,
 	pub no_except   : bool             // force optimization flag #noexcept
 }
 

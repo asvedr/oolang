@@ -1,5 +1,13 @@
+exception EInt : int;
+
 fn main() : () {
-	var a = readln() as int;
-	var b = readln() as int;
-	print((a + b) as str);
+	try {
+		var a = readln() as int;
+		var b = readln() as int;
+		print((a + b) as str);
+		throw EInt 5;
+		throw NullPtr;
+	} catch EInt a {
+		print("error found")
+	}
 }

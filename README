@@ -33,8 +33,8 @@ Action ::= Expr
 		   'for' ['::' id] id [':' Type] 'in' Expr ActList         // foreach loop
 		   'for' ['::' id] id [':' Type] 'in' Expr .. Expr ActList // 'for i in 0 .. 10 \n print(i)'
            'if' Expr ActList ['else' ActList]                      // condition
-           'try' ActList ('catch' [id ':' Type] ActList)+          // try-catch
-           'throw' Expr
+           'try' ActList ('catch' id [id] ActList)+                // try-catch
+           'throw' id [Expr]                                       // throw exception with optional param
 
 Expr ::= Expr '(' (Expr,)* ')'                          // fun call
          Expr operator Expr                             // operators '+', '-', '*', '/' ...

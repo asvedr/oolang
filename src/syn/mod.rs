@@ -12,6 +12,7 @@ pub mod act;
 pub mod _fn;
 pub mod class;
 pub mod ext_c;
+pub mod except;
 pub mod _mod;
 
 pub use syn::reserr::*;
@@ -23,5 +24,6 @@ pub use syn::_fn::*;
 pub use syn::class::*;
 pub use syn::ext_c::*;
 pub use syn::_mod::*;
+pub use syn::except::*;
 
 pub type ActF = Act<SynFn>;

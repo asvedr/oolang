@@ -366,7 +366,11 @@ pub fn find_unknown(body : &Vec<ActF>) -> &Cursor {
 						go_a!(&c.act);
 					}
 				},
-				ActVal::Throw(ref e) => go_e!(e),
+				ActVal::Throw(_, _, ref e) =>
+					match *e {
+						Some(ref e) => go_e!(e),
+						_ => ()
+					},
 				_ => ()
 			}
 		}
