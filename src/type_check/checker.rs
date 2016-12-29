@@ -886,11 +886,12 @@ impl Checker {
 				expr.kind = Type::Class(pref.clone(), name.clone(), tmpl.clone())
 			},
 			EVal::Item(ref mut a, ref mut i) => {
+				// FOR 'a' ALLOW TYPES: Vec<_>, Asc<_,_>, Str
 				check!(a);
 				check!(i);
 				if a.kind.is_unk() {
 					unk_count += 1;
-				} else if a.kind.is_arr() {
+				} else if a.kind.is_arr() || a.kind.is_str() {
 					if i.kind.is_int() {
 						// ALL OK
 					} else if i.kind.is_unk() {
