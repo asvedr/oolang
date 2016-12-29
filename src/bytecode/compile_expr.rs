@@ -41,13 +41,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 			}
 		},
 		EVal::Call(ref tp, ref fun, ref args) => {
-			match fun.val {
-				EVal::Var(ref pref, ref name) => {
-					match pref {
-						
-					}
-				},
-				_ => {
+			macro_rules! regular_expr {() => {{
 					let mut c_args = vec![];
 					for a in args.iter() {
 						c_args.push(compile(a, state));
@@ -78,7 +72,18 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 					};
 					cmds.push(Cmd::Call(call));
 					dst
-				}
+				}};
+			}
+			match fun.val {
+				EVal::Var(ref pref, ref name) => {
+					if pref[0] == "%loc" {
+						regular_expr!()
+					} else if pref[0] == "%mod" {
+					} else if pref[0] == "%std" {
+					} else {
+					}
+				},
+				_ => regular_expr!()
 			}
 		},
 		NewClass   (Option<Vec<Type>>,Vec<String>,String,Vec<Expr>),
@@ -88,11 +93,18 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 			state.pop_v();
 			state.pop_i();
 			macro_rules! make_cmd{($a:expr,$i:expr,$d:expr) => {{
-				match arr.kind {
-					Type::Str   => Cmd::ItemStr($a,$i,$d),
-					Type::Arr   => Cmd::ItemVec($a,$i,$d),
-					_ /* asc */ => Cmd::ItemAsc($a,$i,$d)
-				}
+				let ctp = match arr.kind {
+					Type::Str   => ContType::Str,
+					Type::Arr   => ContType::Vec,
+					_ /* asc */ => ContType::Asc
+				};
+				Cmd::WithItem(WithItem{
+					is_get    : true,
+					container : $a,
+					index     : $i,
+					cont_type : ctp,
+					value     : $d
+				})
 			}};}
 			match e.kind {
 				Type::Int|Type::Char|Type::Bool => {

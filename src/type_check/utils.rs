@@ -294,7 +294,7 @@ pub fn find_unknown(body : &Vec<ActF>) -> &Cursor {
 			Some(&e.addres)
 		} else {
 			match e.val {
-				EVal::Call(_, ref f, ref a) => {
+				EVal::Call(_, ref f, ref a, _) => {
 					go_e!(f);
 					for i in a.iter() {
 						go_e!(i);

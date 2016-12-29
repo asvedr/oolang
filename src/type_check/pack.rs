@@ -2,7 +2,7 @@ use syn::type_sys::*;
 use syn::reserr::*;
 use type_check::tclass::*;
 use std::fmt::Write;
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{HashMap, BTreeMap, BTreeSet};
 
 macro_rules! pack_of {
 	($_self:expr, $pref:expr) => {{
@@ -68,27 +68,29 @@ macro_rules! find_import {
 }
 
 pub struct Pack {
-	pub name    : Vec<String>,
-	pub packs   : HashMap<String,*const Pack>,  // imports
-	pub out_cls : HashMap<String,*const Pack>,  // imports *
-	pub out_fns : BTreeMap<String,*const Pack>, // imports *
-	pub out_exc : BTreeMap<String,*const Pack>, // imports *
-	pub cls     : HashMap<String,TClass>,
-	pub fns     : BTreeMap<String,Type>,
-	pub excepts : BTreeMap<String,Option<Type>>
+	pub name     : Vec<String>,
+	pub packs    : HashMap<String,*const Pack>,  // imports
+	pub out_cls  : HashMap<String,*const Pack>,  // imports *
+	pub out_fns  : BTreeMap<String,*const Pack>, // imports *
+	pub out_exc  : BTreeMap<String,*const Pack>, // imports *
+	pub cls      : HashMap<String,TClass>,
+	pub fns      : BTreeMap<String,Type>,
+	pub fns_noex : BTreeSet<String>,             // optimizator noexcept flag
+	pub excepts  : BTreeMap<String,Option<Type>>
 }
 
 impl Pack {
 	pub fn new() -> Pack {
 		Pack{
-			name    : Vec::new(),
-			packs   : HashMap::new(),
-			out_cls : HashMap::new(),
-			out_fns : BTreeMap::new(),
-			out_exc : BTreeMap::new(),
-			cls     : HashMap::new(),
-			fns     : BTreeMap::new(),
-			excepts : BTreeMap::new()
+			name      : Vec::new(),
+			packs     : HashMap::new(),
+			out_cls   : HashMap::new(),
+			out_fns   : BTreeMap::new(),
+			out_exc   : BTreeMap::new(),
+			cls       : HashMap::new(),
+			fns       : BTreeMap::new(),
+			fns_noex  : BTreeSet::new(),
+			excepts   : BTreeMap::new()
 		}
 	}
 	pub fn show(&self) -> String {
@@ -106,6 +108,21 @@ impl Pack {
 		for name in self.fns.keys() {
 			let _ = write!(out, "\t{} : {:?}\n", name, self.fns.get(name).unwrap());
 		}
+		let _ = write!(out, "CLASSES:\n");
+		for name in self.cls.keys() {
+			let cls = self.cls.get(name).unwrap();
+			let _ = write!(out, "\tCLASS {}<{:?}>({:?})\n", name, cls.params, cls.args);
+			
+			for pname in cls.privs.keys() {
+				let attr = cls.privs.get(pname).unwrap();
+				let _ = write!(out, "\t\tPRIV {} {:?}\n", pname, unsafe{&*attr._type});
+			}
+			for pname in cls.pubs.keys() {
+				let attr = cls.pubs.get(pname).unwrap();
+				let _ = write!(out, "\t\tPUB  {} {:?}\n", pname, unsafe{&*attr._type});
+			}
+			
+		}
 		return out;
 	}
 	pub fn get_cls(&self, pref : &Vec<String>, name : &String) -> Option<*const TClass> {
@@ -116,6 +133,20 @@ impl Pack {
 	}
 	pub fn get_fn(&self, pref : &Vec<String>, name : &String) -> Option<*const Type> {
 		get_obj!(self, pref, name, fns, out_fns)
+	}
+	// DON'T USE WITH pref == []
+	pub fn is_fn_noexcept(&self, pref : &Vec<String>, name : &String) -> bool {
+		if pref[0] == "%mod" {
+			self.fns_noex.contains(name)
+		} else {
+			unsafe {
+				let pack = pack_of!(self, pref);
+				match pack {
+					Some(ptr) => (*ptr).fns_noex.contains(name),
+					_ => panic!()
+				}
+			}
+		}
 	}
 	// changing arg
 	pub fn open_pref(&self, pref : &mut Vec<String>) {

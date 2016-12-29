@@ -12,7 +12,7 @@ pub enum EVal {
 	Str        (String),
 	Char       (char),
 	Bool       (bool),
-	Call       (Option<Vec<Type>>,Box<Expr>,Vec<Expr>),
+	Call       (Option<Vec<Type>>,Box<Expr>,Vec<Expr>,bool), // last flag is 'noexcept'
 	NewClass   (Option<Vec<Type>>,Vec<String>,String,Vec<Expr>),
 	Item       (Box<Expr>,Box<Expr>),     // item of array or asc
 	Var        (Vec<String>, String),     // namespace, name
@@ -54,8 +54,12 @@ impl Show for Expr {
 			EVal::Str(ref a)  => vec![format!("{}\"{}\"{}",tab,a,tp)],
 			EVal::Char(ref a) => vec![format!("{}\'{}\'{}",tab,a,tp)],
 			EVal::Bool(ref a) => vec![format!("{}{}{}",tab,a,tp)],
-			EVal::Call(_,ref fun,ref args) => {
-				let mut res = vec![format!("{}CALL{}", tab, tp)/*, format!("{}FUN", tab)*/];
+			EVal::Call(_,ref fun,ref args,ref noexc) => {
+				let mut res = if *noexc {
+					vec![format!("{}CALL *noexcept* {}", tab, tp)/*, format!("{}FUN", tab)*/]
+				} else {
+					vec![format!("{}CALL{}", tab, tp)/*, format!("{}FUN", tab)*/]
+				};
 				for line in fun.show(layer + 1) {
 					res.push(line);
 				}
@@ -314,7 +318,7 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 				if ans.val == "(" {
 					let args = try!(parse_list(lexer, &curs, &parse_expr, "(", ")"));
 					//let opos = obj.addres.clone();
-					obj = expr!(EVal::Call(None,Box::new(obj), args.val), curs);
+					obj = expr!(EVal::Call(None,Box::new(obj), args.val, false), curs);
 					curs = args.cursor;
 				// INDEXING
 				} else if ans.val == "[" {	
@@ -396,7 +400,7 @@ fn build(seq : &mut Vec<Result<Box<Expr>,usize>>, addr : &Vec<Cursor>) -> Expr {
 			let left  = build_local(seq, addr, left, min_p_ind);
 			let right = build_local(seq, addr, min_p_ind + 1, right);
 			let fun = expr!(EVal::Var(vec!["%opr".to_string()], fun_id.to_string()), addr[min_p_ind].clone());
-			return expr!(EVal::Call(None, Box::new(fun), vec![left,right]), addr[min_p_ind].clone());
+			return expr!(EVal::Call(None, Box::new(fun), vec![left,right], false), addr[min_p_ind].clone());
 		}
 	}
 	let len = seq.len();

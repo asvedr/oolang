@@ -128,6 +128,10 @@ impl Checker {
 				Some(_) => throw!("fun with this name already exist in this module", f.addr),
 				_ => ()
 			}
+			// OPT FLAG
+			if f.no_except {
+				pack.fns_noex.insert(f.name.clone());
+			}
 		}
 		// ADD CLASSES TO ENV
 		for c in smod.classes.iter_mut() {
@@ -661,7 +665,7 @@ impl Checker {
 		// 	Type::Unk => (), _ => return Ok(false)
 		// }
 		match expr.val {
-			EVal::Call(ref mut tmpl, ref mut f, ref mut args) => {
+			EVal::Call(ref mut tmpl, ref mut f, ref mut args, ref mut noexc) => {
 				let mut res_type = Type::Unk;
 				let chf : Option <*const HashMap<String,Type>> = check_fun!(**f, res_type);
 				for a in args.iter_mut() {
@@ -818,6 +822,8 @@ impl Checker {
 						/*for a in args.iter_mut() {
 							check!(a);
 						}*/
+						let mut type_known = false;
+						// TYPING
 						match f.kind {
 							Type::Fn(ref tmpl_t, ref args_t, ref res_t) => {
 								// CHECK TMPL
@@ -838,9 +844,38 @@ impl Checker {
 									}
 									expr.kind = (**res_t).clone();
 								}
+								type_known = true;
 							},
 							Type::Unk => unk_count += 1,
-							ref t => throw!(format!("expect Fn found {:?}", t), f.addres.clone())
+							ref t => {
+								throw!(format!("expect Fn found {:?}", t), f.addres.clone())
+							}
+						}
+						if type_known {
+							// OPT FLAG
+							match f.val {
+								EVal::Var(ref pref, ref name) => {
+									if pref[0] == "%mod" {
+										*noexc = env.pack().is_fn_noexcept(pref, name)
+									}
+								},
+								EVal::Attr(ref obj, ref prop_name, ref is_meth) => {
+									if *is_meth {
+										match obj.kind {
+											Type::Class(ref pref, ref name, _) => {
+												match env.pack().get_cls(pref, name) {
+													Some(cls_ptr) => unsafe {
+														*noexc = (*cls_ptr).is_method_noexc(prop_name)
+													},
+													_ => panic!()
+												}
+											},
+											_ => ()
+										}
+									}
+								}
+								_ => ()
+							}
 						}
 					}
 				}

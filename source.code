@@ -4,6 +4,8 @@ fn main() : () {
 	try {
 		var a = readln() as int;
 		var b = readln() as int;
+		var c = [1,2,3,4];
+		c.len;
 		print((a + b) as str);
 		throw EInt 5;
 		throw NullPtr;

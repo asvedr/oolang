@@ -37,7 +37,7 @@ fn main() {
 						println!("{}", e[0].mess);
 						return;
 					},
-					_ => ()
+					_ => m.print()
 				}
 			}
 			compile_fun::compile(&m.funs[0]);

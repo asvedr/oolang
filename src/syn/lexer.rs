@@ -141,7 +141,6 @@ impl Lexer {
 		}
 	}
 	pub fn lex(&self, curs : &Cursor) -> Result<LexRes,LexErr> {
-		//println!("LOOK FROM {:?}", curs);
 		let ans = try!(self.lex_priv(curs));
 		if ans.val == "" {
 			self.lex(&ans.cursor)
@@ -171,6 +170,10 @@ impl Lexer {
 				None => lexerr!(line, column, format!("from line:{} column:{} bad lexem:'{}'", curs.line, curs.column, acc)),
 				Some(i) => {
 					let mach : &Machine = &machines[i];
+					if acc.len() == 0 {
+						// THIS IS A COMMENT
+						return Ok(LexRes{val : acc, kind : LexTP::Opr, cursor : Cursor{line : p_line, column : p_column}})
+					}
 					for _ in 0 .. acc.len() - mach.len {
 						acc.pop();
 					}
@@ -226,7 +229,6 @@ impl Lexer {
 				prev_star = false;
 				continue;
 			}
-			//println!("psl:{} pst:{} cl:{} cc:{} '{}'", prev_slash, prev_star, comm_line, comm_count, sym);
 			if sym == '/' {
 				prev_slash = true;
 				prev_star  = false;
@@ -279,8 +281,9 @@ impl Lexer {
 		// this block for EOF.
 		// if any machines was activated before EOF then we try to finalize
 		// else throw 'EOF' error
-		if any_on
-			{finalizer!()}
+		if any_on {
+			finalizer!()
+		}
 		else
 			{lexerr!(line, column, "EOF")}
 	}

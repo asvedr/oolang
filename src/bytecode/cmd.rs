@@ -11,10 +11,7 @@ pub enum Cmd {
 	SetI(isize,Reg),
 	SetR(f64,Reg),
 	SetS(String,Reg),
-	//   arr ind dst
-	ItemVec(Reg,Reg,Reg),
-	ItemAsc(Reg,Reg,Reg),
-	ItemStr(Reg,Reg,Reg),
+	WithItem(Box<WithItem>),
 	//   obj  name  dst
 	Meth(Reg,String,Reg), // it works like make-clos
 	MakeClos(Box<MakeClos>),
@@ -49,9 +46,12 @@ impl Show for Cmd {
 			Cmd::SetI(ref n, ref r) => vec![format!("{}SET INT {} => {:?}", tab, n, r)],
 			Cmd::SetR(ref n, ref r) => vec![format!("{}SER REL {} => {:?}", tab, n, r)],
 			Cmd::SetS(ref n, ref r) => vec![format!("{}SER STR {} => {:?}", tab, n, r)],
-			Cmd::ItemVec(ref ar, ref ind, ref dst) => vec![format!("{}ITEM ARR {:?} [{:?}] => {:?}", tab, ar, ind, dst)],
-			Cmd::ItemAsc(ref ar, ref ind, ref dst) => vec![format!("{}ITEM ASC {:?} [{:?}] => {:?}", tab, ar, ind, dst)],
-			Cmd::ItemStr(ref ar, ref ind, ref dst) => vec![format!("{}ITEM STR {:?} [{:?}] => {:?}", tab, ar, ind, dst)],
+			Cmd::WithItem(ref obj) =>
+				if obj.is_get {
+					vec![format!("{}GET ITEM<{:?}> {:?} [{:?}] => {:?}", tab, obj.cont_type, obj.container, obj.index, obj.value)]
+				} else {
+					vec![format!("{}SET ITEM<{:?}> {:?} [{:?}] <= {:?}", tab, obj.cont_type, obj.container, obj.index, obj.value)] 
+				},
 			Cmd::Meth(ref obj, ref name, ref dst) => vec![format!("{}METHOD {} (self:{:?}) => {:?}", tab, name, obj, dst)],
 			Cmd::MakeClos(ref cls) => vec![format!("{}{:?}", tab, **cls)],
 			Cmd::Prop(ref obj, ref n, ref dst) => vec![format!("{}PROP {:?} [{:?}] => {:?}", tab, obj, n, dst)],
@@ -106,6 +106,21 @@ pub enum Convert {
 	S2I,
 	
 	B2I
+}
+
+pub struct WithItem {
+	container : Reg,
+	index     : Reg,
+	is_get    : bool, // true - get, false - set
+	value     : Reg,  // if get then destination else source
+	cont_type : ContType
+}
+
+#[derive(Debug,PartialEq)]
+pub enum ContType {
+	Vec,
+	Asc,
+	Str
 }
 
 // int operation

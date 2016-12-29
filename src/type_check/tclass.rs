@@ -19,31 +19,34 @@ impl Parent {
 
 pub struct Attr {
 	pub _type     : *const Type,
-	pub is_method : bool
+	pub is_method : bool,
+	pub is_no_exc : bool
 }
 
 impl Attr {
-	pub fn method(t : *const Type) -> Attr {
+	pub fn method(t : *const Type, noexc : bool) -> Attr {
 		Attr{
 			_type : t,
-			is_method : true
+			is_method : true,
+			is_no_exc : noexc
 		}
 	}
 	pub fn prop(t : *const Type) -> Attr {
 		Attr {
 			_type : t,
-			is_method : false
+			is_method : false,
+			is_no_exc : false
 		}
 	}
 }
 
 pub struct TClass {
 	pub source : Option<*const Class>,
-	pub parent : Option</* *const TClass*/Parent>,
+	pub parent : Option<Parent>,
 	pub privs  : BTreeMap<String,Attr>, // orig type saved in syn_class
 	pub pubs   : BTreeMap<String,Attr>, 
-	pub params : Vec<String>,                  // template
-	pub args   : Vec<Type>                     // constructor 
+	pub params : Vec<String>,           // template
+	pub args   : Vec<Type>              // constructor 
 }
 
 impl TClass {
@@ -91,54 +94,64 @@ impl TClass {
 		//		}
 		//	}
 		}}; }
-		macro_rules! foreach_part{
-			($seq_src:ident, $seq_dst:expr, $getter:ident, $parent:expr, $addr:expr, $name:expr, $cns:expr) => {
+		macro_rules! foreach_prop{
+			($seq_src:ident, $seq_dst:expr, $parent:expr) => {
 				for prop in cls.$seq_src.iter() {
-					if (*$parent).exist_attr($name(prop)) {
-						syn_throw!("this prop exist in parent", $addr(prop))
+					if (*$parent).exist_attr(&prop.name) {
+						syn_throw!("this prop exist in parent", prop.addres)
 					} else {
-						match $seq_dst.insert($name(prop).clone(), $cns(&prop.$getter)) {
-							Some(_) => syn_throw!(format!("this prop already exist"), $addr(prop)),
+						match $seq_dst.insert(prop.name.clone(), Attr::prop(&prop.ptype)) {
+							Some(_) => syn_throw!(format!("this prop already exist"), prop.addres),
 							_ => ()
 						}
 					}
 				}
 			};
-			($seq_src:ident, $seq_dst:expr, $getter:ident, $addr:expr, $name:expr, $cns:expr) => {
+			($seq_src:ident, $seq_dst:expr) => {
 				for prop in cls.$seq_src.iter() {
-					match $seq_dst.insert($name(prop).clone(), $cns(&prop.$getter)) {
-						Some(_) => syn_throw!(format!("this prop already exist"), $addr(&prop)),
+					match $seq_dst.insert(prop.name.clone(), Attr::prop(&prop.ptype)) {
+						Some(_) => syn_throw!(format!("this prop already exist"), prop.addres),
 						_ => ()
 					}
 				}
 			};
 		}
-		fn get_prop_addr(p : &Prop) -> &Cursor {
-			&p.addres
-		}
-		fn get_meth_addr(p : &Method) -> &Cursor {
-			&p.func.addr
-		}
-		fn get_prop_name(p : &Prop) -> &String {
-			&p.name
-		}
-		fn get_meth_name(p : &Method) -> &String {
-			&p.func.name
+		macro_rules! foreach_meth{
+			($seq_src:ident, $seq_dst:expr, $parent:expr) => {
+				for prop in cls.$seq_src.iter() {
+					if (*$parent).exist_attr(&prop.func.name) {
+						syn_throw!("this prop exist in parent", prop.func.addr)
+					} else {
+						match $seq_dst.insert(prop.func.name.clone(), Attr::method(&prop.ftype, prop.func.no_except)) {
+							Some(_) => syn_throw!(format!("this prop already exist"), prop.func.addr),
+							_ => ()
+						}
+					}
+				}
+			};
+			($seq_src:ident, $seq_dst:expr) => {
+				for prop in cls.$seq_src.iter() {
+					match $seq_dst.insert(prop.func.name.clone(), Attr::method(&prop.ftype, prop.func.no_except)) {
+						Some(_) => syn_throw!(format!("this prop already exist"), prop.func.addr),
+						_ => ()
+					}
+				}
+			};
 		}
 		unsafe {
 			match parent {
 				Some(par) => {
-					foreach_part!(priv_prop, privs, ptype, par.class, get_prop_addr, get_prop_name, Attr::prop);
-					foreach_part!(pub_prop, pubs, ptype, par.class, get_prop_addr, get_prop_name, Attr::prop);
-					foreach_part!(priv_fn, privs, ftype, par.class, get_meth_addr, get_meth_name, Attr::method);
-					foreach_part!(pub_fn, pubs, ftype, par.class, get_meth_addr, get_meth_name, Attr::method);
+					foreach_prop!(priv_prop, privs, par.class);
+					foreach_prop!(pub_prop, pubs, par.class);
+					foreach_meth!(priv_fn, privs, par.class);
+					foreach_meth!(pub_fn, pubs, par.class);
 					make!(Some(par))
 				},
 				None => {
-					foreach_part!(priv_prop, privs, ptype, get_prop_addr, get_prop_name, Attr::prop);
-					foreach_part!(pub_prop, pubs, ptype, get_prop_addr, get_prop_name, Attr::prop);
-					foreach_part!(priv_fn, privs, ftype, get_meth_addr, get_meth_name, Attr::method);
-					foreach_part!(pub_fn, pubs, ftype, get_meth_addr, get_meth_name, Attr::method);
+					foreach_prop!(priv_prop, privs);
+					foreach_prop!(pub_prop, pubs);
+					foreach_meth!(priv_fn, privs);
+					foreach_meth!(pub_fn, pubs);
 					make!(None)
 				}
 			}
@@ -244,6 +257,25 @@ impl TClass {
 					_ =>
 						match (*lnk).privs.get(name) {
 							Some(p) => return p.is_method,
+							_ =>
+								match (*lnk).parent {
+									Some(ref par) => lnk = par.class,
+									_ => panic!()
+								}
+						}
+				}
+			}
+		}
+	}
+	pub fn is_method_noexc(&self, name : &String) -> bool {
+		unsafe {
+			let mut lnk : *const TClass = &*self;
+			loop {
+				match (*lnk).pubs.get(name) {
+					Some(p) => return p.is_no_exc,
+					_ =>
+						match (*lnk).privs.get(name) {
+							Some(p) => return p.is_no_exc,
 							_ =>
 								match (*lnk).parent {
 									Some(ref par) => lnk = par.class,

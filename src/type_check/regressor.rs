@@ -8,7 +8,7 @@ use std::mem;
 pub fn regress_expr(env : &mut LocEnv, expr : &mut Expr, e_type : &Type) -> CheckRes {
 	macro_rules! regress {($e:expr, $t:expr) => {try!(regress_expr(env, $e, $t))}; }
 	match expr.val {
-		EVal::Call(ref mut tmpl, ref mut fun, ref mut args) => {
+		EVal::Call(ref mut tmpl, ref mut fun, ref mut args, _) => {
 			macro_rules! a { () => {args[0]}; }
 			macro_rules! b { () => {args[1]}; }
 			macro_rules! coerse { ($e:expr, $from:expr, $to:expr) => {{

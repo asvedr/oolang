@@ -330,8 +330,12 @@ impl FunEnv {
 						Some(res) => {
 							let flag = (*cls).is_method(mname);
 							match res {
-								Ok(lnk) => return Some( ((*lnk).clone(), flag) ),
-								Err(t) => return Some( (t,flag) )
+								Ok(lnk) => {
+									return Some( ((*lnk).clone(), flag) )
+								},
+								Err(t) => {
+									return Some( (t,flag) )
+								}
 							}
 						},
 						None => return None
