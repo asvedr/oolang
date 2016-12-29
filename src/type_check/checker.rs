@@ -53,9 +53,8 @@ macro_rules! set_var_type {
 		if $exp.kind.is_unk() {
 			match $exp.val {
 				EVal::Var(ref p, ref n) =>
-					match *p {
-						None => $env.replace_unk(n, &$tp),
-						_ => ()
+					if p.len() == 0 {
+						$env.replace_unk(n, &$tp);
 					},
 				_ => ()
 			}
@@ -160,9 +159,10 @@ impl Checker {
 							pack.check_class(pref, name, pars, &c.addres)?;
 							let cls =
 								if pref[0] == "%mod" {
-									pack.get_cls(None, name)
+									let p = Vec::new();
+									pack.get_cls(&p, name)
 								} else {
-									pack.get_cls(Some(pref), name)
+									pack.get_cls(pref, name)
 								};
 							let cls = cls.unwrap();
 							Some(Parent::new(cls, p_ref))
@@ -492,10 +492,10 @@ impl Checker {
 						unk_count += try!(self.check_fn(pack, &mut **df, Some(env), _self));
 					}
 					for name in df.outers.iter() {
-						let mut pref = None;
+						let mut pref = Vec::new();
 						let mut tp = Type::Unk;
 						let _ = env.get_var(&mut pref, name, &mut tp, &df.addr);
-						if match pref{Some(ref p) => p[0] == "%out", _ => false} {
+						if pref[0] == "%out" {
 							env.fun_env_mut().used_outers.insert(name.clone());
 						}
 					}
@@ -643,14 +643,14 @@ impl Checker {
 		macro_rules! check_fun {($e:expr, $o:expr) =>
 			{match $e.val {
 				EVal::Var(ref pref, ref name) => {
-					match *pref {
-						Some(ref vec) =>
-							if vec[0] == "#opr" {
-								is_in!(name, $o, int_real_op, is_in!(name, $o, int_op, is_in!(name, $o, real_op, is_in!(name, $o, all_op, is_in!(name, $o, bool_op, None)))))
-							} else {
-								None
-							},
-						_ => None
+					if pref.len() > 0 {
+						if pref[0] == "%opr" {
+							is_in!(name, $o, int_real_op, is_in!(name, $o, int_op, is_in!(name, $o, real_op, is_in!(name, $o, all_op, is_in!(name, $o, bool_op, None)))))
+						} else {
+							None
+						}
+					} else {
+						None
 					}
 				},
 				_ => None
@@ -862,10 +862,11 @@ impl Checker {
 				unsafe {
 					let cls =
 						if pref[0] == "%mod" {
-							/*(*env.global)*/env.pack().get_cls(None, name).unwrap()
+							let p = Vec::new();
+							env.pack().get_cls(&p, name).unwrap()
 						}
 						else { 
-							/*(*env.global)*/env.pack().get_cls(Some(pref), name).unwrap()
+							env.pack().get_cls(pref, name).unwrap()
 						};
 					if (*cls).params.len() != pcnt {
 						throw!(format!("class {} expect {} params, given {}", name, (*cls).params.len(), pcnt), &expr.addres)
@@ -920,7 +921,7 @@ impl Checker {
 				//println!("GET VAR FOR {:?} {}", pref, name);
 				//println!("{}", env.show());
 				try!(env.get_var(pref, name, &mut expr.kind, &expr.addres));
-				if match *pref{Some(ref p) => p[0] == "%out", _ => false} {
+				if pref[0] == "%out" {
 					env.fun_env_mut().used_outers.insert(name.clone());
 				}
 				/* MUST RECUSRIVE CHECK FOR COMPONENTS */

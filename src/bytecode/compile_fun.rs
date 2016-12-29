@@ -1,9 +1,9 @@
 use bytecode::func::*;
 use bytecode::cmd::*;
 use bytecode::registers::*;
-use std::collections::HashMap;
+use bytecode::state::*;
 use syn::*;
-use std::fmt::Write;
+use std::collections::HashMap;
 
 pub fn compile(fun : &SynFn/*, dst : &mut Vec<CodeFn>, */) {
 	let mut env = Env{
@@ -17,35 +17,6 @@ pub fn compile(fun : &SynFn/*, dst : &mut Vec<CodeFn>, */) {
 	env.print()
 }
 
-struct Env {
-	out   : HashMap<String,u8>,
-	args  : HashMap<String,u8>,
-	loc_i : HashMap<String,u8>,
-	loc_r : HashMap<String,u8>,
-	loc_v : HashMap<String,u8>
-}
-
-impl Show for Env {
-	fn show(&self, _ : usize) -> Vec<String> {
-		let mut res = vec![];
-		macro_rules! go {($name:expr, $store:ident) => {{
-			let mut line = String::new();
-			let _ = write!(line, "{}: {}", $name, '{');
-			for name in self.$store.keys() {
-				let _ = write!(line, "{}:{}, ", name, self.$store.get(name).unwrap());
-			}
-			let _ = write!(line, "{}", '}');
-			res.push(line);
-		}};}
-		go!("OUTERS", out);
-		go!("ARGS", args);
-		go!("LOC INT",  loc_i);
-		go!("LOC REAL", loc_r);
-		go!("LOC VAR",  loc_v);
-		res
-	}
-}
-
 fn make_env(fun : &SynFn, env : &mut Env) {
 	for i in 0 .. fun.args.len() {
 		env.args.insert(fun.args[i].name.clone(), i as u8);
@@ -53,6 +24,26 @@ fn make_env(fun : &SynFn, env : &mut Env) {
 	for i in 0 .. fun.outers.len() {
 		env.out.insert(fun.outers[i].clone(), i as u8);
 	}
+	/*fn expr(e : &Expr, env : &mut Env) {
+		match e {
+			EVal::Call       (_, ref f, ref args) => {
+				let l = args.len() + 1;
+				if env.fargs 
+			},
+			EVal::NewClass   (_, _, _, ref args) => {
+				
+			},
+			EVal::Item       (ref a, ref b) => {
+				
+			},
+			EVal::Arr        (ref a) => {
+			},
+			EVal::Asc        (ref prs) => {
+			},
+			EVal::Attr       (ref obj, _, _) => expr(a),
+			EVal::ChangeType (ref a, _) => expr(a)
+		}
+	}*/
 	fn act(action : &ActF, env : &mut Env) {
 		macro_rules! add {($store:expr, $name:expr) => {
 			if ! $store.contains_key($name) {
@@ -61,6 +52,7 @@ fn make_env(fun : &SynFn, env : &mut Env) {
 			}
 		};}
 		match action.val {
+			//ActVal::Expr(ref e) => expr(e, env),
 			ActVal::DVar(ref name, ref tp, _) => {
 				if tp.is_int() || tp.is_char() || tp.is_bool() {
 					add!(env.loc_i, name)
@@ -130,3 +122,4 @@ fn make_env(fun : &SynFn, env : &mut Env) {
 		act(a, env);
 	}
 }
+

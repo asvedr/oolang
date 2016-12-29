@@ -1,6 +1,7 @@
 pub mod registers;
 pub mod cmd;
 pub mod func;
+pub mod state;
 pub mod compile_fun;
 
 /*

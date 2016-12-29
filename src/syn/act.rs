@@ -229,7 +229,7 @@ fn is_act_end(lexer : &Lexer, curs : &Cursor) -> bool {
 
 fn parse_e_name(lexer : &Lexer, curs : &Cursor) -> SynRes<(Vec<String>, String)> {
 	let mut acc  = vec![];
-	let mut name = String::new();
+	let mut name;// = String::new();
 	let sym = lex_type!(lexer, curs, LexTP::Id);
 	name = sym.val;
 	let mut curs = sym.cursor;

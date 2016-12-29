@@ -208,7 +208,7 @@ impl LocEnv {
 			}
 		}}
 	}
-	pub fn get_var(&self, pref : &mut Option<Vec<String>>, name : &String, tp_dst : &mut Type, pos : &Cursor) -> CheckRes {
+	pub fn get_var(&self, pref : &mut Vec<String>, name : &String, tp_dst : &mut Type, pos : &Cursor) -> CheckRes {
 		macro_rules! clone_type { ($t:expr) => { match *$t {Ok(ref t) => (**t).clone(), Err(ref t) => (**t).clone()} }; }
 		let mut lnk : *const LocEnv = &*self;
 		unsafe { loop {
@@ -216,25 +216,24 @@ impl LocEnv {
 				LocEnv::FunEnv(ref fe) => return fe.get_var(pref, name, tp_dst, pos),
 				LocEnv::SubEnv(ref se) => {
 					//let pref_l : *mut Option<Vec<String>> = &mut *pref;
-					match *pref {
-						None => 
+					if pref.len() == 0 {
 							match se.local.get(name) {
 								Some(t) => {
 									*tp_dst = clone_type!(t);
-									*pref = Some(vec!["%loc".to_string()]);
+									pref.push("%loc".to_string());
 									return Ok(())
 								},
 								None => //unsafe { (*se.parent).get_var(pref, name, tp_dst, pos) }
 									lnk = se.parent
-							},
-						Some(ref mut lst) => 
-							if lst[0] == "%loc" {
-								*tp_dst = clone_type!(se.local.get(name).unwrap());
-								return Ok(())
-							} else {
-								//unsafe { (*se.parent).get_var(&mut *pref_l, name, tp_dst, pos) }
-								lnk = se.parent
 							}
+					} else {
+						if pref[0] == "%loc" {
+							*tp_dst = clone_type!(se.local.get(name).unwrap());
+							return Ok(())
+						} else {
+							//unsafe { (*se.parent).get_var(&mut *pref_l, name, tp_dst, pos) }
+							lnk = se.parent
+						}
 					}
 				}
 			}

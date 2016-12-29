@@ -17,7 +17,7 @@ pub struct CodeFn {
 }
 
 impl Show for CodeFn {
-	fn show(&self, layer : usize) -> Vec<String> {
+	fn show(&self, _ : usize) -> Vec<String> {
 		let mut acc = vec![format!("FUNC {}, {}", self.name, self.args)];
 		acc.push(format!(" CAN THROW EXCEPTION {}", self.can_throw));
 		acc.push(format!(" USE STDI {} USE STDR {}", self.use_std_i, self.use_std_r));

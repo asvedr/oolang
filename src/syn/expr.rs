@@ -14,13 +14,13 @@ pub enum EVal {
 	Bool       (bool),
 	Call       (Option<Vec<Type>>,Box<Expr>,Vec<Expr>),
 	NewClass   (Option<Vec<Type>>,Vec<String>,String,Vec<Expr>),
-	Item       (Box<Expr>,Box<Expr>),         // item of array or asc
-	Var        (Option<Vec<String>>, String), // namespace, name
-	Arr        (Vec<Expr>),                   // new arr
-	Asc        (Vec<Pair<Expr,Expr>>),        // new Asc. Only strings, chars and int allowed for key
+	Item       (Box<Expr>,Box<Expr>),     // item of array or asc
+	Var        (Vec<String>, String),     // namespace, name
+	Arr        (Vec<Expr>),               // new arr
+	Asc        (Vec<Pair<Expr,Expr>>),    // new Asc. Only strings, chars and int allowed for key
 	//          obj       pname  is_meth
-	Attr       (Box<Expr>,String,bool),       // geting class attrib: 'object.prop' or 'object.fun()'
-	ChangeType (Box<Expr>, Type),             // type coersing
+	Attr       (Box<Expr>,String,bool),   // geting class attrib: 'object.prop' or 'object.fun()'
+	ChangeType (Box<Expr>, Type),         // type coersing
 	TSelf,
 	Null
 }
@@ -79,14 +79,13 @@ impl Show for Expr {
 			},
 			EVal::Var(ref p, ref a) => {
 				let mut pref = String::new();
-				match *p {
-					Some(ref v) => {
-						for s in v.iter() {
-							pref.push_str(&*s);
-							pref.push_str("::");
-						}
-					},
-					None => pref.push_str("_::")
+				if p.len() > 0 {
+					for s in p.iter() {
+						pref.push_str(&*s);
+						pref.push_str("::");
+					}
+				} else {
+					pref.push_str("_::")
 				}
 				vec![format!("{}{}{}{}",tab,pref,a,tp)]
 			},
@@ -210,7 +209,7 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 			let prefix = pans.val;
 			curs = pans.cursor;
 			let id = lex_type!(lexer, &curs, LexTP::Id);
-			obj = expr!(EVal::Var(Some(prefix), id.val), curs);
+			obj = expr!(EVal::Var(prefix, id.val), curs);
 			curs = id.cursor;
 		},
 		None =>
@@ -288,7 +287,7 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 					obj = expr!(EVal::NewClass(tmpl,pref,name,args), orig_c);
 				},
 				LexTP::Id   => {
-					obj  = expr!(EVal::Var(None, ans.val), curs);
+					obj  = expr!(EVal::Var(Vec::new(), ans.val), curs);
 					curs = ans.cursor;
 				},
 				LexTP::Br if ans.val == "[" => {
@@ -396,7 +395,7 @@ fn build(seq : &mut Vec<Result<Box<Expr>,usize>>, addr : &Vec<Cursor>) -> Expr {
 			let fun_id = match seq[min_p_ind] {Err(ref i) => OPERS[*i], _ => panic!()};
 			let left  = build_local(seq, addr, left, min_p_ind);
 			let right = build_local(seq, addr, min_p_ind + 1, right);
-			let fun = expr!(EVal::Var(Some(vec!["#opr".to_string()]), fun_id.to_string()), addr[min_p_ind].clone());
+			let fun = expr!(EVal::Var(vec!["%opr".to_string()], fun_id.to_string()), addr[min_p_ind].clone());
 			return expr!(EVal::Call(None, Box::new(fun), vec![left,right]), addr[min_p_ind].clone());
 		}
 	}

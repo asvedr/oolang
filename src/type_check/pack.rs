@@ -24,34 +24,32 @@ macro_rules! pack_of {
 
 macro_rules! get_obj {
 	($_self:expr, $pref:expr, $name:expr, $map:ident, $out_map:ident) => {unsafe {
-		match $pref {
-			Some(pref) => {
-				if pref[0] == "%mod" {
-					match $_self.$map.get($name) {
-						Some(ans) => Some(&*ans),
-						_ => None
-					}
-				} else {
-					let pack = pack_of!($_self, pref);
-					match pack {
-						Some(ptr) =>
-							match (*ptr).$map.get($name) {
-								Some(ans) => Some(&*ans),
-								None => None
-							},
-						_ => None
-					}
-				}
-			},
-			None =>
+		if $pref.len() > 0 {
+			if $pref[0] == "%mod" {
 				match $_self.$map.get($name) {
 					Some(ans) => Some(&*ans),
-					None =>
-						match $_self.$out_map.get($name) {
-							Some(pack) => Some(&*(**pack).$map.get($name).unwrap()),
-							None => None
-						}
+					_ => None
 				}
+			} else {
+				let pack = pack_of!($_self, $pref);
+				match pack {
+					Some(ptr) =>
+						match (*ptr).$map.get($name) {
+							Some(ans) => Some(&*ans),
+							None => None
+						},
+					_ => None
+				}
+			}
+		} else {
+			match $_self.$map.get($name) {
+				Some(ans) => Some(&*ans),
+				None =>
+					match $_self.$out_map.get($name) {
+						Some(pack) => Some(&*(**pack).$map.get($name).unwrap()),
+						None => None
+					}
+			}
 		}
 	}};
 }
@@ -110,13 +108,13 @@ impl Pack {
 		}
 		return out;
 	}
-	pub fn get_cls(&self, pref : Option<&Vec<String>>, name : &String) -> Option<*const TClass> {
+	pub fn get_cls(&self, pref : &Vec<String>, name : &String) -> Option<*const TClass> {
 		get_obj!(self, pref, name, cls, out_cls)
 	}
-	pub fn get_exception(&self, pref : Option<&Vec<String>>, name : &String) -> Option<*const Option<Type>> {
+	pub fn get_exception(&self, pref : &Vec<String>, name : &String) -> Option<*const Option<Type>> {
 		get_obj!(self, pref, name, excepts, out_exc)
 	}
-	pub fn get_fn(&self, pref : Option<&Vec<String>>, name : &String) -> Option<*const Type> {
+	pub fn get_fn(&self, pref : &Vec<String>, name : &String) -> Option<*const Type> {
 		get_obj!(self, pref, name, fns, out_fns)
 	}
 	// changing arg
@@ -137,7 +135,7 @@ impl Pack {
 		// .get_cls, .open_pref
 		// GET OBJ
 		let cls = if pref.len() == 0 {
-			match self.get_cls(None, name) {
+			match self.get_cls(pref, name) {
 				None => syn_throw!(format!("class {} not found", name), pos),
 				Some(cls) => cls
 			}
@@ -149,7 +147,7 @@ impl Pack {
 				_ => return Ok(())
 			}
 		} else {
-			match self.get_cls(Some(pref), name) {
+			match self.get_cls(pref, name) {
 				None => {
 					println!("4!");
 					syn_throw!(format!("class {:?}{} not found", pref, name), pos)

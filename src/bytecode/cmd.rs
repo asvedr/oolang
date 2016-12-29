@@ -12,7 +12,9 @@ pub enum Cmd {
 	SetR(f64,Reg),
 	SetS(String,Reg),
 	//   arr ind dst
-	Item(Reg,Reg,Reg),
+	ItemVec(Reg,Reg,Reg),
+	ItemAsc(Reg,Reg,Reg),
+	ItemStr(Reg,Reg,Reg),
 	//   obj  name  dst
 	Meth(Reg,String,Reg), // it works like make-clos
 	MakeClos(Box<MakeClos>),
@@ -47,7 +49,9 @@ impl Show for Cmd {
 			Cmd::SetI(ref n, ref r) => vec![format!("{}SET INT {} => {:?}", tab, n, r)],
 			Cmd::SetR(ref n, ref r) => vec![format!("{}SER REL {} => {:?}", tab, n, r)],
 			Cmd::SetS(ref n, ref r) => vec![format!("{}SER STR {} => {:?}", tab, n, r)],
-			Cmd::Item(ref ar, ref ind, ref dst) => vec![format!("{}ITEM {:?} [{:?}] => {:?}", tab, ar, ind, dst)],
+			Cmd::ItemVec(ref ar, ref ind, ref dst) => vec![format!("{}ITEM ARR {:?} [{:?}] => {:?}", tab, ar, ind, dst)],
+			Cmd::ItemAsc(ref ar, ref ind, ref dst) => vec![format!("{}ITEM ASC {:?} [{:?}] => {:?}", tab, ar, ind, dst)],
+			Cmd::ItemStr(ref ar, ref ind, ref dst) => vec![format!("{}ITEM STR {:?} [{:?}] => {:?}", tab, ar, ind, dst)],
 			Cmd::Meth(ref obj, ref name, ref dst) => vec![format!("{}METHOD {} (self:{:?}) => {:?}", tab, name, obj, dst)],
 			Cmd::MakeClos(ref cls) => vec![format!("{}{:?}", tab, **cls)],
 			Cmd::Prop(ref obj, ref n, ref dst) => vec![format!("{}PROP {:?} [{:?}] => {:?}", tab, obj, n, dst)],
