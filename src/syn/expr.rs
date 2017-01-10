@@ -57,9 +57,9 @@ impl Show for Expr {
 			EVal::Bool(ref a) => vec![format!("{}{}{}",tab,a,tp)],
 			EVal::Call(_,ref fun,ref args,ref noexc) => {
 				let mut res = if *noexc {
-					vec![format!("{}CALL *noexcept* {}", tab, tp)/*, format!("{}FUN", tab)*/]
+					vec![format!("{}CALL exc:NO  {}", tab, tp)/*, format!("{}FUN", tab)*/]
 				} else {
-					vec![format!("{}CALL{}", tab, tp)/*, format!("{}FUN", tab)*/]
+					vec![format!("{}CALL exc:YES {}", tab, tp)/*, format!("{}FUN", tab)*/]
 				};
 				for line in fun.show(layer + 1) {
 					res.push(line);

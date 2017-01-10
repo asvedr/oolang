@@ -699,6 +699,7 @@ impl Checker {
 								//set_var_type!(env, args[0], $tp);
 								//set_var_type!(env, args[1], $tp);
 								// REGRESS CALL
+								*noexc = true;
 								regress!(&mut args[0], $tp.clone());
 								regress!(&mut args[1], $tp.clone());
 								match *res_type {
@@ -863,11 +864,12 @@ impl Checker {
 								throw!(format!("expect Fn found {:?}", t), f.addres.clone())
 							}
 						}
-						if type_known {
+						//if type_known {
 							// OPT FLAG
+							// CHECK NOEXCEPT
 							match f.val {
 								EVal::Var(ref pref, ref name) => {
-									if pref[0] == "%mod" {
+									if pref[0] != "%loc" {
 										*noexc = env.pack().is_fn_noexcept(pref, name)
 									}
 								},
@@ -882,13 +884,23 @@ impl Checker {
 													_ => panic!()
 												}
 											},
+											Type::Arr(ref item) => {
+												let pref = vec!["%std".to_string()];
+												let name = "%arr".to_string();
+												match env.pack().get_cls(&pref, &name) {
+													Some(cls_ptr) => unsafe {
+														*noexc = (*cls_ptr).is_method_noexc(prop_name)
+													},
+													_ => panic!()
+												}
+											},
 											_ => ()
 										}
 									}
 								}
 								_ => ()
 							}
-						}
+						//}
 					}
 				}
 			},
