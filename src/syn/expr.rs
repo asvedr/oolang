@@ -4,6 +4,7 @@ use syn::reserr::*;
 use syn::type_sys::*;
 use std::str::FromStr;
 use std::mem;
+use std::rc::Rc;
 
 #[derive(Clone)]
 pub enum EVal {
@@ -12,15 +13,15 @@ pub enum EVal {
 	Str        (String),
 	Char       (char),
 	Bool       (bool),
-	Call       (Option<Vec<Type>>,Box<Expr>,Vec<Expr>,bool), // last flag is 'noexcept'
-	NewClass   (Option<Vec<Type>>,Vec<String>,String,Vec<Expr>),
+	Call       (Option<Vec<RType>>,Box<Expr>,Vec<Expr>,bool), // last flag is 'noexcept'
+	NewClass   (Option<Vec<RType>>,Vec<String>,String,Vec<Expr>),
 	Item       (Box<Expr>,Box<Expr>),     // item of array or asc
 	Var        (Vec<String>, String),     // namespace, name
 	Arr        (Vec<Expr>),               // new arr
 	Asc        (Vec<Pair<Expr,Expr>>),    // new Asc. Only strings, chars and int allowed for key
 	//          obj       pname  is_meth
 	Attr       (Box<Expr>,String,bool),   // geting class attrib: 'object.prop' or 'object.fun()'
-	ChangeType (Box<Expr>, Type),         // type coersing
+	ChangeType (Box<Expr>, RType),        // type coersing
 	TSelf,
 	Null
 }
@@ -36,7 +37,7 @@ pub const IROPB : u8 = 6; // int real op => bool
 #[derive(Clone)]
 pub struct Expr {
 	pub val     : EVal,
-	pub kind    : Type,
+	pub kind    : RType,
 	pub addres  : Cursor,
 	pub op_flag : u8      // field for regress type calculation
 }
@@ -155,7 +156,7 @@ impl Show for Expr {
 
 macro_rules! expr {
 	($v:expr, $addr:expr, $k:expr) => {Expr{val : $v, kind : $k,        addres : $addr, op_flag : 0}};
-	($v:expr, $addr:expr)          => {Expr{val : $v, kind : Type::Unk, addres : $addr, op_flag : 0}};
+	($v:expr, $addr:expr)          => {Expr{val : $v, kind : Type::unk(), addres : $addr, op_flag : 0}};
 }
 
 // search for prefix part of id : ModA::ModB::var => [ModA::ModB::]
@@ -226,20 +227,20 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 				LexTP::Int  => {
 					//println!("INT");
 					//println!("VAL: '{}'", ans.val);
-					obj = expr!(EVal::Int(i64::from_str(&*ans.val).unwrap()), curs, Type::Int);
+					obj = expr!(EVal::Int(i64::from_str(&*ans.val).unwrap()), curs, Type::int());
 					curs = ans.cursor;
 					//println!("INTOK");
 				},
 				LexTP::Real => {
-					obj = expr!(EVal::Real(f64::from_str(&*ans.val).unwrap()), curs, Type::Real);
+					obj = expr!(EVal::Real(f64::from_str(&*ans.val).unwrap()), curs, Type::real());
 					curs = ans.cursor;
 				},
 				LexTP::Str  => {
-					obj = expr!(EVal::Str(ans.val), curs, Type::Str);
+					obj = expr!(EVal::Str(ans.val), curs, Rc::new(Type::Str));
 					curs = ans.cursor;
 				},
 				LexTP::Char => {
-					obj = expr!(EVal::Char(ans.val.chars().next().unwrap()), curs, Type::Char);
+					obj = expr!(EVal::Char(ans.val.chars().next().unwrap()), curs, Type::char());
 					curs = ans.cursor;
 				},
 				LexTP::Id if ans.val == "self" => {
@@ -251,11 +252,11 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 					curs = ans.cursor;
 				},
 				LexTP::Id if ans.val == "true"  => {
-					obj = expr!(EVal::Bool(true), curs, Type::Bool);
+					obj = expr!(EVal::Bool(true), curs, Type::bool());
 					curs = ans.cursor;
 				},
 				LexTP::Id if ans.val == "false" => {
-					obj = expr!(EVal::Bool(false), curs, Type::Bool);
+					obj = expr!(EVal::Bool(false), curs, Type::bool());
 					curs = ans.cursor;
 				},
 				LexTP::Id if ans.val == "new" => {

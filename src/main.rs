@@ -4,13 +4,13 @@ mod syn;
 #[macro_use]
 mod type_check;
 mod preludelib;
-mod bytecode;
+//mod bytecode;
 //use std::io;
 use std::io::Read;
 use std::fs::File;
 use syn::*;
 use type_check::checker::*;
-use bytecode::*;
+//use bytecode::*;
 
 fn main() {
 	let mut source = String::new();
@@ -40,7 +40,9 @@ fn main() {
 					_ => m.print()
 				}
 			}
+			/*
 			compile_fun::compile(&m.funs[0]);
+			*/
 		},
 		Err(vec) => {
 			for e in vec {

@@ -8,7 +8,7 @@ pub type CType = String;
 pub struct CFun {
 	pub name      : String,
 	pub cname     : String,
-	pub ftype     : Type,
+	pub ftype     : RType,
 	pub addres    : Cursor,
 	pub no_except : bool
 }

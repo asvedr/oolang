@@ -2,6 +2,7 @@ use syn::reserr::*;
 use syn::utils::*;
 //use syn::lexer::*;
 use std::fmt;
+use std::rc::Rc;
 
 #[derive(Clone,PartialEq)]
 pub enum Type {
@@ -12,26 +13,30 @@ pub enum Type {
 	Str,
 	Bool,
 	Void,
-	Arr(Vec<Type>), // it easily to check then use box (Box<Type>),
+	Arr(Vec<RType>), // it easily to check then use box (Box<Type>),
 	// Asc(Box<Type>,Box<Type>),
 	//    prefix       name   template
-	Class(Vec<String>,String,Option<Vec<Type>>),
+	Class(Vec<String>,String,Option<Vec<RType>>),
 	//  (template)?         args        result
-	Fn(Option<Vec<String>>, Vec<Type>, Box<Type>),
+	Fn(Option<Vec<String>>, Vec<RType>, RType),
 }
+
+pub type RType = Rc<Type>;
 
 #[macro_export]
 macro_rules! type_fn {
 	($t:expr, $args:expr, $res:expr) => {
-		Type::Fn(Some($t), $args, Box::new($res))
+		Rc::new(Type::Fn(Some($t), $args, $res))
 	};
 	($args:expr, $res:expr) => {
-		Type::Fn(None, $args, Box::new($res))
+		Rc::new(Type::Fn(None, $args, $res))
 	};
 }
 #[macro_export]
 macro_rules! type_c {
-	($n:expr) => {Type::Class(vec![], $n, None)}
+	($n:expr) => {Rc::new(Type::Class(vec![], $n, None))};
+	($p:expr, $n:expr) => {Rc::new(Type::Class($p, $n, None))};
+	($p:expr, $n:expr, $t:expr) => {Rc::new(Type::Class($p, $n, $t))}
 }
 
 macro_rules! check_is {($_self:expr, $t:ident) => {
@@ -42,6 +47,18 @@ macro_rules! check_is {($_self:expr, $t:ident) => {
 };}
 
 impl Type {
+	pub fn unk() -> RType { Rc::new(Type::Unk) }
+	pub fn int() -> RType { Rc::new(Type::Int) }
+	pub fn real() -> RType { Rc::new(Type::Real) }
+	pub fn char() -> RType { Rc::new(Type::Char) }
+	pub fn str() -> RType { Rc::new(Type::Str) }
+	pub fn bool() -> RType { Rc::new(Type::Bool) }
+	pub fn void() -> RType { Rc::new(Type::Void) }
+	pub fn arr(a : RType) -> RType { Rc::new(Type::Arr(vec![a])) }
+//	Class(Vec<String>,String,Option<Vec<RType>>),
+	//  (template)?         args        result
+//	Fn(Option<Vec<String>>, Vec<RType>, RType),
+
 	pub fn is_int(&self)  -> bool {check_is!(self, Int)}
 	pub fn is_real(&self) -> bool {check_is!(self, Real)}
 	pub fn is_char(&self) -> bool {check_is!(self, Char)}
@@ -55,13 +72,11 @@ impl Type {
 			_ => false
 		}
 	}
-	pub fn asc_key_val(&self, key : &mut Type, val : &mut Type) {
+	pub fn asc_key_val(&self) -> (RType, RType) {
 		match *self {
-			Type::Class(_,_,Some(ref params)) => {
-				*key = params[0].clone();
-				*val = params[1].clone();
-			},
-			_ => ()
+			Type::Class(_,_,Some(ref params)) =>
+				return (params[0].clone(), params[1].clone()),
+			_ => panic!()
 		}
 	}
 	pub fn is_arr(&self) -> bool {
@@ -70,7 +85,7 @@ impl Type {
 			_ => false
 		}
 	}
-	pub fn arr_item(&self) -> &Type {
+	pub fn arr_item(&self) -> &RType {
 		match *self {
 			Type::Arr(ref i) => &i[0],
 			_ => panic!()
@@ -102,13 +117,13 @@ impl Type {
 			_ => panic!()
 		}
 	}
-	pub fn c_params(&self) -> Option<&Vec<Type>> {
+	pub fn c_params(&self) -> Option<&Vec<RType>> {
 		match *self {
 			Type::Class(_,_,Some(ref v)) => Some(v),
 			_ => None
 		}
 	}
-	pub fn components(&self, res : &mut Vec<*const Type>) {
+	/*pub fn components(&self, res : &mut Vec<*const Type>) {
 		match *self {
 			Type::Arr(ref a) => res.push(&a[0]),
 			Type::Class(_,_,Some(ref v)) => {
@@ -124,7 +139,7 @@ impl Type {
 			},
 			_ => ()
 		}
-	}
+	}*/
 }
 
 impl fmt::Debug for Type {
@@ -162,29 +177,29 @@ impl fmt::Debug for Type {
 
 pub type Tmpl = Vec<String>;
 
-pub fn parse_type(lexer : &Lexer, curs : &Cursor) -> SynRes<Type> {
+pub fn parse_type(lexer : &Lexer, curs : &Cursor) -> SynRes<RType> {
 	let ans = lex!(lexer, curs);
 	match &*ans.val {
-		"int"  => syn_ok!(Type::Int, ans.cursor),
-		"real" => syn_ok!(Type::Real, ans.cursor),
-		"char" => syn_ok!(Type::Char, ans.cursor),
-		"str"  => syn_ok!(Type::Str, ans.cursor),
-		"bool" => syn_ok!(Type::Bool, ans.cursor),
+		"int"  => syn_ok!(Rc::new(Type::Int), ans.cursor),
+		"real" => syn_ok!(Rc::new(Type::Real), ans.cursor),
+		"char" => syn_ok!(Rc::new(Type::Char), ans.cursor),
+		"str"  => syn_ok!(Rc::new(Type::Str), ans.cursor),
+		"bool" => syn_ok!(Rc::new(Type::Bool), ans.cursor),
 		"Fn"   => { // FUNC
 			let args = try!(parse_list(lexer, &ans.cursor, &parse_type, "(", ")"));
 			let curs = lex!(lexer, &args.cursor, ":");
 			let res = try!(parse_type(lexer, &curs));
-			syn_ok!(Type::Fn(None, args.val, Box::new(res.val)), res.cursor);
+			syn_ok!(Rc::new(Type::Fn(None, args.val, res.val)), res.cursor);
 		},
 		"["    => { // ARRAY
 			let inner = try!(parse_type(lexer, &ans.cursor));
 			let out = lex!(lexer, &inner.cursor, "]");
-			let res = Type::Arr(/*Box::new*/vec![inner.val]);
-			syn_ok!(res, out);
+			let res = Type::Arr(vec![inner.val]);
+			syn_ok!(Rc::new(res), out);
 		},
 		"("    => { // VOID
 			let rest = lex!(lexer, &ans.cursor, ")");
-			syn_ok!(Type::Void, rest)
+			syn_ok!(Rc::new(Type::Void), rest)
 		},
 		_      => { // CLASS
 			// this may be 'Class' or 'Class<A,B...>
@@ -195,7 +210,7 @@ pub fn parse_type(lexer : &Lexer, curs : &Cursor) -> SynRes<Type> {
 			macro_rules! class_fin {
 				($pars:expr, $curs:expr) => {{
 					let name = acc.pop().unwrap();
-					syn_ok!(Type::Class(acc, name, $pars), $curs)
+					syn_ok!(Rc::new(Type::Class(acc, name, $pars)), $curs)
 				}};
 			}
 			loop {
@@ -210,7 +225,7 @@ pub fn parse_type(lexer : &Lexer, curs : &Cursor) -> SynRes<Type> {
 								curs = sym.cursor;
 							} else if sym.val == "<" {
 								//let ans = try!(parse_tmpl(lexer, &ans.cursor));
-								let ans : SynAns<Vec<Type>> = try!(parse_list(lexer, &ans.cursor, &parse_type, "<", ">"));
+								let ans : SynAns<Vec<RType>> = try!(parse_list(lexer, &ans.cursor, &parse_type, "<", ">"));
 								//syn_ok!(Type::Class(acc, Some(ans.val)), ans.cursor);
 								class_fin!(Some(ans.val), ans.cursor)
 							} else {

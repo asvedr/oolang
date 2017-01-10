@@ -4,7 +4,7 @@ use std::fmt;
 
 pub struct DefExcept {
 	pub name : String,
-	pub arg  : Option<Type>,
+	pub arg  : Option<RType>,
 	pub addr : Cursor
 }
 

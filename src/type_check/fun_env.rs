@@ -10,7 +10,7 @@ macro_rules! throw {
 
 macro_rules! ok {() => {return Ok(())};}
 
-type VMap = BTreeMap<String, Result<*const Type, *mut Type>>;
+type VMap = BTreeMap<String, Result<RType, *mut RType>>;
 
 type CheckRes    = Result<(),Vec<SynErr>>;
 type CheckAns<A> = Result<A,Vec<SynErr>>;
@@ -21,13 +21,13 @@ pub struct FunEnv {
 	pub outers      : VMap,
 	pub used_outers : HashSet<String>,
 	pub templates   : HashSet<String>,      // local templates
-	pub ret_type    : Option<*const Type>,
+	pub ret_type    : Option<RType>,
 	pub loop_labels : Vec<*const String>,   // for 'break' cmd
-	pub self_val    : Option<*const Type>   // if you check method, then Class in this val. if it's global fun then None
+	pub self_val    : Option<RType>   // if you check method, then Class in this val. if it's global fun then None
 }
 
 impl FunEnv {
-	pub fn new(pack : *const Pack, _self : Option<*const Type>) -> FunEnv {
+	pub fn new(pack : *const Pack, _self : Option<RType>) -> FunEnv {
 		FunEnv {
 			global      : pack,
 			local       : BTreeMap::new(),
@@ -52,18 +52,18 @@ impl FunEnv {
 			self.templates.insert(name.clone());
 		}
 	}
-	pub fn set_ret_type(&mut self, t : &Type) {
-		self.ret_type = Some(&*t);
+	pub fn set_ret_type(&mut self, t : RType) {
+		self.ret_type = Some(t);
 	}
-	pub fn check_ret_type(&self, t : &Type) -> bool {
+	pub fn check_ret_type(&self, t : &RType) -> bool {
 		match self.ret_type {
-			Some(ref t1) => unsafe{ **t1 == *t },
+			Some(ref t1) => *t1 == *t,
 			_ => false
 		}
 	}
-	pub fn ret_type(&self) -> &Type {
+	pub fn ret_type(&self) -> &RType {
 		match self.ret_type {
-			Some(ref t) => unsafe { &**t },
+			Some(ref t) => t,
 			_ => panic!()
 		}
 	}
@@ -85,12 +85,12 @@ impl FunEnv {
 		out
 
 	}
-	pub fn replace_unk(&self, name : &String, tp : &Type) {
+	pub fn replace_unk(&self, name : &String, tp : RType) {
 		match self.local.get(name) {
 			Some(ans) =>
 				unsafe {
 					match *ans {
-						Err(ref ptr) => **ptr = tp.clone(),
+						Err(ref ptr) => **ptr = tp,
 						_ => panic!("replace_unk: var known: {}", name)
 					}
 				},
@@ -99,7 +99,7 @@ impl FunEnv {
 					Some(ans) => 
 						unsafe {
 							match *ans {
-								Err(ref ptr) => **ptr = tp.clone(),
+								Err(ref ptr) => **ptr = tp,
 								_ => panic!("replace_unk: var known: {}", name)
 							}
 						},
@@ -107,21 +107,21 @@ impl FunEnv {
 				}
 		}
 	}
-	pub fn get_local_var(&self, name : &String) -> &Type {
+	pub fn get_local_var(&self, name : &String) -> &RType {
 		match self.local.get(name) {
 			Some(v) =>
 				match *v {
-					Ok(l)  => unsafe { &*l },
-					Err(l) => unsafe { &*l }
+					Ok(ref l)  => l,
+					Err(ref l) => unsafe { &**l }
 				},
 			_ => panic!()
 		}
 	}
-	pub fn get_var(&self, pref : &mut Vec<String>, name : &String, tp_dst : &mut Type, pos : &Cursor) -> CheckRes {
+	pub fn get_var(&self, pref : &mut Vec<String>, name : &String, tp_dst : &mut RType, pos : &Cursor) -> CheckRes {
 		macro_rules! LOCAL   { () => { pref.push(("%loc").to_string()) }; }
 		macro_rules! OUTER   { () => { pref.push(("%out").to_string()) }; }
 		macro_rules! THISMOD { () => { pref.push(("%mod").to_string()) }; }
-		macro_rules! clone_type { ($t:expr) => {match *$t {Ok(ref t) => (**t).clone(), Err(ref t) => (**t).clone()} }; }
+		macro_rules! clone_type { ($t:expr) => {match *$t {Ok(ref t) => (*t).clone(), Err(ref t) => (**t).clone()} }; }
 		if pref.len() == 0 {
 			match self.local.get(name) {
 				Some(t) => {
@@ -139,9 +139,12 @@ impl FunEnv {
 						None => unsafe {
 							match (*self.global).get_fn(pref, name) {
 								Some(t) => {
-									*tp_dst = (*t).clone();
+									*tp_dst = t;
 									match (*self.global).pack_of_fn(name) {
-										Some(p) => *pref = p,
+										Some(p) => {
+											//println!("PACK FOUND {:?}", p);
+											*pref = p
+										},
 										_ => THISMOD!()
 									};
 									ok!()
@@ -163,13 +166,13 @@ impl FunEnv {
 					ok!()
 				} else if pref[0] == "%mod" {
 					let p = Vec::new();
-					*tp_dst = (*(*self.global).get_fn(&p, name).unwrap()).clone();
+					*tp_dst = (*self.global).get_fn(&p, name).unwrap();
 					ok!()
 				}
 				match (*self.global).get_fn(pref, name) {
 					Some(t) => {
 						(*self.global).open_pref(pref);
-						*tp_dst = (*t).clone();
+						*tp_dst = t.clone();
 						ok!()
 					}
 					None => {
@@ -185,20 +188,20 @@ impl FunEnv {
 			}
 		}
 	}
-	pub fn check_exception(&self, pref : &mut Vec<String>, name : &String, pos : &Cursor) -> CheckAns<&Option<Type>> {
+	pub fn check_exception(&self, pref : &mut Vec<String>, name : &String, pos : &Cursor) -> CheckAns<Option<RType>> {
 		unsafe {
 			if pref.len() == 0 {
 				match (*self.global).excepts.get(name) {
 					Some(arg) => {
 						pref.push("%mod".to_string());
-						return Ok(arg);
+						return Ok(arg.clone());
 					},
 					None => {
 						match (*self.global).out_exc.get(name) {
 							Some(pack) => {
 								*pref = (**pack).name.clone();
 								match (**pack).excepts.get(name) {
-									Some(arg) => return Ok(arg),
+									Some(arg) => return Ok(arg.clone()),
 									None => panic!()
 								}
 							},
@@ -213,13 +216,13 @@ impl FunEnv {
 					},
 					Some(arg) => {
 						(*self.global).open_pref(pref);
-						return Ok(&*arg);
+						return Ok(arg);
 					}
 				}
 			}
 		}
 	}
-	pub fn check_class(&self, pref : &mut Vec<String>, name : &String, params : &Option<Vec<Type>>, pos : &Cursor) -> CheckRes {
+	pub fn check_class(&self, pref : &mut Vec<String>, name : &String, params : &Option<Vec<RType>>, pos : &Cursor) -> CheckRes {
 		if pref.len() == 0 {
 			// PREFIX NOT EXIST OR IT'S A TEMPLATE TYPE
 			if self.templates.contains(name) {
@@ -281,9 +284,36 @@ impl FunEnv {
 		}
 	}*/
 	// return Option<(methodType, isMethod)>
-	pub fn get_attrib(&self, cls : &Type, mname : &String, priv_too : bool) -> Option<(Type,bool)> {
+	pub fn get_cls(&self, cls : &Type) -> Option<*const TClass> {
 		unsafe {
 			match *cls {
+				Type::Class(ref pref, ref cname, ref params) => {
+					if pref.len() == 0 || pref[0] == "%mod" {
+						// PREFIX NOT EXIST OR IT'S A TEMPLATE TYPE
+						if self.templates.contains(cname) {
+							None
+						} else {
+						// IT'S IN IMPORTED SPACE
+							let p = Vec::new();
+							(*self.global).get_cls(&p, cname)
+						}
+					} else {
+						// IT'S IN AVAILABLE MODULES
+						(*self.global).get_cls(pref, cname)
+					}
+				},
+				Type::Arr(ref params) => {
+					let cname = format!("%arr");
+					let p = Vec::new();
+					(*self.global).get_cls(&p, &cname)
+				},
+				_ => return None
+			}
+		}
+	}
+	pub fn get_attrib(&self, cls : &RType, mname : &String, priv_too : bool) -> Option<(RType,bool)> {
+		unsafe {
+			match **cls {
 				Type::Class(ref pref, ref cname, ref params) => {
 					let cls : *const TClass =
 						if pref.len() == 0 || pref[0] == "%mod" {
@@ -313,10 +343,7 @@ impl FunEnv {
 					match m {
 						Some(res) => {
 							let flag = (*cls).is_method(mname);
-							match res {
-								Ok(lnk) => return Some( ((*lnk).clone(), flag) ),
-								Err(t) => return Some( (t, flag) )
-							}
+							return Some( (res, flag) )
 						},
 						None => return None
 					}
@@ -329,14 +356,7 @@ impl FunEnv {
 					match m {
 						Some(res) => {
 							let flag = (*cls).is_method(mname);
-							match res {
-								Ok(lnk) => {
-									return Some( ((*lnk).clone(), flag) )
-								},
-								Err(t) => {
-									return Some( (t,flag) )
-								}
-							}
+							return Some( (res, flag) )
 						},
 						None => return None
 					}

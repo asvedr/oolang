@@ -4,11 +4,11 @@ use syn::utils::*;
 use syn::type_sys::*;
 //use lexer::*;
 use syn::reserr::*;
-//use std::fmt;
+use std::rc::Rc;
 
 pub struct Arg {
 	pub name  : String,
-	pub tp    : Type,
+	pub tp    : RType,
 	pub val   : Option<Expr>,
 	pub named : bool
 }
@@ -17,12 +17,12 @@ pub struct SynFn {
 	pub name        : String,
 	pub tmpl        : Tmpl,            // if fun has no tmpl then []
 	pub args        : Vec<Arg>,
-	pub rettp       : Type,            // return type
+	pub rettp       : RType,           // return type
 	pub body        : Vec<Act<SynFn>>, 
 	pub addr        : Cursor,          // fun start addres
 	pub can_be_clos : bool,            // if has names args or option args then can't be used as closure
 	pub has_named   : bool,            // does fun has named args
-	pub ftype       : Type,            // Fn(args) -> res
+	pub ftype       : RType,           // Fn(args) -> res
 	// COMPILE TIME
 	pub outers      : Vec<String>,
 	pub no_except   : bool             // force optimization flag #noexcept
@@ -151,9 +151,9 @@ pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 	}
 	let ftype =
 		if tmpl.len() == 0 {
-			Type::Fn(None, atypes, Box::new(tp.val.clone()))
+			Rc::new(Type::Fn(None, atypes, tp.val.clone()))
 		} else {
-			Type::Fn(Some(tmpl.clone()), atypes, Box::new(tp.val.clone()))
+			Rc::new(Type::Fn(Some(tmpl.clone()), atypes, tp.val.clone()))
 		};
 	let res = SynFn {
 		name        : name.val,

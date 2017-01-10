@@ -8,7 +8,7 @@ use syn::compile_flags::*;
 
 pub struct Class {
 	pub addres    : Cursor,
-	pub parent    : Option<Type>,
+	pub parent    : Option<RType>,
 	pub singleton : bool,
 	pub template  : Vec<String>,
 	pub name      : String,
@@ -21,12 +21,12 @@ pub struct Class {
 pub struct Method {
 	pub is_virt : bool,
 	pub func    : SynFn,
-	pub ftype   : Type // fill in type check
+	pub ftype   : RType // fill in type check
 }
 
 pub struct Prop {
 	pub name   : String,
-	pub ptype  : Type,
+	pub ptype  : RType,
 	pub addres : Cursor
 }
 
@@ -166,18 +166,18 @@ pub fn parse_class(lexer : &Lexer, curs : &Cursor) -> SynRes<Class> {
 			let mut meth = try!(parse_fn_full(lexer, &curs));
 			attr_to_fn!(meth.val);
 			if is_pub {
-				pub_fn.push(Method{is_virt : false, func : meth.val, ftype : Type::Unk});
+				pub_fn.push(Method{is_virt : false, func : meth.val, ftype : Type::unk()});
 			} else {
-				priv_fn.push(Method{is_virt : false, func : meth.val, ftype : Type::Unk});
+				priv_fn.push(Method{is_virt : false, func : meth.val, ftype : Type::unk()});
 			}
 			curs = meth.cursor;
 		} else if sym.val == "virtual" {
 			let mut meth = try!(parse_fn_full(lexer, &sym.cursor));
 			attr_to_fn!(meth.val);
 			if is_pub {
-				pub_fn.push(Method{is_virt : true, func : meth.val, ftype : Type::Unk});
+				pub_fn.push(Method{is_virt : true, func : meth.val, ftype : Type::unk()});
 			} else {
-				priv_fn.push(Method{is_virt : true, func : meth.val, ftype : Type::Unk});
+				priv_fn.push(Method{is_virt : true, func : meth.val, ftype : Type::unk()});
 			}
 			curs = meth.cursor;
 		} else {

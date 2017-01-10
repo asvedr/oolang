@@ -13,7 +13,7 @@ macro_rules! throw {
 #[macro_export]
 macro_rules! ok {() => {return Ok(())};}
 
-pub type VMap = BTreeMap<String, Result<*const Type, *mut Type>>;
+pub type VMap = BTreeMap<String, Result<RType, *mut RType>>;
 // Ok  (WE TRULY KNOW WHAT IT IS)
 // Err (WE CALCULATED THIS AND WE CAN MISTAKE)
 
@@ -68,7 +68,7 @@ macro_rules! get_fenv_m {
 }
 
 impl LocEnv {
-	pub fn new(pack : *const Pack, tmpl : &Vec<String>, _self : Option<*const Type>) -> LocEnv {
+	pub fn new(pack : *const Pack, tmpl : &Vec<String>, _self : Option<RType>) -> LocEnv {
 		//LocEnv::FunEnv(FunEnv::new())
 		let mut env = FunEnv::new(pack, _self);
 		for t in tmpl.iter() {
@@ -79,7 +79,7 @@ impl LocEnv {
 	pub fn inherit(parent : &mut LocEnv) -> LocEnv {
 		LocEnv::SubEnv(SubEnv{parent : &mut *parent, local : BTreeMap::new()})
 	}
-	pub fn self_val(&self) -> Option<*const Type> {
+	pub fn self_val(&self) -> Option<RType> {
 		get_fenv!(self).self_val.clone()
 	}
 	pub fn pack(&self) -> &Pack {
@@ -143,7 +143,7 @@ impl LocEnv {
 			//LocEnv::SubEnv(ref mut se) => unsafe{ (*se.parent).add_outer(out) }
 		}
 	}
-	pub fn set_ret_type(&mut self, t : &Type) {
+	/*pub fn set_ret_type(&mut self, t : &Type) {
 		get_fenv_m!(self).set_ret_type(t)
 	}
 	pub fn check_ret_type(&self, t : &Type) -> bool {
@@ -151,7 +151,7 @@ impl LocEnv {
 	}
 	pub fn ret_type(&self) -> &Type {
 		get_fenv!(self).ret_type()
-	}
+	}*/
 	pub fn show(&self) -> String {
 		match *self {
 			LocEnv::FunEnv(ref fe) => fe.show(),
@@ -168,7 +168,7 @@ impl LocEnv {
 			}
 		}
 	}
-	pub fn replace_unk(&self, name : &String, tp : &Type) {
+	pub fn replace_unk(&self, name : &String, tp : RType) {
 		let mut lnk : *const LocEnv = &*self;
 		unsafe { loop {
 			match *lnk {
@@ -190,7 +190,7 @@ impl LocEnv {
 			}
 		}}
 	}
-	pub fn get_local_var(&self, name : &String) -> &Type {
+	pub fn get_local_var(&self, name : &String) -> &RType {
 		let mut lnk : *const LocEnv = &*self;
 		unsafe { loop {
 			match *lnk {
@@ -198,8 +198,8 @@ impl LocEnv {
 				LocEnv::SubEnv(ref se) => {
 					match se.local.get(name) {
 						Some(v) => match *v {
-							Ok(l) => return &*l,
-							Err(l) => return &*l
+							Ok(ref l) => return &l,
+							Err(ref l) => return &**l
 						},
 						None => //unsafe { (*se.parent).get_local_var(name) }
 							lnk = se.parent
@@ -208,8 +208,8 @@ impl LocEnv {
 			}
 		}}
 	}
-	pub fn get_var(&self, pref : &mut Vec<String>, name : &String, tp_dst : &mut Type, pos : &Cursor) -> CheckRes {
-		macro_rules! clone_type { ($t:expr) => { match *$t {Ok(ref t) => (**t).clone(), Err(ref t) => (**t).clone()} }; }
+	pub fn get_var(&self, pref : &mut Vec<String>, name : &String, tp_dst : &mut RType, pos : &Cursor) -> CheckRes {
+		macro_rules! clone_type { ($t:expr) => { match *$t {Ok(ref t) => (*t).clone(), Err(ref t) => (**t).clone()} }; }
 		let mut lnk : *const LocEnv = &*self;
 		unsafe { loop {
 			match *lnk {
@@ -239,16 +239,16 @@ impl LocEnv {
 			}
 		}}
 	}
-	pub fn check_class(&self, pref : &mut Vec<String>, name : &String, params : &Option<Vec<Type>>, pos : &Cursor) -> CheckRes {
-		get_fenv!(self).check_class(pref, name, params, pos)
-	}
+	//pub fn check_class(&self, pref : &mut Vec<String>, name : &String, params : &Option<Vec<RType>>, pos : &Cursor) -> CheckRes {
+	//	get_fenv!(self).check_class(pref, name, params, pos)
+	//}
 	//pub fn get_class(&self, pref : &Vec<String>, name : &String) -> *const TClass {
 	//	get_fenv!(self).get_class(pref, name)
 	//}
-	pub fn get_attrib(&self, cls : &Type, mname : &String, priv_too : bool) -> Option< (Type,bool) > {
-		get_fenv!(self).get_attrib(cls, mname, priv_too)
-	}
-	pub fn add_loc_var(&mut self, name : &String, tp : Result<*const Type, *mut Type>, pos : &Cursor) -> CheckRes {
+	//pub fn get_attrib(&self, cls : &RType, mname : &String, priv_too : bool) -> Option< (RType,bool) > {
+	//	get_fenv!(self).get_attrib(cls, mname, priv_too)
+	//}
+	pub fn add_loc_var(&mut self, name : &String, tp : Result<RType, *mut RType>, pos : &Cursor) -> CheckRes {
 		//let env = get_fenv_m!(self);
 		let local = match *self {
 			LocEnv::FunEnv(ref mut env) => &mut env.local,

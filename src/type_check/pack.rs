@@ -74,9 +74,9 @@ pub struct Pack {
 	pub out_fns  : BTreeMap<String,*const Pack>, // imports *
 	pub out_exc  : BTreeMap<String,*const Pack>, // imports *
 	pub cls      : HashMap<String,TClass>,
-	pub fns      : BTreeMap<String,Type>,
+	pub fns      : BTreeMap<String,RType>,
 	pub fns_noex : BTreeSet<String>,             // optimizator noexcept flag
-	pub excepts  : BTreeMap<String,Option<Type>>
+	pub excepts  : BTreeMap<String,Option<RType>>
 }
 
 impl Pack {
@@ -115,11 +115,11 @@ impl Pack {
 			
 			for pname in cls.privs.keys() {
 				let attr = cls.privs.get(pname).unwrap();
-				let _ = write!(out, "\t\tPRIV {} {:?}\n", pname, unsafe{&*attr._type});
+				let _ = write!(out, "\t\tPRIV {} {:?}\n", pname, attr._type);
 			}
 			for pname in cls.pubs.keys() {
 				let attr = cls.pubs.get(pname).unwrap();
-				let _ = write!(out, "\t\tPUB  {} {:?}\n", pname, unsafe{&*attr._type});
+				let _ = write!(out, "\t\tPUB  {} {:?}\n", pname, attr._type);
 			}
 			
 		}
@@ -128,11 +128,17 @@ impl Pack {
 	pub fn get_cls(&self, pref : &Vec<String>, name : &String) -> Option<*const TClass> {
 		get_obj!(self, pref, name, cls, out_cls)
 	}
-	pub fn get_exception(&self, pref : &Vec<String>, name : &String) -> Option<*const Option<Type>> {
-		get_obj!(self, pref, name, excepts, out_exc)
+	pub fn get_exception(&self, pref : &Vec<String>, name : &String) -> Option<Option<RType>> {
+		match get_obj!(self, pref, name, excepts, out_exc) {
+			Some(l) => Some(l.clone()),
+			_       => None
+		}
 	}
-	pub fn get_fn(&self, pref : &Vec<String>, name : &String) -> Option<*const Type> {
-		get_obj!(self, pref, name, fns, out_fns)
+	pub fn get_fn(&self, pref : &Vec<String>, name : &String) -> Option<RType> {
+		match get_obj!(self, pref, name, fns, out_fns) {
+			Some(l) => Some(l.clone()),
+			_       => None
+		}
 	}
 	// DON'T USE WITH pref == []
 	pub fn is_fn_noexcept(&self, pref : &Vec<String>, name : &String) -> bool {
@@ -162,7 +168,7 @@ impl Pack {
 	pub fn pack_of_cls(&self, name : &String) -> Option<Vec<String>> { // Some(pack) or None[it mean then class is in self module]
 		find_import!(self, name, cls, out_cls)
 	}
-	pub fn check_class(&self, pref : &mut Vec<String>, name : &String, params : &Option<Vec<Type>>, pos : &Cursor) -> Result<(), Vec<SynErr>> {
+	pub fn check_class(&self, pref : &mut Vec<String>, name : &String, params : &Option<Vec<RType>>, pos : &Cursor) -> Result<(), Vec<SynErr>> {
 		// .get_cls, .open_pref
 		// GET OBJ
 		let cls = if pref.len() == 0 {

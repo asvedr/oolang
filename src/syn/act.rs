@@ -2,14 +2,13 @@ use syn::reserr::*;
 use syn::utils::*;
 use syn::expr::*;
 use syn::type_sys::*;
-//use std::fmt;
 
 // DF is non declared struct for 'def function'
 pub struct SynCatch<DF> {
 	pub epref  : Vec<String>,
 	pub ekey   : String,
 	pub vname  : Option<String>,
-	pub vtype  : Type,
+	pub vtype  : RType,
 	pub act    : Vec<Act<DF>>,
 	pub addres : Cursor
 }
@@ -18,7 +17,7 @@ pub enum ActVal<DF> {
 	Expr(Expr),
 	DFun(Box<DF>),
 	//   name   var type     init val
-	DVar(String,Type,Option<Expr>),
+	DVar(String,RType,Option<Expr>),
 	//   a  =  b
 	Asg(Expr,Expr),
 	Ret(Option<Expr>),
@@ -28,7 +27,7 @@ pub enum ActVal<DF> {
 	//   label         vname  from  to   body
 	For(Option<String>,String,Expr,Expr,Vec<Act<DF>>), // for i in range(a + 1, b - 2) {}
 	//      label          vname  vtype cont  body
-	Foreach(Option<String>,String,Type, Expr,Vec<Act<DF>>),  // for i in array {}
+	Foreach(Option<String>,String,RType, Expr,Vec<Act<DF>>),  // for i in array {}
 	// cond   then    else
 	If(Expr,Vec<Act<DF>>,Vec<Act<DF>>),
 	Try(Vec<Act<DF>>,Vec<SynCatch<DF>>), // try-catch
@@ -267,7 +266,7 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
 				curs = tp.cursor;
 				tp.val
 			} else {
-				Type::Unk
+				Type::unk()
 			};
 			// try find init val
 			if is_act_end(lexer, &curs) {
@@ -317,7 +316,7 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
 			// var name
 			let var = lex_type!(lexer, &curs, LexTP::Id);
 			let ans = lex!(lexer, &var.cursor);
-			let mut tp = Type::Unk;
+			let mut tp = Type::unk();
 			if ans.val == ":" {
 				let ans = try!(parse_type(lexer, &ans.cursor));
 				curs = ans.cursor;
@@ -380,7 +379,7 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
 					if ans.val == "{" {
 						let al = parse_act_list(lexer, &curs, fparse)?;
 						curs = al.cursor;
-						ctchs.push(SynCatch{ekey : String::new(), epref : vec![], vtype : Type::Unk, vname : None, act : al.val, addres : addr});
+						ctchs.push(SynCatch{ekey : String::new(), epref : vec![], vtype : Type::unk(), vname : None, act : al.val, addres : addr});
 					} else {
 						// ans - EXCEPTON NAME
 						//let key = lex_type!(lexer, &curs, LexTP::Id);
@@ -402,7 +401,7 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
 						}
 						let al = parse_act_list(lexer, &curs, fparse)?;
 						curs = al.cursor;
-						ctchs.push(SynCatch{ekey : name, epref : pref, vname : var, vtype : Type::Unk, act : al.val, addres : addr});
+						ctchs.push(SynCatch{ekey : name, epref : pref, vname : var, vtype : Type::unk(), act : al.val, addres : addr});
 						//ctchs.push(SynCatch{except : Some(tp.val), vname : Some(ans.val), act : al.val, addres : addr});
 					}
 				} else {
