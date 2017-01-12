@@ -16,12 +16,18 @@ pub struct Env {
 pub struct State {
 	pub mod_name : String,
 	pub env      : Env,
+	catches   : Vec<u8>, // READONLY current stack of catch blocks
+	loops     : Vec<u8>  // READONLY current stack of loops
 	//pub max_i  : u8,
 	//pub max_r  : u8,
 	//pub max_v  : u8,
-	stack_i : u8,
-	stack_r : u8,
-	stack_v : u8
+	stack_i   : u8,
+	stack_r   : u8,
+	stack_v   : u8,
+	lambda_n  : usize,  // counter for making names for local funs
+	exc_off   : bool,
+	c_counter : u8, // id generator for catch sections
+	l_counter : u8, // id generator for loop sections
 }
 
 macro_rules! push {($_self:expr, $st:ident, $mx:ident) => {{
@@ -46,7 +52,12 @@ impl State {
 //			max_v    : 0,
 			stack_i  : 0,
 			stack_r  : 0,
-			stack_v  : 0
+			stack_v  : 0,
+			lambda_n : 0,
+			exc_off  : false,
+			catches  : vec![],
+			loops_in : vec![],
+			loops_out: vec![]
 		}
 	}
 	pub fn push_i(&mut self) -> u8 {
@@ -66,6 +77,56 @@ impl State {
 	}
 	pub fn pop_v(&mut self) -> u8 {
 		pop!(self, stack_v)
+	}
+	pub fn pop_this_stack(&mut self, reg : &Reg) {
+		if reg.is_stack() {
+			if reg.is_int() {
+				self.pop_i()
+			} else if reg.is_real() {
+				self.pop_r()
+			} else {
+				self.pop_v()
+			}
+		}
+	}
+	pub fn clear_stacks(&mut self) {
+		stack_i.clear();
+		stack_r.clear();
+		stack_v.clear();
+	}
+	pub fn push_loop(&mut self) -> u8 {
+		self.loops.push(self.counter_l);
+		self.counter_l += 1;
+	}
+	pub fn pop_loop(&mut self) {
+		self.loops.pop();
+	}
+	pub fn push_trycatch(&mut self) -> u8 {
+		self.catches.push(self.counter_c);
+		self.counter_c += 1;
+	}
+	pub fn pop_trycatch(&mut self) {
+		self.catches.pop();
+	}
+	pub fn try_catch_label(&self) -> String {
+		let n = self.catches[self.catches.len() - 1];
+		format!("TRY_CATCH{}", n);
+	}
+	pub fn try_ok_label(&self) -> String {
+		let n = self.catches[self.catches.len() - 1];
+		format!("TRY_OK{}", n)
+	}
+	pub fn loop_in_label(&self) -> String {
+		let n = self.loops[self.loops.len() - 1];
+		format!("LOOP_BEGIN{}", n);
+	}
+	pub fn loop_out_label(&self) -> String {
+		let n = self.loops[self.loops.len() - 1];
+		format!("LOOP_END{}", n);
+	}
+	pub fn break_label(&self, skip : usize) -> String {
+		let n = self.loops[self.loops.len() - skip];
+		format!("LOOP_END{}", n);
 	}
 }
 

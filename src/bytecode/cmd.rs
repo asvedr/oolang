@@ -7,6 +7,7 @@ pub enum Cmd {
 	Mov(Reg,Reg),
 	IOp(Box<Opr>), // int operation
 	ROp(Box<Opr>), // real operation
+	VOp(Box<Opr>), // oper for object
 	Call(Box<Call>),
 	SetI(isize,Reg),
 	SetR(f64,Reg),
@@ -22,13 +23,61 @@ pub enum Cmd {
 	NewCls(Box<NewCls>),
 
 	Throw(usize,Option<Reg>), // try optimize it: if catch in this function, just use simple goto
-	Ret(Option<Reg>),
+	Ret(Reg),
 	Goto(String), // used by break, loops, try-catch
 	If(Reg,Vec<Cmd>,Vec<Cmd>),
 
 	// NOT EXECUTABLE
+	Noop,
 	Label(String), // for goto
 	Catch(Vec<Catch>) // translated to switch(ex_type){case ...}
+}
+
+impl Cmd {
+	pub fn get_out(&self) -> Option<&Reg> {
+		match *self {		
+			Reg::Mov(_,ref a) => Some(a),
+			Reg::IOp(ref o) => Some(&o.dst),
+			Reg::ROp(ref o) => Some(&o.dst),
+			Reg::VOp(ref o) => Some(&o.dst),
+			Reg::Call(ref c) => Some(&c.dst),
+			Reg::SetI(_, ref a) => Some(a),
+			Reg::SetR(_, ref a) => Some(a),
+			Reg::SetS(_, ref a) => Some(a),
+			Reg::WithItem(ref i) =>
+				if i.is_get {
+					Some(&i.value)
+				} else {
+					None
+				},
+			Reg::Meth(_,_,ref a) => Some(a),
+			Reg::MakeClos(ref c) => Some(&c.dst),
+			Reg::Prop(_,_,ref a) => Some(a),
+			Reg::Conv(_,_,ref a) => Some(a),
+			_ => None
+		}
+	}
+	pub fn set_out(&mut self, out : Reg) {
+		match *self {		
+			Reg::Mov(_,ref mut a) => *a = out,
+			Reg::IOp(ref mut o) => o.dst = out,
+			Reg::ROp(ref mut o) => o.dst = out,
+			Reg::VOp(ref mut o) => o.dst = out,
+			Reg::Call(ref mut c) => c.dst = out,
+			Reg::SetI(_, ref mut a) => *a = out,
+			Reg::SetR(_, ref mut a) => *a = out,
+			Reg::SetS(_, ref mut a) => *a = out,
+			Reg::WithItem(ref i) =>
+				if i.is_get {
+					i.value = out
+				},
+			Reg::Meth(_,_,ref a) => *a = out,
+			Reg::MakeClos(ref c) => c.dst = out,
+			Reg::Prop(_,_,ref a) => *a = out,
+			Reg::Conv(_,_,ref a) => *a = out,
+			_ => ()
+		}
+	}
 }
 
 impl Show for Cmd {
@@ -42,6 +91,7 @@ impl Show for Cmd {
 			Cmd::Mov(ref a, ref b) => vec![format!("{}{:?} => {:?}", tab, a, b)],
 			Cmd::IOp(ref opr) => vec![format!("{}int {:?}", tab, opr)], // int operation
 			Cmd::ROp(ref opr) => vec![format!("{}real {:?}", tab, opr)], // real operation
+			Cmd::VOp(ref opr) => vec![format!("{}object {:?}", tab, opr)], // object operation
 			Cmd::Call(ref cal) => vec![format!("{}{:?}", tab, **cal)],
 			Cmd::SetI(ref n, ref r) => vec![format!("{}SET INT {} => {:?}", tab, n, r)],
 			Cmd::SetR(ref n, ref r) => vec![format!("{}SER REL {} => {:?}", tab, n, r)],
@@ -77,6 +127,7 @@ impl Show for Cmd {
 				acc.push(format!("{}ENDIF", tab));
 				acc
 			},
+			Cmd::Noop => vec![format!("{}NOOP", tab)],
 			Cmd::Catch(ref lst) => {
 				let mut acc = vec![format!("{}CATCH", tab)];
 				for ctch in lst.iter() {
@@ -128,15 +179,16 @@ pub struct Opr {
 	pub a   : Reg,
 	pub b   : Reg,
 	pub dst : Reg,
-	pub opr : char
+	pub opr : String,
+	pub is_f: bool
 }
 
 pub struct Call {
 	pub func        : Reg,
 	pub args        : Vec<Reg>,
 	pub dst         : Reg,
-	pub can_throw   : bool,
-	pub catch_block : Option<String>
+//	pub can_throw   : bool,
+	pub catch_block : Option<String> // NONE ONLY OF CAN'T THROW
 }
 
 pub struct MakeClos {
@@ -145,11 +197,11 @@ pub struct MakeClos {
 	pub dst    : Reg
 }
 
-pub struct NewCls {
+/*pub struct NewCls {
 	pub cls  : usize,
 	pub args : Vec<Reg>,
 	pub dst  : Reg
-}
+}*/
 
 pub struct Catch {
 	pub key  : usize,

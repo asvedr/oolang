@@ -2,61 +2,55 @@ Synopsis:
 Objective oriented language with module system, closures, GC, try-catch, static typing with hindley-milner, FFI to C.
 Compilation to C.
 
-Semantic:
+fn arr<A>(a : A) : [A] {
+	return []
+}
 
-DefModule ::= (Use;)* (ModuleBody)*
-Use ::= 'use' (id '::')* id ['as' id]
-        'use' (id '::')* '*'
-ModuleBody ::= DefFun                            // define function
-               DefClass                          // define class
-               'extern' 'fn' id ':' Type '=' str // FFI function
-               'extern' 'type' id                // FFI type
+class Point {
+	pub x : real;
+	pub y : real;
+	pub fn add(p : Point) : Point {
+		return new Point(self.x + p.x, self.y + p.y);
+	};
+	pub fn mul(a : real) : Point {
+		return new Point(self.x * a, self.y * a);
+	};
+	pub fn init(x : real, y : real) : () {
+		self.x = x;
+		self.y = y;
+	}
+}
 
-//                   if singleton    template         name  if inherit
-DefClass ::= 'class' ['single']    ['<' (Type,)+ '>'] id    [':' Type]   '{' (ClassItem)* '}'
+class Pass { pub fn init():(){} }
 
-ClassItem ::= ('pub'|'priv') ['virtual'] DefFun // method
-              ('pub'|'priv') id ':' Type        // property
+class<A> Node {
+	pub next : Node<A>;
+	pub val  : A;
+	pub fn init(h : A, t : Node<A>) : () {
+		self.next = t;
+		self.val = h;
+	}
+}
 
-DefFun ::= 'fn' id ['<' (Name,)+ '>'] '(' (Arg,)* ')' ':' Type ActList
-Arg ::= ['~'] id ['=' Expr] ':' Type
 
-ActList ::= '{' (Action ;)* '}' // body of funs, loops, conditions
-// code action
-Action ::= Expr
-           DefFun                                                  // local fun definition
-           'var' id [':' Type] ['=' Expr]                          // local var definition
-           Expr '=' Expr                                           // assignation
-           'return' Expr                                           // return
-           'break' [id]                                            // break loop [by id]
-           'while' ['::' id] Expr ActList                          // loop [with id]
-		   'for' ['::' id] id [':' Type] 'in' Expr ActList         // foreach loop
-		   'for' ['::' id] id [':' Type] 'in' Expr .. Expr ActList // 'for i in 0 .. 10 \n print(i)'
-           'if' Expr ActList ['else' ActList]                      // condition
-           'try' ActList ('catch' id [id] ActList)+                // try-catch
-           'throw' id [Expr]                                       // throw exception with optional param
-
-Expr ::= Expr '(' (Expr,)* ')'                          // fun call
-         Expr operator Expr                             // operators '+', '-', '*', '/' ...
-         Expr '.' Expr                                  // property of object 
-         Expr '[' Expr ']'                              // item of array
-         'new' Type ['<' (Type,)+ '>'] '(' (Expr,)* ')' // new object
-         Expr 'as' Type                                 // type coersing
-         '[' (Expr,)* ']'                               // new array
-         '{' ((Expr ':' Expr) ,)* '}'                   // new hash tbl
-         id                                             // variable
-         number                                         // int or float
-         str                                            // string
-         char                                           // char
-		 'null'
-		 'self'
-
-Type ::= 'int'
-         'real'
-         'str'
-         'bool'
-         'char'
-         '()'                           // void
-         '['Type']'                     // array of
-         (id ::)*id ['<'(Type,)+'>']    // class
-         'Fn' '(' (Type,)* ')' ':' Type // function
+class<A> Stack {
+	priv head : Node<A>;
+	priv _len  : int;
+	pub fn len() : int {
+		return self._len;
+	};
+	pub fn push(item : A) : () {
+		self._len = self._len + 1;
+		self.head = new Node<A>(item, self.head);
+	};
+	pub fn pop() : A {
+		if self.head == null {
+			throw new Exception("NULL")
+		} else {
+			self._len = self._len - 1;
+			var hd = self.head;
+			self.head = hd.next;
+			return hd.val;
+		}
+	}
+}
