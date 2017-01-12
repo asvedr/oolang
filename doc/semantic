@@ -1,0 +1,69 @@
+compile flags:
+#NoExcept:
+	> Optimisation flag. Calling #NoExcept function hasn't check for except value. It faster but can be not safe.
+	> #NoExcept call automaticly used on fun's that defined as #NoExcept in all calls.
+	> all calls IN NOEXCEPT FUNCTION used as #NoExcept calls
+	> YOU CAN'T USE EXCEPTION INSIDE BODY OF noexcept function
+	- can use on toplevel when defining function or FFI c function
+	- can use on class when defining method
+
+comments:
+	// \n
+	/*  */
+
+DefModule ::= (Use;)* (ModuleBody)*
+Use ::= 'use' (id '::')* id ['as' id]
+        'use' (id '::')* '*'
+ModuleBody ::= DefFun                            // define function
+               DefClass                          // define class
+               'extern' 'fn' id ':' Type '=' str // FFI function
+               'extern' 'type' id                // FFI type
+
+//                   if singleton    template         name  if inherit
+DefClass ::= 'class' ['single']    ['<' (Type,)+ '>'] id    [':' Type]   '{' (ClassItem)* '}'
+
+ClassItem ::= ('pub'|'priv') ['virtual'] DefFun // method
+              ('pub'|'priv') id ':' Type        // property
+
+DefFun ::= 'fn' id ['<' (Name,)+ '>'] '(' (Arg,)* ')' ':' Type ActList
+Arg ::= ['~'] id ['=' Expr] ':' Type
+
+ActList ::= '{' (Action ;)* '}' // body of funs, loops, conditions
+// code action
+Action ::= Expr
+           DefFun                                                  // local fun definition
+           'var' id [':' Type] ['=' Expr]                          // local var definition
+           Expr '=' Expr                                           // assignation
+           'return' Expr                                           // return
+           'break' [id]                                            // break loop [by id]
+           'while' ['::' id] Expr ActList                          // loop [with id]
+		   'for' ['::' id] id [':' Type] 'in' Expr ActList         // foreach loop
+		   'for' ['::' id] id [':' Type] 'in' Expr .. Expr ActList // 'for i in 0 .. 10 \n print(i)'
+           'if' Expr ActList ['else' ActList]                      // condition
+           'try' ActList ('catch' id [id] ActList)+                // try-catch
+           'throw' id [Expr]                                       // throw exception with optional param
+
+Expr ::= Expr '(' (Expr,)* ')'                          // fun call
+         Expr operator Expr                             // operators '+', '-', '*', '/' ...
+         Expr '.' Expr                                  // property of object 
+         Expr '[' Expr ']'                              // item of array
+         'new' Type ['<' (Type,)+ '>'] '(' (Expr,)* ')' // new object
+         Expr 'as' Type                                 // type coersing
+         '[' (Expr,)* ']'                               // new array
+         '{' ((Expr ':' Expr) ,)* '}'                   // new hash tbl
+         id                                             // variable
+         number                                         // int or float
+         str                                            // string
+         char                                           // char
+		 'null'
+		 'self'
+
+Type ::= 'int'
+         'real'
+         'str'
+         'bool'
+         'char'
+         '()'                           // void
+         '['Type']'                     // array of
+         (id ::)*id ['<'(Type,)+'>']    // class
+         'Fn' '(' (Type,)* ')' ':' Type // function

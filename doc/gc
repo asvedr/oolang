@@ -1,0 +1,3 @@
+GC is a reference counting without remove-if on all dec-link
+every N1 time's you call alloc-var-mem using soft gc call that clear soft heap
+every N2 time's you call soft heap used calling hard gc that clear hard heap

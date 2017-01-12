@@ -1,0 +1,31 @@
+primes types:
+	int
+	real
+	char
+	bool
+GC not used for primes
+
+class types:
+	- str
+	- [type] - (array of 'type')
+	- Asc<key,val> - hash map 
+	- user defined classes 'A'
+	- user defined templates classes 'A<P1,P2...>
+GC used for classes
+
+using coersing:
+	obj.call() as Type
+
+coersing with transmutation:
+int to str
+int to real
+int to bool
+real to int
+real to str
+int to bool
+bool to int
+str to int
+str to real
+str to bool
+
+all other coersing just change value in type check system
