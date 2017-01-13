@@ -29,7 +29,7 @@ impl ExcKeys {
 	pub fn get(&self, pref : &Vec<String>, name : &String) -> usize {
 		let mut res = String::new();
 		make_name!(pref, name, res);
-		match self.map.get(res) {
+		match self.map.get(&res) {
 			Some(a) => *a,
 			_ => panic!("bad exception key: {}", name)
 		}
@@ -85,6 +85,8 @@ macro_rules! push {($_self:expr, $st:ident, $mx:ident) => {{
 		$_self.$st - 1
 }};}
 macro_rules! pop{($_self:expr, $st:ident) => {{
+	if $_self.$st == 0
+		{ return 0; }
 	$_self.$st -= 1;
 	return $_self.$st + 1;
 }};}
@@ -135,13 +137,14 @@ impl State {
 		}
 	}
 	pub fn clear_stacks(&mut self) {
-		stack_i.clear();
-		stack_r.clear();
-		stack_v.clear();
+		self.stack_i = 0;
+		self.stack_r = 0;
+		self.stack_v = 0;
 	}
 	pub fn push_loop(&mut self) -> u8 {
 		self.loops.push(self.l_counter);
 		self.l_counter += 1;
+		self.l_counter
 	}
 	pub fn pop_loop(&mut self) {
 		self.loops.pop();
@@ -149,13 +152,14 @@ impl State {
 	pub fn push_trycatch(&mut self) -> u8 {
 		self.catches.push(self.c_counter);
 		self.c_counter += 1;
+		self.c_counter
 	}
 	pub fn pop_trycatch(&mut self) {
 		self.catches.pop();
 	}
 	pub fn try_catch_label(&self) -> String {
 		let n = self.catches[self.catches.len() - 1];
-		format!("TRY_CATCH{}", n);
+		format!("TRY_CATCH{}", n)
 	}
 	pub fn try_ok_label(&self) -> String {
 		let n = self.catches[self.catches.len() - 1];
@@ -163,15 +167,15 @@ impl State {
 	}
 	pub fn loop_in_label(&self) -> String {
 		let n = self.loops[self.loops.len() - 1];
-		format!("LOOP_BEGIN{}", n);
+		format!("LOOP_BEGIN{}", n)
 	}
 	pub fn loop_out_label(&self) -> String {
 		let n = self.loops[self.loops.len() - 1];
-		format!("LOOP_END{}", n);
+		format!("LOOP_END{}", n)
 	}
 	pub fn break_label(&self, skip : usize) -> String {
 		let n = self.loops[self.loops.len() - skip];
-		format!("LOOP_END{}", n);
+		format!("LOOP_END{}", n)
 	}
 }
 

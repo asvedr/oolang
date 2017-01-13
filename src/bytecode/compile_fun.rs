@@ -2,7 +2,7 @@ use bytecode::func::*;
 use bytecode::cmd::*;
 use bytecode::registers::*;
 use bytecode::state::*;
-use bytecode::compile_act::*;
+use bytecode::compile_act as c_act;
 use syn::*;
 use std::collections::HashMap;
 
@@ -58,7 +58,7 @@ pub fn compile(fun : &SynFn/*, dst : &mut Vec<CodeFn>, */) -> CFun {
 	let gc = GlobalConf::new(6);
 	let mut body = vec![];
 	state.push_trycatch();
-	compile_act(fun.body, &mut state, &gc, &mut body);
+	c_act::compile(&fun.body, &mut state, &gc, &mut body);
 	if body.len() == 0 || match body[body.len() - 1] {Cmd::Ret(_) => false, _ => true} {
 		body.push(Cmd::Ret(Reg::Null))
 	}
@@ -93,9 +93,9 @@ fn get_stacks_size(cmds : &Vec<Cmd>, si : &mut u8, sr : &mut u8, sv : &mut u8) {
 			match reg {
 				Some(reg) => {
 					match *reg {
-						Reg::IStack(ref n) => set_max!(si, *n),
-						Reg::RStack(ref n) => set_max!(sr, *n),
-						Reg::VStack(ref n) => set_max!(sv, *n),
+						Reg::IStack(ref n) => set_max!(si, *n + 1),
+						Reg::RStack(ref n) => set_max!(sr, *n + 1),
+						Reg::VStack(ref n) => set_max!(sv, *n + 1),
 						_ => ()
 					}
 					true

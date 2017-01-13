@@ -37,45 +37,45 @@ pub enum Cmd {
 impl Cmd {
 	pub fn get_out(&self) -> Option<&Reg> {
 		match *self {		
-			Reg::Mov(_,ref a) => Some(a),
-			Reg::IOp(ref o) => Some(&o.dst),
-			Reg::ROp(ref o) => Some(&o.dst),
-			Reg::VOp(ref o) => Some(&o.dst),
-			Reg::Call(ref c) => Some(&c.dst),
-			Reg::SetI(_, ref a) => Some(a),
-			Reg::SetR(_, ref a) => Some(a),
-			Reg::SetS(_, ref a) => Some(a),
-			Reg::WithItem(ref i) =>
+			Cmd::Mov(_,ref a) => Some(a),
+			Cmd::IOp(ref o) => Some(&o.dst),
+			Cmd::ROp(ref o) => Some(&o.dst),
+			Cmd::VOp(ref o) => Some(&o.dst),
+			Cmd::Call(ref c) => Some(&c.dst),
+			Cmd::SetI(_, ref a) => Some(a),
+			Cmd::SetR(_, ref a) => Some(a),
+			Cmd::SetS(_, ref a) => Some(a),
+			Cmd::WithItem(ref i) =>
 				if i.is_get {
 					Some(&i.value)
 				} else {
 					None
 				},
-			Reg::Meth(_,_,ref a) => Some(a),
-			Reg::MakeClos(ref c) => Some(&c.dst),
-			Reg::Prop(_,_,ref a) => Some(a),
-			Reg::Conv(_,_,ref a) => Some(a),
+			Cmd::Meth(_,_,ref a) => Some(a),
+			Cmd::MakeClos(ref c) => Some(&c.dst),
+			Cmd::Prop(_,_,ref a) => Some(a),
+			Cmd::Conv(_,_,ref a) => Some(a),
 			_ => None
 		}
 	}
 	pub fn set_out(&mut self, out : Reg) {
 		match *self {		
-			Reg::Mov(_,ref mut a) => *a = out,
-			Reg::IOp(ref mut o) => o.dst = out,
-			Reg::ROp(ref mut o) => o.dst = out,
-			Reg::VOp(ref mut o) => o.dst = out,
-			Reg::Call(ref mut c) => c.dst = out,
-			Reg::SetI(_, ref mut a) => *a = out,
-			Reg::SetR(_, ref mut a) => *a = out,
-			Reg::SetS(_, ref mut a) => *a = out,
-			Reg::WithItem(ref i) =>
+			Cmd::Mov(_,ref mut a) => *a = out,
+			Cmd::IOp(ref mut o) => o.dst = out,
+			Cmd::ROp(ref mut o) => o.dst = out,
+			Cmd::VOp(ref mut o) => o.dst = out,
+			Cmd::Call(ref mut c) => c.dst = out,
+			Cmd::SetI(_, ref mut a) => *a = out,
+			Cmd::SetR(_, ref mut a) => *a = out,
+			Cmd::SetS(_, ref mut a) => *a = out,
+			Cmd::WithItem(ref mut i) =>
 				if i.is_get {
 					i.value = out
 				},
-			Reg::Meth(_,_,ref a) => *a = out,
-			Reg::MakeClos(ref c) => c.dst = out,
-			Reg::Prop(_,_,ref a) => *a = out,
-			Reg::Conv(_,_,ref a) => *a = out,
+			Cmd::Meth(_,_,ref mut a) => *a = out,
+			Cmd::MakeClos(ref mut c) => c.dst = out,
+			Cmd::Prop(_,_,ref mut a) => *a = out,
+			Cmd::Conv(_,_,ref mut a) => *a = out,
 			_ => ()
 		}
 	}
@@ -226,6 +226,6 @@ impl Debug for Call {
 			Some(ref t) => t.to_string(),
 			_ => "_".to_string()
 		};
-		write!(f, "CALL[TRY:{:?} CATCH: {}]: {:?} {:?} => {:?}", self.can_throw, catch, self.func, self.args, self.dst)
+		write!(f, "CALL[CATCH: {}]: {:?} {:?} => {:?}", catch, self.func, self.args, self.dst)
 	}
 }

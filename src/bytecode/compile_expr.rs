@@ -1,12 +1,15 @@
 use bytecode::state::*;
 use bytecode::registers::*;
 use bytecode::cmd::*;
+use syn::expr::*;
+use syn::type_sys::*;
+use syn::utils::Show;
 
 pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
-	match e {	
+	match e.val {
 		EVal::Int(ref v)  => {
 			let reg = Reg::IStack(state.push_i());
-			cmds.push(Cmd::SetI(*v, reg.clone()));
+			cmds.push(Cmd::SetI(*v as isize, reg.clone()));
 			reg
 		},
 		EVal::Real(ref v) => {
@@ -27,7 +30,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 		},
 		EVal::Bool(ref b) => {
 			let reg = Reg::IStack(state.push_i());
-			cmds.push(Cmd::SetI(if b {1} else {0}, reg.clone()));
+			cmds.push(Cmd::SetI(if *b {1} else {0}, reg.clone()));
 			reg
 		},
 		EVal::Var(ref pref, ref var) => {
@@ -38,16 +41,16 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 			} else if pref[0] == "%mod" {
 				Reg::Name(Box::new(format!("{}_{}", state.mod_name, var)))
 			} else if pref[0] == "%std" {
-				Reg::Name(Box::new(format!("_std_{}", name)))
+				Reg::Name(Box::new(format!("_std_{}", var)))
 			} else {
-				let r_name = String::new();
+				let mut r_name = String::new();
 				for i in pref.iter() {
 					r_name = format!("{}{}_", r_name, i);
 				}
 				Reg::Name(Box::new(format!("{}_{}", r_name, var)))
 			}
 		},
-		EVal::Call(ref tp, ref fun, ref args, ref noexc) => {
+		EVal::Call(_, ref fun, ref args, ref noexc) => {
 			macro_rules! regular_expr {($fun_v:expr) => {{
 					let mut c_args = vec![];
 					for a in args.iter() {
@@ -70,7 +73,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 							state.pop_v();
 						}
 					};
-					let dst = match *tp {
+					let dst = match *e.kind {
 						Type::Int|Type::Char|Type::Bool => Reg::TempI,
 						Type::Real => Reg::TempR,
 						Type::Void => Reg::Null,
@@ -81,7 +84,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 						args        : c_args,
 						dst         : dst.clone(),
 						//can_throw   : !noexc,
-						catch_block : if noexc || state.exc_off {None} else {Some(state.try_catch_label())}
+						catch_block : if *noexc || state.exc_off {None} else {Some(state.try_catch_label())}
 					});
 					cmds.push(Cmd::Call(call));
 					let res_reg;
@@ -94,7 +97,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 					}
 					cmds.push(Cmd::Mov(dst, res_reg.clone()));
 					res_reg
-				}};
+				}}
 			}
 			match fun.val {
 				EVal::Var(ref pref, ref name) => {
@@ -107,8 +110,8 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 						let name = format!("_std_{}", name);
 						regular_expr!(Err(Reg::Name(Box::new(name))))
 					} else if pref[0] == "%opr" {
-						let a = compile(args[0], state, cmds);
-						let b = compile(args[1], state, cmds);
+						let a = compile(&args[0], state, cmds);
+						let b = compile(&args[1], state, cmds);
 						if a.is_int() {
 							state.pop_i();
 						} else if a.is_real() {
@@ -123,7 +126,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 						} else {
 							state.pop_v();
 						}
-						match name {
+						match name.as_ref() {
 							"+"|"-"|"*"|"/" => 
 								if e.kind.is_int() {
 									let out = Reg::IStack(state.push_i());
@@ -195,7 +198,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 							name_res = format!("{}_{}", name_res, pref[i]);
 						}
 						name_res = format!("{}_{}", name_res, name);
-						regular_expr!(Err(Reg::Name(Box::new(name_res))));
+						regular_expr!(Err(Reg::Name(Box::new(name_res))))
 					}
 				},
 				_ => regular_expr!(Ok(&fun))
@@ -242,10 +245,10 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 			state.pop_v();
 			state.pop_i();
 			macro_rules! make_cmd{($a:expr,$i:expr,$d:expr) => {{
-				let ctp = match arr.kind {
-					Type::Str   => ContType::Str,
-					Type::Arr   => ContType::Vec,
-					_ /* asc */ => ContType::Asc
+				let ctp = match *arr.kind {
+					Type::Str    => ContType::Str,
+					Type::Arr(_) => ContType::Vec,
+					_ /* asc */  => ContType::Asc
 				};
 				WithItem{
 					is_get    : true,
@@ -255,7 +258,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 					value     : $d
 				}
 			}};}
-			let cmd : WithItem = match e.kind {
+			let cmd : WithItem = match *e.kind {
 				Type::Int|Type::Char|Type::Bool => {
 					let r = Reg::IStack(state.push_i());
 					make_cmd!(arr_c, ind_c, r.clone())
@@ -300,7 +303,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 				let call : Box<Call> = Box::new(call);
 				cmds.push(Cmd::Call(call))
 			}};}
-			match val.kind {
+			match *val.kind {
 				Type::Int  => 
 					match **tp {
 						Type::Real => cmds.push(Cmd::Conv(reg, Convert::I2R, out.clone())),
@@ -339,6 +342,9 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 			out
 		},
 		EVal::TSelf => Reg::RSelf,
-		EVal::Null => Reg::Null
+		EVal::Null => Reg::Null,
+		EVal::Arr(_) => panic!(),
+		EVal::Asc(_) => panic!(),
+		EVal::Attr(_, _, _) => panic!()
 	}
 }

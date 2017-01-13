@@ -20,7 +20,7 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, gc : &GlobalConf, cmds : &
 				match *val {
 					None => cmds.push(Cmd::Mov(Reg::Null, reg)),
 					Some(ref val) => {
-						c_expr::compile(e, state, cmds);
+						c_expr::compile(val, state, cmds);
 						set_last_mov(cmds, reg);
 					}
 				}
@@ -36,7 +36,8 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, gc : &GlobalConf, cmds : &
 				} else if is_item {
 					let src = c_expr::compile(val, state, cmds);
 					c_expr::compile(var, state, cmds);
-					match cmds[cmds.len() - 1] {
+					let len = cmds.len();
+					match cmds[len - 1] {
 						Cmd::WithItem(ref mut with_it) => {
 							with_it.is_get = false;
 							with_it.value = src;
@@ -93,7 +94,7 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, gc : &GlobalConf, cmds : &
 				cmds.push(Cmd::Goto(ok.clone()));
 				cmds.push(Cmd::Label(state.try_catch_label()));
 				state.pop_trycatch();
-				let mut ctchs = vec![];
+				let mut ctchs_res = vec![];
 				for c in ctchs.iter() {
 					let id = gc.excepts.get(&c.epref, &c.ekey);
 					let mut code = vec![];
@@ -103,15 +104,17 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, gc : &GlobalConf, cmds : &
 					}
 					compile(&c.act, state, gc, &mut code);
 					code.push(Cmd::Goto(ok.clone()));
-					ctchs.push(Catch {
+					ctchs_res.push(Catch {
 						key  : id,
 						code : code
 					});
 				};
-				cmds.push(Cmd::Catch(ctchs, state.try_catch_label()));
+				cmds.push(Cmd::Catch(ctchs_res, state.try_catch_label()));
 				cmds.push(Cmd::Label(ok));
 			}
-			//ActVal::Throw(Vec<String>,String,Option<Expr>)
+			ActVal::For(_, _, _, _, _) => panic!(),
+			ActVal::Foreach(_, _, _, _, _) => panic!(),
+			ActVal::Throw(_, _, _) => panic!()
 		}
 	}
 }
@@ -129,7 +132,8 @@ fn set_last_mov(cmds : &mut Vec<Cmd>, dst : Reg) {
 					match cmds[i-1].get_out() {
 						Some(reg) =>
 							if reg == in_reg {
-								cmds.pop();
+								//cmds.pop();
+								// NEED POP
 							} else {
 								break
 							},
@@ -141,7 +145,10 @@ fn set_last_mov(cmds : &mut Vec<Cmd>, dst : Reg) {
 			},
 			_ => break
 		}
+		// IF BREAK HASN'T CALLED THEN NEED POP
+		cmds.pop();
 	}
 	// SETTING OUT
-	cmds[cmds.len() - 1].set_out(dst)
+	let len = cmds.len();
+	cmds[len - 1].set_out(dst)
 }
