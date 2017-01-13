@@ -284,62 +284,66 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 		//EVal::Attr(ref expr,String,bool),       // geting class attrib: 'object.prop' or 'object.fun()'
 		EVal::ChangeType(ref val, ref tp) => {
 			let reg = compile(val, state, cmds);
-			let mut out = if tp.is_int() {
-				Reg::TempI
-			} else if tp.is_real() {
-				Reg::TempR
+			if val.kind == *tp {
+				reg
 			} else {
-				Reg::Temp
-			};
-			macro_rules! fun {($fname:expr) => {{
-				let name = format!("_std_{}", $fname);
-				let args = vec![reg];
-				let call = Call {
-					func        : Reg::Name(Box::new(name)),
-					args        : args,
-					dst         : out.clone(),
-					catch_block : if state.exc_off {None} else {Some(state.try_catch_label())}
+				let mut out = if tp.is_int() {
+					Reg::TempI
+				} else if tp.is_real() {
+					Reg::TempR
+				} else {
+					Reg::Temp
 				};
-				let call : Box<Call> = Box::new(call);
-				cmds.push(Cmd::Call(call))
-			}};}
-			match *val.kind {
-				Type::Int  => 
-					match **tp {
-						Type::Real => cmds.push(Cmd::Conv(reg, Convert::I2R, out.clone())),
-						Type::Str  => fun!("int2str"),//cmds.push(Cmd::Conv(reg, Convert::ITOS, out.clone())),
-						Type::Bool => cmds.push(Cmd::Conv(reg, Convert::I2B, out.clone())),
-						Type::Char => return reg,
-						_ => panic!()
-					},
-				Type::Bool =>
-					match **tp {
-						Type::Int => return reg,
-						Type::Str => fun!("bool2str"),//cmds.push(Cmd::Conv(reg, Convert::BTOS, out.clone())),
-						_ => panic!()
-					},
-				Type::Char =>
-					match **tp {
-						Type::Int => return reg,
-						Type::Str => fun!("char2str"),//cmds.push(Cmd::Conv(reg, Convert::CTOS, out.clone())),
-						_ => panic!()
-					},
-				Type::Str  =>
-					match **tp {
-						Type::Int  => fun!("str2int"),
-						Type::Real => fun!("str2real"),
-						Type::Bool => fun!("str2bool"),
-						_ => panic!()
-					},
-				Type::Real =>
-					match **tp {
-						Type::Int => cmds.push(Cmd::Conv(reg, Convert::R2I, out.clone())),
-						Type::Str => fun!("real2str"),
-						_ => panic!()
-					},
-				_ => return reg
+				macro_rules! fun {($fname:expr) => {{
+					let name = format!("_std_{}", $fname);
+					let args = vec![reg];
+					let call = Call {
+						func        : Reg::Name(Box::new(name)),
+						args        : args,
+						dst         : out.clone(),
+						catch_block : if state.exc_off {None} else {Some(state.try_catch_label())}
+					};
+					let call : Box<Call> = Box::new(call);
+					cmds.push(Cmd::Call(call))
+				}};}
+				match *val.kind {
+					Type::Int  => 
+						match **tp {
+							Type::Real => cmds.push(Cmd::Conv(reg, Convert::I2R, out.clone())),
+							Type::Str  => fun!("int2str"),//cmds.push(Cmd::Conv(reg, Convert::ITOS, out.clone())),
+							Type::Bool => cmds.push(Cmd::Conv(reg, Convert::I2B, out.clone())),
+							Type::Char => return reg,
+							_ => panic!()
+						},
+					Type::Bool =>
+						match **tp {
+							Type::Int => return reg,
+							Type::Str => fun!("bool2str"),//cmds.push(Cmd::Conv(reg, Convert::BTOS, out.clone())),
+							_ => panic!()
+						},
+					Type::Char =>
+						match **tp {
+							Type::Int => return reg,
+							Type::Str => fun!("char2str"),//cmds.push(Cmd::Conv(reg, Convert::CTOS, out.clone())),
+							_ => panic!()
+						},
+					Type::Str  =>
+						match **tp {
+							Type::Int  => fun!("str2int"),
+							Type::Real => fun!("str2real"),
+							Type::Bool => fun!("str2bool"),
+							_ => panic!()
+						},
+					Type::Real =>
+						match **tp {
+							Type::Int => cmds.push(Cmd::Conv(reg, Convert::R2I, out.clone())),
+							Type::Str => fun!("real2str"),
+							_ => panic!()
+						},
+					_ => return reg
+				}
+				out
 			}
-			out
 		},
 		EVal::TSelf => Reg::RSelf,
 		EVal::Null => Reg::Null,

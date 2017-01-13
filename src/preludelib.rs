@@ -60,6 +60,8 @@ impl Prelude {
 		meth!(except, "param", type_fn!(vec![], Type::str()), true);
 		newf!("print",  type_fn!(vec![Type::str()], Type::void()));
 		newf!("readln", type_fn!(vec![], Type::str()));
+		newf!("add_str", type_fn!(vec![Type::str(), Type::str()], Type::str()));
+		newf!("add_i", type_fn!(vec![Type::int(), Type::int()], Type::int()));
 		newe!("IndexError");
 		newe!("NullPtr");
 		}

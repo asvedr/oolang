@@ -35,6 +35,47 @@ pub enum Cmd {
 }
 
 impl Cmd {
+	pub unsafe fn regs_in_use(&self, store : &mut Vec<*const Reg>) {
+		store.clear();
+		macro_rules! add {($e:expr) => {store.push(&$e)}; }
+		match *self {
+			Cmd::Mov(ref a, _) => add!(*a),
+			Cmd::IOp(ref opr) => {
+				add!(opr.a);
+				add!(opr.b);
+			},
+			Cmd::ROp(ref opr) => {
+				add!(opr.a);
+				add!(opr.b);
+			},
+			Cmd::VOp(ref opr) => {
+				add!(opr.a);
+				add!(opr.b);
+			},
+			Cmd::Call(ref cal) => {
+				add!(cal.func);
+				for a in cal.args.iter() {
+					add!(*a);
+				}
+			},
+			Cmd::WithItem(ref obj) => {
+				add!(obj.container);
+				add!(obj.index);
+				if obj.is_get {
+					add!(obj.value);
+				}
+			},
+			Cmd::Meth(ref obj, _, _) => add!(*obj),
+			Cmd::MakeClos(ref cls) =>
+				for r in cls.to_env.iter() {
+					add!(*r);
+				},
+			Cmd::Prop(ref obj, _, _) => add!(*obj),
+			Cmd::Conv(ref a, _, _) => add!(*a),
+			Cmd::Ret(ref val) => add!(*val),
+			_ => ()
+		}
+	}
 	pub fn get_out(&self) -> Option<&Reg> {
 		match *self {		
 			Cmd::Mov(_,ref a) => Some(a),
@@ -95,8 +136,8 @@ impl Show for Cmd {
 			Cmd::VOp(ref opr) => vec![format!("{}object {:?}", tab, opr)], // object operation
 			Cmd::Call(ref cal) => vec![format!("{}{:?}", tab, **cal)],
 			Cmd::SetI(ref n, ref r) => vec![format!("{}SET INT {} => {:?}", tab, n, r)],
-			Cmd::SetR(ref n, ref r) => vec![format!("{}SER REL {} => {:?}", tab, n, r)],
-			Cmd::SetS(ref n, ref r) => vec![format!("{}SER STR {} => {:?}", tab, n, r)],
+			Cmd::SetR(ref n, ref r) => vec![format!("{}SET REL {} => {:?}", tab, n, r)],
+			Cmd::SetS(ref n, ref r) => vec![format!("{}SET STR {:?} => {:?}", tab, n, r)],
 			Cmd::WithItem(ref obj) =>
 				if obj.is_get {
 					vec![format!("{}GET ITEM<{:?}> {:?} [{:?}] => {:?}", tab, obj.cont_type, obj.container, obj.index, obj.value)]
