@@ -10,14 +10,62 @@ pub struct Env {
 	pub loc_i : HashMap<String,u8>, // local optimized
 	pub loc_r : HashMap<String,u8>, // local optimized
 	pub loc_v : HashMap<String,u8>, // local unoptimized
-	//fargs : usize               // count vars for fun args
+	//fargs : usize                 // count vars for fun args
+}
+
+pub struct ExcKeys {
+	map : HashMap<String,usize>,
+	cnt : usize
+}
+
+macro_rules! make_name{($pref:expr, $name:expr, $res:expr) => {{
+	for i in $pref.iter() {
+		$res = format!("{}{}_", $res, i);
+	}
+	$res = format!("{}{}_", $res, $name);
+}};}
+
+impl ExcKeys {
+	pub fn get(&self, pref : &Vec<String>, name : &String) -> usize {
+		let mut res = String::new();
+		make_name!(pref, name, res);
+		match self.map.get(res) {
+			Some(a) => *a,
+			_ => panic!("bad exception key: {}", name)
+		}
+	}
+	pub fn add(&mut self, pref : &Vec<String>, name : &String) {
+		let mut res = String::new();
+		make_name!(pref, name, res);
+		self.map.insert(res, self.cnt);
+		self.cnt += 1;
+	}
+	pub fn new(c : usize) -> ExcKeys {
+		ExcKeys {
+			cnt : c,
+			map : HashMap::new()
+		}
+	}
+}
+
+pub struct GlobalConf {
+	pub excepts : ExcKeys
+}
+
+impl GlobalConf {
+	pub fn new(c : usize) -> GlobalConf {
+		GlobalConf{
+			excepts : ExcKeys::new(c)
+		}
+	}
 }
 
 pub struct State {
 	pub mod_name : String,
 	pub env      : Env,
+	pub exc_off  : bool,
 	catches   : Vec<u8>, // READONLY current stack of catch blocks
-	loops     : Vec<u8>  // READONLY current stack of loops
+	loops     : Vec<u8>, // READONLY current stack of loops
 	//pub max_i  : u8,
 	//pub max_r  : u8,
 	//pub max_v  : u8,
@@ -25,7 +73,6 @@ pub struct State {
 	stack_r   : u8,
 	stack_v   : u8,
 	lambda_n  : usize,  // counter for making names for local funs
-	exc_off   : bool,
 	c_counter : u8, // id generator for catch sections
 	l_counter : u8, // id generator for loop sections
 }
@@ -45,19 +92,17 @@ macro_rules! pop{($_self:expr, $st:ident) => {{
 impl State {
 	pub fn new(e : Env, mod_name : String) -> State {
 		State{
-			mod_name : mod_name,
-			env      : e,
-//			max_i    : 0,
-//			max_r    : 0,
-//			max_v    : 0,
-			stack_i  : 0,
-			stack_r  : 0,
-			stack_v  : 0,
-			lambda_n : 0,
-			exc_off  : false,
-			catches  : vec![],
-			loops_in : vec![],
-			loops_out: vec![]
+			mod_name  : mod_name,
+			env       : e,
+			stack_i   : 0,
+			stack_r   : 0,
+			stack_v   : 0,
+			lambda_n  : 0,
+			exc_off   : false,
+			catches   : vec![],
+			loops     : vec![],
+			l_counter : 0,
+			c_counter : 0
 		}
 	}
 	pub fn push_i(&mut self) -> u8 {
@@ -81,11 +126,11 @@ impl State {
 	pub fn pop_this_stack(&mut self, reg : &Reg) {
 		if reg.is_stack() {
 			if reg.is_int() {
-				self.pop_i()
+				self.pop_i();
 			} else if reg.is_real() {
-				self.pop_r()
+				self.pop_r();
 			} else {
-				self.pop_v()
+				self.pop_v();
 			}
 		}
 	}
@@ -95,15 +140,15 @@ impl State {
 		stack_v.clear();
 	}
 	pub fn push_loop(&mut self) -> u8 {
-		self.loops.push(self.counter_l);
-		self.counter_l += 1;
+		self.loops.push(self.l_counter);
+		self.l_counter += 1;
 	}
 	pub fn pop_loop(&mut self) {
 		self.loops.pop();
 	}
 	pub fn push_trycatch(&mut self) -> u8 {
-		self.catches.push(self.counter_c);
-		self.counter_c += 1;
+		self.catches.push(self.c_counter);
+		self.c_counter += 1;
 	}
 	pub fn pop_trycatch(&mut self) {
 		self.catches.pop();

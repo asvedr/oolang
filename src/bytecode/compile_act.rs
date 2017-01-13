@@ -4,27 +4,20 @@ use bytecode::registers::*;
 use bytecode::cmd::*;
 use bytecode::compile_expr as c_expr;
 
-pub fn compile(acts : &Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd>) {
+pub fn compile(acts : &Vec<ActF>, state : &mut State, gc : &GlobalConf, cmds : &mut Vec<Cmd>) {
 	for a in acts.iter() {
 		state.clear_stacks();
 		match a.val {
-			EVal::Expr(ref e) => {
-				let out = c_expr::compile(e, state, cmds)
+			ActVal::Expr(ref e) => {
+				let out = c_expr::compile(e, state, cmds);
 				if out != Reg::Null {
-					set_last_mov(Reg::Null)
-					/*let i = cmds.len() - 1;
-					if match cmds[i] {Mov::(_,_) => true, _ => false} {
-						cmds.pop();
-						cmds[i-1].set_out(Reg::Null);
-					} else {
-						cmds[i].set_out(Reg::Null);
-					}*/
+					set_last_mov(cmds, Reg::Null)
 				}
 			},
-			EVal::DFun(Box<DF>) => panic!(),
-			EVal::DVar(ref name, ref tp, ref val) => {
+			ActVal::DFun(_) => panic!(),
+			ActVal::DVar(ref name, ref tp, ref val) => {
 				let reg = state.env.get_loc_var(name, &**tp);
-				match val {
+				match *val {
 					None => cmds.push(Cmd::Mov(Reg::Null, reg)),
 					Some(ref val) => {
 						c_expr::compile(e, state, cmds);
@@ -32,7 +25,7 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd>) {
 					}
 				}
 			},
-			EVal::Asg(ref var, ref val) => {
+			ActVal::Asg(ref var, ref val) => {
 				let is_var  = match var.val {EVal::Var(_,_) => true, _ => false};
 				let is_item = match var.val {EVal::Item(_,_) => true, _ => false};
 				// else is attr
@@ -54,7 +47,7 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd>) {
 					panic!()
 				}
 			},
-			EVal::Ret(ref e) =>
+			ActVal::Ret(ref e) =>
 				match *e {
 					Some(ref e) => {
 						let out = c_expr::compile(e, state, cmds);
@@ -62,15 +55,63 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd>) {
 					},
 					_ => cmds.push(Cmd::Ret(Reg::Null))
 				},
-			EVal::Break(_, ref n) => {
+			ActVal::Break(_, ref n) => {
 				cmds.push(Cmd::Goto(state.break_label(*n)))
+			},
+			ActVal::While(_, ref cond, ref act) => {
+				state.push_loop();
+				cmds.push(Cmd::Label(state.loop_in_label()));
+				let res = c_expr::compile(cond, state, cmds);
+				state.clear_stacks();
+				let mut body = vec![];
+				compile(act, state, gc, &mut body);
+				body.push(Cmd::Goto(state.loop_in_label()));
+				let cmd = Cmd::If(res, body, vec![Cmd::Goto(state.loop_out_label())]);
+				cmds.push(cmd);
+				cmds.push(Cmd::Label(state.loop_out_label()));
+				state.pop_loop();
+			},
+			//ActVal::For(Option<String>,String,Expr,Expr,Vec<Act<DF>>), // for i in range(a + 1, b - 2) {}
+			//ActVal::Foreach(Option<String>,String,RType, Expr,Vec<Act<DF>>),  // for i in array {}
+			ActVal::If(ref cond, ref ok, ref fail) => {
+				let res = c_expr::compile(cond, state, cmds);
+				state.clear_stacks();
+				let mut ok_body = vec![];
+				compile(ok, state, gc, &mut ok_body);
+				if fail.len() > 0 {
+					let mut no_body = vec![];
+					compile(fail, state, gc, &mut no_body);
+					cmds.push(Cmd::If(res, ok_body, no_body));
+				} else {
+					cmds.push(Cmd::If(res, ok_body, vec![]));
+				}
+			},
+			ActVal::Try(ref body, ref ctchs) => {
+				state.push_trycatch();
+				let ok = state.try_ok_label();
+				compile(body, state, gc, cmds);
+				cmds.push(Cmd::Goto(ok.clone()));
+				cmds.push(Cmd::Label(state.try_catch_label()));
+				state.pop_trycatch();
+				let mut ctchs = vec![];
+				for c in ctchs.iter() {
+					let id = gc.excepts.get(&c.epref, &c.ekey);
+					let mut code = vec![];
+					match c.vname {
+						Some(ref name) => code.push(Cmd::Mov(Reg::Exc,state.env.get_loc_var(name, &c.vtype))),
+						_ => ()
+					}
+					compile(&c.act, state, gc, &mut code);
+					code.push(Cmd::Goto(ok.clone()));
+					ctchs.push(Catch {
+						key  : id,
+						code : code
+					});
+				};
+				cmds.push(Cmd::Catch(ctchs, state.try_catch_label()));
+				cmds.push(Cmd::Label(ok));
 			}
-			EVal::While(Option<String>, Expr, Vec<Act<DF>>),
-			EVal::For(Option<String>,String,Expr,Expr,Vec<Act<DF>>), // for i in range(a + 1, b - 2) {}
-			EVal::Foreach(Option<String>,String,RType, Expr,Vec<Act<DF>>),  // for i in array {}
-			EVal::If(Expr,Vec<Act<DF>>,Vec<Act<DF>>),
-			EVal::Try(Vec<Act<DF>>,Vec<SynCatch<DF>>), // try-catch
-			EVal::Throw(Vec<String>,String,Option<Expr>)
+			//ActVal::Throw(Vec<String>,String,Option<Expr>)
 		}
 	}
 }
@@ -83,15 +124,15 @@ fn set_last_mov(cmds : &mut Vec<Cmd>, dst : Reg) {
 		}
 		let i = cmds.len() - 1;
 		match cmds[i] {
-			Reg::Mov(ref in_reg,_) => if {
+			Cmd::Mov(ref in_reg,_) => {
 				if i - 1 >= 0 {
 					match cmds[i-1].get_out() {
 						Some(reg) =>
 							if reg == in_reg {
-								cmds.pop()
+								cmds.pop();
 							} else {
 								break
-							}
+							},
 						_ => break
 					}
 				} else {

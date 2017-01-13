@@ -2,10 +2,49 @@ use bytecode::func::*;
 use bytecode::cmd::*;
 use bytecode::registers::*;
 use bytecode::state::*;
+use bytecode::compile_act::*;
 use syn::*;
 use std::collections::HashMap;
 
-pub fn compile(fun : &SynFn/*, dst : &mut Vec<CodeFn>, */) {
+pub struct CFun {
+	pub name    : String,
+	pub arg_cnt : u8,
+	pub out_cnt : u8,
+	pub stack_i : u8,
+	pub stack_r : u8,
+	pub stack_v : u8,
+	pub var_i   : u8,
+	pub var_r   : u8,
+	pub var_v   : u8,
+	pub body    : Vec<Cmd>
+}
+
+impl Show for CFun {
+	fn show(&self, layer : usize) -> Vec<String> {
+		let mut tab = String::new();
+		for _ in 0 .. layer {
+			tab.push(' ');
+		}
+		let mut res = vec![format!("{}fn {}", tab, self.name)];
+		tab.push(' ');
+		tab.push(' ');
+		res.push(format!("{}args:  {}", tab, self.arg_cnt));
+		res.push(format!("{}outer: {}", tab, self.out_cnt));
+		res.push(format!("{}stack: {} {} {}", tab, self.stack_i, self.stack_r, self.stack_v));
+		res.push(format!("{}local: {} {} {}", tab, self.var_i, self.var_r, self.var_v));
+		tab.pop();
+		tab.pop();
+		for c in self.body.iter() {
+			for l in c.show(layer + 1) {
+				res.push(l);
+			}
+		}
+		res.push(format!("{}endfn", tab));
+		res
+	}
+}
+
+pub fn compile(fun : &SynFn/*, dst : &mut Vec<CodeFn>, */) -> CFun {
 	let mut env = Env{
 		out   : HashMap::new(),
 		args  : HashMap::new(),
@@ -14,7 +53,70 @@ pub fn compile(fun : &SynFn/*, dst : &mut Vec<CodeFn>, */) {
 		loc_v : HashMap::new()
 	};
 	make_env(fun, &mut env);
-	env.print()
+	let mut state = State::new(env, "main".to_string());
+	state.exc_off = fun.no_except;
+	let gc = GlobalConf::new(6);
+	let mut body = vec![];
+	state.push_trycatch();
+	compile_act(fun.body, &mut state, &gc, &mut body);
+	if body.len() == 0 || match body[body.len() - 1] {Cmd::Ret(_) => false, _ => true} {
+		body.push(Cmd::Ret(Reg::Null))
+	}
+	if !fun.no_except {
+		body.push(Cmd::Label(state.try_catch_label()));
+		body.push(Cmd::ReRaise);
+		body.push(Cmd::Ret(Reg::Null))
+	}
+	let mut max_i = 0;
+	let mut max_r = 0;
+	let mut max_v = 0;
+	get_stacks_size(&body, &mut max_i, &mut max_r, &mut max_v);
+	CFun {	
+		name    : format!("{}_{}", state.mod_name, fun.name),
+		arg_cnt : fun.args.len() as u8,
+		out_cnt : fun.outers.len() as u8,
+		stack_i : max_i,
+		stack_r : max_r,
+		stack_v : max_v,
+		var_i   : state.env.loc_i.len() as u8,
+		var_r   : state.env.loc_r.len() as u8,
+		var_v   : state.env.loc_v.len() as u8,
+		body    : body
+	}
+}
+
+fn get_stacks_size(cmds : &Vec<Cmd>, si : &mut u8, sr : &mut u8, sv : &mut u8) {
+	macro_rules! set_max {($var:expr, $val:expr) => {if $val > *$var {*$var = $val}}; }
+	for c in cmds.iter() {
+		let checked = {
+			let reg = c.get_out();
+			match reg {
+				Some(reg) => {
+					match *reg {
+						Reg::IStack(ref n) => set_max!(si, *n),
+						Reg::RStack(ref n) => set_max!(sr, *n),
+						Reg::VStack(ref n) => set_max!(sv, *n),
+						_ => ()
+					}
+					true
+				},
+				_ => false
+			}
+		};
+		if !checked {
+			match *c {
+				Cmd::If(_, ref a, ref b) => {
+					get_stacks_size(a, si, sr, sv);
+					get_stacks_size(b, si, sr, sv);
+				},
+				Cmd::Catch(ref catchs, _) =>
+					for catch in catchs.iter() {
+						get_stacks_size(&catch.code, si, sr, sv)
+					},
+				_ => ()
+			}
+		}
+	}
 }
 
 fn make_env(fun : &SynFn, env : &mut Env) {
@@ -24,26 +126,6 @@ fn make_env(fun : &SynFn, env : &mut Env) {
 	for i in 0 .. fun.outers.len() {
 		env.out.insert(fun.outers[i].clone(), i as u8);
 	}
-	/*fn expr(e : &Expr, env : &mut Env) {
-		match e {
-			EVal::Call       (_, ref f, ref args) => {
-				let l = args.len() + 1;
-				if env.fargs 
-			},
-			EVal::NewClass   (_, _, _, ref args) => {
-				
-			},
-			EVal::Item       (ref a, ref b) => {
-				
-			},
-			EVal::Arr        (ref a) => {
-			},
-			EVal::Asc        (ref prs) => {
-			},
-			EVal::Attr       (ref obj, _, _) => expr(a),
-			EVal::ChangeType (ref a, _) => expr(a)
-		}
-	}*/
 	fn act(action : &ActF, env : &mut Env) {
 		macro_rules! add {($store:expr, $name:expr) => {
 			if ! $store.contains_key($name) {

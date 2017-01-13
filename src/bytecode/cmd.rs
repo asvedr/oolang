@@ -20,17 +20,18 @@ pub enum Cmd {
 	Prop(Reg,usize,Reg),
 	//ObjToObj(),
 	Conv(Reg,Convert,Reg),
-	NewCls(Box<NewCls>),
+	//NewCls(Box<NewCls>),
 
 	Throw(usize,Option<Reg>), // try optimize it: if catch in this function, just use simple goto
 	Ret(Reg),
 	Goto(String), // used by break, loops, try-catch
 	If(Reg,Vec<Cmd>,Vec<Cmd>),
+	ReRaise, // if exception can't be catched. making reraise and return from function
 
 	// NOT EXECUTABLE
 	Noop,
 	Label(String), // for goto
-	Catch(Vec<Catch>) // translated to switch(ex_type){case ...}
+	Catch(Vec<Catch>,String) // translated to switch(ex_type){case ...}. Second field is link to next 'catch' if all this was failed
 }
 
 impl Cmd {
@@ -106,7 +107,7 @@ impl Show for Cmd {
 			Cmd::MakeClos(ref cls) => vec![format!("{}{:?}", tab, **cls)],
 			Cmd::Prop(ref obj, ref n, ref dst) => vec![format!("{}PROP {:?} [{:?}] => {:?}", tab, obj, n, dst)],
 			Cmd::Conv(ref a, ref cnv, ref dst) => vec![format!("{}CONV {:?} : {:?} => {:?}", tab, a, cnv, dst)],
-			Cmd::NewCls(ref cls) => vec![format!("{}{:?}", tab, cls)],
+			//Cmd::NewCls(ref cls) => vec![format!("{}{:?}", tab, cls)],
 			Cmd::Throw(ref n, ref v) => vec![format!("{}THROW {:?} {:?}", tab, n, v)],
 			Cmd::Ret(ref val) => vec![format!("{}RETURN {:?}", tab, val)],
 			Cmd::Goto(ref lab) => vec![format!("{}GOTO {}", tab, lab)],
@@ -128,8 +129,9 @@ impl Show for Cmd {
 				acc
 			},
 			Cmd::Noop => vec![format!("{}NOOP", tab)],
-			Cmd::Catch(ref lst) => {
-				let mut acc = vec![format!("{}CATCH", tab)];
+			Cmd::ReRaise => vec![format!("{}RERAISE", tab)],
+			Cmd::Catch(ref lst, ref next) => {
+				let mut acc = vec![format!("{}CATCH next:'{}'", tab, next)];
 				for ctch in lst.iter() {
 					acc.push(format!("{}CASE {}", tab, ctch.key));
 					for cmd in ctch.code.iter() {
@@ -146,25 +148,17 @@ impl Show for Cmd {
 
 #[derive(Debug)]
 pub enum Convert {
-	I2S,
 	I2R,
 	I2B,
-
-	R2I,
-	R2S,
-
-	S2R,
-	S2I,
-	
-	B2I
+	R2I
 }
 
 pub struct WithItem {
-	container : Reg,
-	index     : Reg,
-	is_get    : bool, // true - get, false - set
-	value     : Reg,  // if get then destination else source
-	cont_type : ContType
+	pub container : Reg,
+	pub index     : Reg,
+	pub is_get    : bool, // true - get, false - set
+	pub value     : Reg,  // if get then destination else source
+	pub cont_type : ContType
 }
 
 #[derive(Debug,PartialEq)]
@@ -208,11 +202,11 @@ pub struct Catch {
 	pub code : Vec<Cmd>
 }
 
-impl Debug for NewCls {
+/*impl Debug for NewCls {
 	fn fmt(&self, f : &mut Formatter) -> Result {
 		write!(f, "NEWCLS {:?} {:?} => {:?}", self.cls, self.args, self.dst)
 	}
-}
+}*/
 
 impl Debug for MakeClos {
 	fn fmt(&self, f : &mut Formatter) -> Result {

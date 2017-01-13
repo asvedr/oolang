@@ -12,6 +12,7 @@ pub enum Reg {
 	Temp,       // SINGLE temp var
 	TempI,
 	TempR,
+	Exc,        // exception value
 	Null,       // no value
 	Name(Box<String>) // getting global symbol
 }
