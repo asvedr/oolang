@@ -4,11 +4,10 @@ fn main() : () {
 	//try {
 		var a = readln() as int;
 		var b = readln() as int;
-		var c = 4;
 		//var c = [1,2,3,4];
 		//c.len();
 		//c.get(2);
-		print((a + b + c) as str);
+		print((a * b + 1 * 2) as str);
 		//throw EInt 5;
 		//throw NullPtr;
 	//} catch EInt a {
