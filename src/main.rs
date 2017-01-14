@@ -1,10 +1,14 @@
 #![allow(dead_code)]
+
+extern crate getopts;
+
 #[macro_use]
 mod syn;
 #[macro_use]
 mod type_check;
 mod preludelib;
 mod bytecode;
+mod cmd_args;
 //use std::io;
 use std::io::Read;
 use std::fs::File;
@@ -13,8 +17,15 @@ use type_check::checker::*;
 use bytecode::compile_fun;
 
 fn main() {
+	let args = match cmd_args::parse() {
+		Ok(a) => a,
+		Err(a) => {
+			println!("{}", a);
+			return;
+		}
+	};
 	let mut source = String::new();
-	match File::open("source.code") {
+	match File::open(&args.input[0].path) {
 		Ok(mut hnd) =>
 			match hnd.read_to_string(&mut source) {
 				Err(e) => {
