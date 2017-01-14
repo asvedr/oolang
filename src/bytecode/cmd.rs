@@ -13,8 +13,9 @@ pub enum Cmd {
 	SetR(f64,Reg),
 	SetS(String,Reg),
 	WithItem(Box<WithItem>),
-	//   obj  name  dst
-	Meth(Reg,String,Reg), // it works like make-clos
+	//       self mname dst
+	MethMake(Reg,String,Reg), // it works like make-clos
+	MethCall(Box<Call>, String), // call.func - ptr to self string - mname
 	MakeClos(Box<MakeClos>),
 	//   obj  ind  dst
 	Prop(Reg,usize,Reg),
@@ -65,7 +66,13 @@ impl Cmd {
 					add!(obj.value);
 				}
 			},
-			Cmd::Meth(ref obj, _, _) => add!(*obj),
+			Cmd::MethMake(ref obj, _, _) => add!(*obj),
+			Cmd::MethCall(ref cal, _) => {
+				add!(cal.func);
+				for a in cal.args.iter() {
+					add!(*a);
+				}
+			},
 			Cmd::MakeClos(ref cls) =>
 				for r in cls.to_env.iter() {
 					add!(*r);
@@ -92,7 +99,8 @@ impl Cmd {
 				} else {
 					None
 				},
-			Cmd::Meth(_,_,ref a) => Some(a),
+			Cmd::MethMake(_,_,ref a) => Some(a),
+			Cmd::MethCall(ref a, _) => Some(&a.dst),
 			Cmd::MakeClos(ref c) => Some(&c.dst),
 			Cmd::Prop(_,_,ref a) => Some(a),
 			Cmd::Conv(_,_,ref a) => Some(a),
@@ -113,7 +121,8 @@ impl Cmd {
 				if i.is_get {
 					i.value = out
 				},
-			Cmd::Meth(_,_,ref mut a) => *a = out,
+			Cmd::MethMake(_,_,ref mut a) => *a = out,
+			Cmd::MethCall(ref mut a, _) => a.dst = out,
 			Cmd::MakeClos(ref mut c) => c.dst = out,
 			Cmd::Prop(_,_,ref mut a) => *a = out,
 			Cmd::Conv(_,_,ref mut a) => *a = out,
@@ -144,7 +153,14 @@ impl Show for Cmd {
 				} else {
 					vec![format!("{}SET ITEM<{:?}> {:?} [{:?}] <= {:?}", tab, obj.cont_type, obj.container, obj.index, obj.value)] 
 				},
-			Cmd::Meth(ref obj, ref name, ref dst) => vec![format!("{}METHOD {} (self:{:?}) => {:?}", tab, name, obj, dst)],
+			Cmd::MethMake(ref obj, ref name, ref dst) => vec![format!("{}MAKE_M {} self:{:?} => {:?}", tab, name, obj, dst)],
+			Cmd::MethCall(ref cal, ref mname) => {
+				let ctch = match cal.catch_block {
+					Some(ref c) => c.clone(),
+					_ => "_".to_string()
+				};
+				vec![format!("{}CALL_M {} [catch:{}] self:{:?} {:?} => {:?}", tab, mname, ctch, cal.func, cal.args, cal.dst)]
+			},
 			Cmd::MakeClos(ref cls) => vec![format!("{}{:?}", tab, **cls)],
 			Cmd::Prop(ref obj, ref n, ref dst) => vec![format!("{}PROP {:?} [{:?}] => {:?}", tab, obj, n, dst)],
 			Cmd::Conv(ref a, ref cnv, ref dst) => vec![format!("{}CONV {:?} : {:?} => {:?}", tab, a, cnv, dst)],

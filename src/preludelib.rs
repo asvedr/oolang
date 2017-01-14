@@ -36,7 +36,7 @@ impl Prelude {
 			}};
 			($name:expr, $t:expr, $noexc:expr) => {{
 				pack.fns.insert($name.to_string(), $t);
-				pack.out_fns.add($name.to_string());
+				pack.fns_noex.insert($name.to_string());
 			}};
 		}
 		macro_rules! meth {($cls:expr, $name:expr, $t:expr, $noexc:expr) => {{
@@ -56,12 +56,13 @@ impl Prelude {
 		meth!(str_s, "len", type_fn!(vec![], Type::int()), true);
 		meth!(str_s, "get", type_fn!(vec![Type::int()], Type::char()), false);
 		meth!(str_s, "set", type_fn!(vec![Type::int(),Type::char()], Type::void()), false);
+		meth!(str_s, "add", type_fn!(vec![Type::str()], Type::void()), false);
 		let except : *mut TClass = newc!("Exception", vec![], vec![Type::str()]);
 		meth!(except, "param", type_fn!(vec![], Type::str()), true);
 		newf!("print",  type_fn!(vec![Type::str()], Type::void()));
 		newf!("readln", type_fn!(vec![], Type::str()));
-		newf!("add_str", type_fn!(vec![Type::str(), Type::str()], Type::str()));
-		newf!("add_i", type_fn!(vec![Type::int(), Type::int()], Type::int()));
+		//newf!("add_str", type_fn!(vec![Type::str(), Type::str()], Type::str()), true);
+		//newf!("add_i", type_fn!(vec![Type::int(), Type::int()], Type::int()));
 		newe!("IndexError");
 		newe!("NullPtr");
 		}

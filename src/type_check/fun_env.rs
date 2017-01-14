@@ -349,10 +349,23 @@ impl FunEnv {
 					}
 				},
 				Type::Arr(ref params) => {
-					let cname = format!("%arr");
+					let cname = "%arr".to_string();
 					let p = Vec::new();
 					let cls = match (*self.global).get_cls(&p, &cname) { Some(c) => c, _ => panic!() };
 					let m = if priv_too { (*cls).look_in_all(mname, Some(params)) } else { (*cls).look_in_pub(mname, Some(params)) };
+					match m {
+						Some(res) => {
+							let flag = (*cls).is_method(mname);
+							return Some( (res, flag) )
+						},
+						None => return None
+					}
+				},
+				Type::Str => {
+					let cname = "%str".to_string();
+					let p = Vec::new();
+					let cls = match (*self.global).get_cls(&p, &cname) { Some(c) => c, _ => panic!() };
+					let m = if priv_too { (*cls).look_in_all(mname, None) } else { (*cls).look_in_pub(mname, None) };
 					match m {
 						Some(res) => {
 							let flag = (*cls).is_method(mname);

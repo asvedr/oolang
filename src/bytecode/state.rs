@@ -136,6 +136,24 @@ impl State {
 			}
 		}
 	}
+	pub fn push_this_stack(&mut self, tp : &Type) -> Reg {
+		if tp.is_int() || tp.is_bool() || tp.is_char() {
+			Reg::IStack(self.push_i())
+		} else if tp.is_real() {
+			Reg::RStack(self.push_r())
+		} else {
+			Reg::VStack(self.push_v())
+		}
+	}
+	pub fn this_temp(&mut self, tp : &Type) -> Reg {
+		if tp.is_int() {
+			Reg::TempI
+		} else if tp.is_real() {
+			Reg::TempR
+		} else {
+			Reg::Temp
+		}
+	}
 	pub fn clear_stacks(&mut self) {
 		self.stack_i = 0;
 		self.stack_r = 0;

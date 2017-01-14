@@ -5,6 +5,7 @@ use syn::expr::*;
 use syn::type_sys::*;
 use syn::utils::Show;
 
+//             expr       any-stats           compiled-out             reg-with-last-value
 pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 	match e.val {
 		EVal::Int(ref v)  => {
@@ -57,8 +58,15 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 						c_args.push(compile(a, state, cmds));
 					}
 					let f;
+					// XXX
+					let mut is_attr = false;
 					match $fun_v {
 						Ok(v) => {
+							{let _ : &Expr = v;}
+							match v.val {
+								EVal::Attr(_,_,ref is_meth) => is_attr = *is_meth,
+								_ => ()
+							}
 							f = compile(v, state, cmds);
 							state.pop_v();
 						},
@@ -79,14 +87,30 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 						Type::Void => Reg::Null,
 						_ => Reg::Temp
 					};
-					let call = Box::new(Call {
-						func        : f,
-						args        : c_args,
-						dst         : dst.clone(),
-						//can_throw   : !noexc,
-						catch_block : if *noexc || state.exc_off {None} else {Some(state.try_catch_label())}
-					});
-					cmds.push(Cmd::Call(call));
+					if is_attr {
+						cmds.pop(); // pop MOV
+						let mmake = cmds.pop().unwrap(); // pop MethMake
+						match mmake {
+							Cmd::MethMake(obj, mname, _) => {
+								let call = Box::new(Call {
+									func : obj,
+									args : c_args,
+									dst  : dst.clone(),
+									catch_block : if *noexc || state.exc_off {None} else {Some(state.try_catch_label())}
+								});
+								cmds.push(Cmd::MethCall(call, mname));
+							},
+							_ => panic!()
+						}
+					} else {
+						let call = Box::new(Call {
+							func        : f,
+							args        : c_args,
+							dst         : dst.clone(),
+							catch_block : if *noexc || state.exc_off {None} else {Some(state.try_catch_label())}
+						});
+						cmds.push(Cmd::Call(call));
+					}
 					let res_reg;
 					if dst.is_int() {
 						res_reg = Reg::IStack(state.push_i());
@@ -276,12 +300,6 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 			cmds.push(Cmd::WithItem(Box::new(cmd)));
 			out
 		},
-		/*
-		Arr        (Vec<Expr>),                   // new arr
-		Asc        (Vec<Pair<Expr,Expr>>),        // new Asc. Only strings, chars and int allowed for key
-		*/
-		//          obj       pname  is_meth
-		//EVal::Attr(ref expr,String,bool),       // geting class attrib: 'object.prop' or 'object.fun()'
 		EVal::ChangeType(ref val, ref tp) => {
 			let reg = compile(val, state, cmds);
 			if val.kind == *tp {
@@ -349,6 +367,19 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 		EVal::Null => Reg::Null,
 		EVal::Arr(_) => panic!(),
 		EVal::Asc(_) => panic!(),
-		EVal::Attr(_, _, _) => panic!()
+		EVal::Attr(ref e, ref name, ref is_meth) => {
+			if *is_meth {
+				let obj = compile(e, state, cmds);
+				state.pop_this_stack(&obj);
+				let cname = e.kind.class_name();
+				let tmp = state.this_temp(&*e.kind);
+				let out = state.push_this_stack(&*e.kind);
+				cmds.push(Cmd::MethMake(obj, format!("{}_M_{}", cname, name), tmp.clone()));
+				cmds.push(Cmd::Mov(tmp, out.clone()));
+				out
+			} else {
+				panic!()
+			}
+		}
 	}
 }

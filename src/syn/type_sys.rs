@@ -105,7 +105,21 @@ impl Type {
 			_ => false
 		}
 	}
-	pub fn c_name(&self) -> &String {
+	pub fn class_name(&self) -> String {
+		match *self {
+			Type::Class(ref pref, ref name, _) => {
+				let mut res = String::new();
+				for p in pref.iter() {
+					res = format!("{}{}_", res, p);
+				}
+				format!("{}{}", res, name)
+			},
+			Type::Arr(_) => "_std_vec".to_string(),
+			Type::Str => "_std_str".to_string(),
+			_ => panic!()
+		}
+	}
+	/*pub fn c_name(&self) -> &String {
 		match *self {
 			Type::Class(_,ref a,_) => a, 
 			_ => panic!()
@@ -122,7 +136,7 @@ impl Type {
 			Type::Class(_,_,Some(ref v)) => Some(v),
 			_ => None
 		}
-	}
+	}*/
 	/*pub fn components(&self, res : &mut Vec<*const Type>) {
 		match *self {
 			Type::Arr(ref a) => res.push(&a[0]),

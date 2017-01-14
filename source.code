@@ -22,6 +22,6 @@ fn main() : () {
 fn main() : () {
 	var a = readln();
 	var b = readln();
-	var c = "3";
-	print(add_str(add_str(a,b),c) as str)
+	a.add(b);
+	print(a);
 }
