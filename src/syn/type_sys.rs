@@ -1,6 +1,5 @@
 use syn::reserr::*;
 use syn::utils::*;
-//use syn::lexer::*;
 use std::fmt;
 use std::rc::Rc;
 
@@ -46,14 +45,43 @@ macro_rules! check_is {($_self:expr, $t:ident) => {
 	}
 };}
 
+struct RcStore {
+	store : Rc<Type>
+}
+
+impl RcStore {
+	fn new(t : Type) -> RcStore {
+		RcStore{store : Rc::new(t)}
+	}
+}
+
+unsafe impl Send for RcStore {}
+unsafe impl Sync for RcStore {}
+
+lazy_static! {
+	static ref STAT_UNK   : RcStore = RcStore::new(Type::Unk);
+	static ref STAT_INT   : RcStore = RcStore::new(Type::Int);
+	static ref STAT_REAL  : RcStore = RcStore::new(Type::Real);
+	static ref STAT_CHAR  : RcStore = RcStore::new(Type::Char);
+	static ref STAT_STR   : RcStore = RcStore::new(Type::Str);
+	static ref STAT_BOOL  : RcStore = RcStore::new(Type::Bool);
+	static ref STAT_VOID  : RcStore = RcStore::new(Type::Void);
+}
+//static stat_int : *mut Type = 0 as *mut Type;
+
 impl Type {
-	pub fn unk() -> RType { Rc::new(Type::Unk) }
-	pub fn int() -> RType { Rc::new(Type::Int) }
-	pub fn real() -> RType { Rc::new(Type::Real) }
-	pub fn char() -> RType { Rc::new(Type::Char) }
-	pub fn str() -> RType { Rc::new(Type::Str) }
-	pub fn bool() -> RType { Rc::new(Type::Bool) }
-	pub fn void() -> RType { Rc::new(Type::Void) }
+	/*pub fn init() {
+		unsafe {
+			stat_int = mem::transmute(Rc::new(Type::Int));
+		}
+	}*/
+	pub fn unk()  -> RType { STAT_UNK.store.clone()  }
+	pub fn int()  -> RType { STAT_INT.store.clone()  }
+	pub fn real() -> RType { STAT_REAL.store.clone() }
+	pub fn char() -> RType { STAT_CHAR.store.clone() }
+	pub fn str()  -> RType { STAT_STR.store.clone()  }
+	pub fn bool() -> RType { STAT_BOOL.store.clone() }
+	pub fn void() -> RType { STAT_VOID.store.clone() }
 	pub fn arr(a : RType) -> RType { Rc::new(Type::Arr(vec![a])) }
 //	Class(Vec<String>,String,Option<Vec<RType>>),
 	//  (template)?         args        result
@@ -159,11 +187,11 @@ pub type Tmpl = Vec<String>;
 pub fn parse_type(lexer : &Lexer, curs : &Cursor) -> SynRes<RType> {
 	let ans = lex!(lexer, curs);
 	match &*ans.val {
-		"int"  => syn_ok!(Rc::new(Type::Int), ans.cursor),
-		"real" => syn_ok!(Rc::new(Type::Real), ans.cursor),
-		"char" => syn_ok!(Rc::new(Type::Char), ans.cursor),
-		"str"  => syn_ok!(Rc::new(Type::Str), ans.cursor),
-		"bool" => syn_ok!(Rc::new(Type::Bool), ans.cursor),
+		"int"  => syn_ok!(Type::int(), ans.cursor),
+		"real" => syn_ok!(Type::real(), ans.cursor),
+		"char" => syn_ok!(Type::char(), ans.cursor),
+		"str"  => syn_ok!(Type::str(), ans.cursor),
+		"bool" => syn_ok!(Type::bool(), ans.cursor),
 		"Fn"   => { // FUNC
 			let args = try!(parse_list(lexer, &ans.cursor, &parse_type, "(", ")"));
 			let curs = lex!(lexer, &args.cursor, ":");

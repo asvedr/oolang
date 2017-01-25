@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
 extern crate getopts;
+#[macro_use]
+extern crate lazy_static;
 
 #[macro_use]
 mod syn;

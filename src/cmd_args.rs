@@ -145,7 +145,7 @@ fn file_type(path : &String) -> StdRes<FType,String> {
 	let name : Vec<char> = path.chars().collect();
 	let mut ftp = String::new();
 	let mut i = name.len() - 1;
-	while i >= 0 {
+	loop {//while i >= 0 {
 		if name[i] == '.' {
 			for j in i+1 .. name.len() {
 				ftp.push(name[j]);
@@ -172,6 +172,9 @@ fn file_type(path : &String) -> StdRes<FType,String> {
 		}
 		if name[i] == '/' {
 			return Ok(FType::Exe);
+		}
+		if i == 0 {
+			break
 		}
 		i -= 1;
 	}
