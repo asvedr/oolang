@@ -2,15 +2,19 @@ use syn::type_sys::*;
 use syn::class::*;
 use syn::reserr::*;
 use std::collections::{BTreeMap, HashMap};
-use std::rc::Rc;
+pub use std::rc::Rc;
+pub use std::cell::RefCell;
+use std::ops::Deref;
+
+pub type RTClass = Rc<RefCell<TClass>>;
 
 pub struct Parent {
-	class  : *const TClass,
+	class  : RTClass,//*const TClass,
 	params : Option<*const Vec<RType>>
 }
 
 impl Parent {
-	pub fn new(cls : *const TClass, pars : Option<*const Vec<RType>>) -> Parent {
+	pub fn new(cls : RTClass, pars : Option<*const Vec<RType>>) -> Parent {
 		Parent {
 			class  : cls,
 			params : pars
@@ -61,8 +65,8 @@ pub struct TClass {
 }
 
 impl TClass {
-	pub fn new(name : String) -> TClass {
-		TClass {
+	pub fn new(name : String) -> RTClass {
+		Rc::new(RefCell::new(TClass {
 			source   : None,
 			fname    : name,
 			parent   : None,
@@ -74,48 +78,54 @@ impl TClass {
 			virt_cnt : 0,
 			props_i  : HashMap::new(),
 			virts_i  : HashMap::new()
+		}))
+	}
+	// rm link to source and clear containers that used only for type-check
+	pub fn prepare_to_translation(&mut self) {
+		self.source = None;
+		self.privs.clear();
+		self.pubs.clear();
+		self.params.clear();
+		self.args.clear();
+		match self.parent {
+			Some(ref mut par) => par.params = None,
+			_ => ()
 		}
 	}
 	pub fn get_prop_i(&self, name : &String) -> Option<usize> {
-		unsafe {
-			let mut cls : *const TClass = &*self;
-			loop {
-				match (*cls).props_i.get(name) {
-					Some(a) => return Some(*a),
-					_ => match (*cls).parent {
-						Some(ref p) => cls = p.class,
-						_ => return None
-					}
+		let mut cls : &TClass = self;
+		loop {
+			match cls.props_i.get(name) {
+				Some(a) => return Some(*a),
+				_ => match cls.parent {
+					Some(ref p) => cls = p.class.borrow().deref(),
+					_ => return None
 				}
 			}
 		}
 	}
 	pub fn get_virt_i(&self, name : &String) -> Option<usize> {
-		unsafe {
-			let mut cls : *const TClass = &*self;
-			loop {
-				match (*cls).virts_i.get(name) {
-					Some(a) => return Some(*a),
-					_ => match (*cls).parent {
-						Some(ref p) => cls = p.class,
-						_ => return None
-					}
+		let mut cls : &TClass = self;
+		loop {
+			match cls.virts_i.get(name) {
+				Some(a) => return Some(*a),
+				_ => match cls.parent {
+					Some(ref p) => cls = p.class.borrow().deref(),
+					_ => return None
 				}
 			}
 		}
 	}
 	pub fn method2name(&self, name : &String) -> Option<String> {
-		unsafe {
-			let mut cls : *const TClass = &*self;
-			loop {
-				match (*cls).pubs.get(name) {
-					Some(_) => return Some(format!("{}_M_{}", (*cls).fname, name)),
-					_ => match (*cls).privs.get(name) {
-						Some(_) => return Some(format!("{}_M_{}", (*cls).fname, name)),
-						_ => match (*cls).parent {
-							Some(ref p) => cls = p.class,
-							_ => return None
-						}
+		let mut cls : &TClass = self;
+		loop {
+			match cls.pubs.get(name) {
+				Some(_) => return Some(format!("{}_M_{}", cls.fname, name)),
+				_ => match cls.privs.get(name) {
+					Some(_) => return Some(format!("{}_M_{}", cls.fname, name)),
+					_ => match cls.parent {
+						Some(ref p) => cls = p.class.borrow().deref(),
+						_ => return None
 					}
 				}
 			}
@@ -157,7 +167,7 @@ impl TClass {
 		}
 	}
 
-	pub fn from_syn(cls : &Class, parent : Option<Parent>, pref : &Vec<String>) -> Result<TClass,Vec<SynErr>> {
+	pub fn from_syn(cls : &Class, parent : Option<Parent>, pref : &Vec<String>) -> Result<RTClass,Vec<SynErr>> {
 		let mut privs : BTreeMap<String, Attr> = BTreeMap::new();
 		let mut pubs  : BTreeMap<String, Attr> = BTreeMap::new();
 		let mut fname = String::new();
@@ -165,14 +175,13 @@ impl TClass {
 		let mut virt_cnt = 0;
 		let mut props_i  = HashMap::new();
 		let mut virts_i  = HashMap::new();
-		unsafe {
-			match parent {
-				Some(ref par) => {
-					prop_cnt = (*par.class).prop_cnt;
-					virt_cnt = (*par.class).virt_cnt;
-				},
-				_ => ()
-			}
+		match parent {
+			Some(ref par) => {
+				let c = par.class.borrow();
+				prop_cnt = c.prop_cnt;
+				virt_cnt = c.virt_cnt;
+			},
+			_ => ()
 		}
 		for p in pref.iter() {
 			fname.push_str(&**p);
@@ -180,7 +189,7 @@ impl TClass {
 		}
 		fname.push_str(&*cls.name);
 		macro_rules! make {($par:expr) => {{
-			return Ok(TClass {
+			return Ok(Rc::new(RefCell::new(TClass {
 				fname    : fname,
 				source   : Some(&*cls),
 				parent   : $par,
@@ -192,7 +201,7 @@ impl TClass {
 				virt_cnt : virt_cnt,
 				props_i  : props_i,
 				virts_i  : virts_i
-			});
+			})));
 		}}; }
 		macro_rules! foreach_prop{
 			($seq_src:ident, $seq_dst:expr, $parent:expr) => {
@@ -250,22 +259,21 @@ impl TClass {
 				}
 			};
 		}
-		unsafe {
-			match parent {
-				Some(par) => {
-					foreach_prop!(priv_prop, privs, par.class);
-					foreach_prop!(pub_prop, pubs, par.class);
-					foreach_meth!(priv_fn, privs, par.class);
-					foreach_meth!(pub_fn, pubs, par.class);
-					make!(Some(par))
-				},
-				None => {
-					foreach_prop!(priv_prop, privs);
-					foreach_prop!(pub_prop, pubs);
-					foreach_meth!(priv_fn, privs);
-					foreach_meth!(pub_fn, pubs);
-					make!(None)
-				}
+		match parent {
+			Some(par) => {
+				let c = par.class.borrow();
+				foreach_prop!(priv_prop, privs, c);
+				foreach_prop!(pub_prop, pubs, c);
+				foreach_meth!(priv_fn, privs, c);
+				foreach_meth!(pub_fn, pubs, c);
+				make!(Some(par))
+			},
+			None => {
+				foreach_prop!(priv_prop, privs);
+				foreach_prop!(pub_prop, pubs);
+				foreach_meth!(priv_fn, privs);
+				foreach_meth!(pub_fn, pubs);
+				make!(None)
 			}
 		}
 	}
@@ -309,92 +317,84 @@ impl TClass {
 		}
 	}
 	fn exist_attr(&self, name : &String) -> bool {
-		let mut lnk : *const TClass = &*self;
-		unsafe { loop {
+		let mut lnk : &TClass = self;
+		loop {
 			if (*lnk).privs.contains_key(name) || (*lnk).pubs.contains_key(name) {
 				return true
 			} else {
 				match (*lnk).parent {
-					Some(ref par) => lnk = par.class,
+					Some(ref par) => lnk = par.class.borrow().deref(),
 					_ => return false
 				}
 			}
-		}}
+		}
 	}
 	pub fn look_in_all(&self, name : &String, tmpl : Option<&Vec<RType>>) -> Option<RType> {
 		// TODO: rec to loop
-		unsafe {
-			let lnk = match self.pubs.get(name) {
-				Some(lnk) => &lnk._type,
-				None =>
-					match self.privs.get(name) {
-						Some(lnk) => &lnk._type,
-						None =>
-							match self.parent {
-								Some(ref lnk) => return (*lnk.class).look_in_all(name, tmpl),
-								None => return None
-							}
-					}
-			};
-			match tmpl {
-				Some(vec) => Some(self.replace_type(lnk, vec, true)),
-				_ => Some(lnk.clone())
-			}
+		let lnk = match self.pubs.get(name) {
+			Some(lnk) => &lnk._type,
+			None =>
+				match self.privs.get(name) {
+					Some(lnk) => &lnk._type,
+					None =>
+						match self.parent {
+							Some(ref lnk) => return lnk.class.borrow().look_in_all(name, tmpl),
+							None => return None
+						}
+				}
+		};
+		match tmpl {
+			Some(vec) => Some(self.replace_type(lnk, vec, true)),
+			_ => Some(lnk.clone())
 		}
 	}
 	pub fn look_in_pub(&self, name : &String, tmpl : Option<&Vec<RType>>) -> Option<RType> {
 		// TODO: rec to loop
-		unsafe {
-			let lnk = match self.pubs.get(name) {
-				Some(lnk) => &lnk._type,
-				None =>
-					match self.parent {
-						Some(ref lnk) => return (*lnk.class).look_in_pub(name, tmpl),
-						None => return None
-					}
-			};
-			match tmpl {
-				Some(vec) => Some(self.replace_type(lnk, vec, true)),
-				_ => Some(lnk.clone())
-			}
+		let lnk = match self.pubs.get(name) {
+			Some(lnk) => &lnk._type,
+			None =>
+				match self.parent {
+					Some(ref lnk) => return lnk.class.borrow().look_in_pub(name, tmpl),
+					None => return None
+				}
+		};
+		match tmpl {
+			Some(vec) => Some(self.replace_type(lnk, vec, true)),
+			_ => Some(lnk.clone())
 		}
 	}
 	// true if attr is method, false if prop. there is no check for existing here
 	pub fn is_method(&self, name : &String) -> bool {
-		unsafe {
-			let mut lnk : *const TClass = &*self;
-			loop {
-				match (*lnk).pubs.get(name) {
-					Some(p) => return p.is_method,
-					_ =>
-						match (*lnk).privs.get(name) {
-							Some(p) => return p.is_method,
-							_ =>
-								match (*lnk).parent {
-									Some(ref par) => lnk = par.class,
-									_ => panic!()
-								}
-						}
-				}
+		let mut lnk : &TClass = self;
+		loop {
+			match (*lnk).pubs.get(name) {
+				Some(p) => return p.is_method,
+				_ =>
+					match (*lnk).privs.get(name) {
+						Some(p) => return p.is_method,
+						_ =>
+							match (*lnk).parent {
+								Some(ref par) => lnk = par.class.borrow().deref(),
+								_ => panic!()
+							}
+					}
 			}
 		}
 	}
 	pub fn is_method_noexc(&self, name : &String) -> bool {
-		unsafe {
-			let mut lnk : *const TClass = &*self;
-			loop {
-				match (*lnk).pubs.get(name) {
-					Some(p) => return p.is_no_exc,
-					_ =>
-						match (*lnk).privs.get(name) {
-							Some(p) => return p.is_no_exc,
-							_ =>
-								match (*lnk).parent {
-									Some(ref par) => lnk = par.class,
-									_ => panic!()
-								}
-						}
-				}
+		let mut lnk : &TClass = self;
+		loop {
+			match (*lnk).pubs.get(name) {
+				Some(p) => return p.is_no_exc,
+				_ =>
+					match (*lnk).privs.get(name) {
+						Some(p) => return p.is_no_exc,
+						_ =>
+							match (*lnk).parent {
+								Some(ref par) => lnk = par.class.borrow().deref(),
+								_ => panic!()
+							}
+					}
 			}
 		}
 	}

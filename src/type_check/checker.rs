@@ -4,7 +4,7 @@ use type_check::tclass::*;
 use type_check::pack::*;
 use std::collections::{HashMap/*, HashSet, BTreeMap*/};
 use std::mem;
-use std::rc::Rc;
+//use std::rc::Rc;
 use type_check::regressor::*;
 use preludelib::*;
 
@@ -169,11 +169,11 @@ impl Checker {
 							let cls =
 								if pref[0] == "%mod" {
 									let p = Vec::new();
-									pack.get_cls(&p, name)
+									pack.get_cls_rc(&p, name)
 								} else {
-									pack.get_cls(pref, name)
+									pack.get_cls_rc(pref, name)
 								};
-							let cls = cls.unwrap();
+							let cls = cls.unwrap().clone();
 							Some(Parent::new(cls, p_ref))
 						},
 						_ => throw!(format!("can't inherit from {:?}", tp), c.addres)
@@ -200,7 +200,7 @@ impl Checker {
 			}
 			match pack.cls.get_mut(&c.name) {
 				Some(tcl) => {
-					unsafe { tcl.check_initializer()? }
+					unsafe { tcl.borrow_mut().check_initializer()? }
 					//println!("INIT PARAMS FOR {}: {:?}", tcl.args)
 				},
 				_ => ()

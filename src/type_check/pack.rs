@@ -3,6 +3,7 @@ use syn::reserr::*;
 use type_check::tclass::*;
 use std::fmt::Write;
 use std::collections::{HashMap, BTreeMap, BTreeSet};
+use std::ops::Deref;
 
 macro_rules! pack_of {
 	($_self:expr, $pref:expr) => {{
@@ -27,7 +28,7 @@ macro_rules! get_obj {
 		if $pref.len() > 0 {
 			if $pref[0] == "%mod" {
 				match $_self.$map.get($name) {
-					Some(ans) => Some(&*ans),
+					Some(ans) => Some(ans),
 					_ => None
 				}
 			} else {
@@ -35,7 +36,7 @@ macro_rules! get_obj {
 				match pack {
 					Some(ptr) =>
 						match (*ptr).$map.get($name) {
-							Some(ans) => Some(&*ans),
+							Some(ans) => Some(ans),
 							None => None
 						},
 					_ => None
@@ -43,10 +44,10 @@ macro_rules! get_obj {
 			}
 		} else {
 			match $_self.$map.get($name) {
-				Some(ans) => Some(&*ans),
+				Some(ans) => Some(ans),
 				None =>
 					match $_self.$out_map.get($name) {
-						Some(pack) => Some(&*(**pack).$map.get($name).unwrap()),
+						Some(pack) => Some((**pack).$map.get($name).unwrap()),
 						None => None
 					}
 			}
@@ -73,7 +74,7 @@ pub struct Pack {
 	pub out_cls  : HashMap<String,*const Pack>,  // imports *
 	pub out_fns  : BTreeMap<String,*const Pack>, // imports *
 	pub out_exc  : BTreeMap<String,*const Pack>, // imports *
-	pub cls      : HashMap<String,TClass>,
+	pub cls      : HashMap<String,RTClass>,
 	pub fns      : BTreeMap<String,RType>,
 	pub fns_noex : BTreeSet<String>,             // optimizator noexcept flag
 	pub excepts  : BTreeMap<String,Option<RType>>
@@ -110,7 +111,7 @@ impl Pack {
 		}
 		let _ = write!(out, "CLASSES:\n");
 		for name in self.cls.keys() {
-			let cls = self.cls.get(name).unwrap();
+			let cls = self.cls.get(name).unwrap().borrow();
 			let _ = write!(out, "\tCLASS {}<{:?}>({:?})\n", name, cls.params, cls.args);
 			
 			for pname in cls.privs.keys() {
@@ -125,8 +126,17 @@ impl Pack {
 		}
 		return out;
 	}
-	pub fn get_cls(&self, pref : &Vec<String>, name : &String) -> Option<*const TClass> {
-		get_obj!(self, pref, name, cls, out_cls)
+	pub fn get_cls(&self, pref : &Vec<String>, name : &String) -> Option<&TClass> {
+		match get_obj!(self, pref, name, cls, out_cls) {
+			Some(t) => Some(t.borrow().deref()),
+			_ => None
+		}
+	}
+	pub fn get_cls_rc(&self, pref : &Vec<String>, name : &String) -> Option<&RTClass> {
+		/*match */get_obj!(self, pref, name, cls, out_cls)/* {
+			Some(t) => Some(t.borrow().deref()),
+			_ => None
+		}*/
 	}
 	pub fn get_exception(&self, pref : &Vec<String>, name : &String) -> Option<Option<RType>> {
 		match get_obj!(self, pref, name, excepts, out_exc) {
