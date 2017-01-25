@@ -2,6 +2,7 @@ use bytecode::func::*;
 use bytecode::cmd::*;
 use bytecode::registers::*;
 use bytecode::state::*;
+use bytecode::global_conf::*;
 use bytecode::compile_act as c_act;
 use syn::*;
 use std::collections::HashMap;

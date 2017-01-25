@@ -45,8 +45,8 @@ impl Attr {
 }
 
 pub struct TClass {
-	pub source : Option<*const Class>,
-	pub fname   : String,               // full name
+	pub source : Option<*const Class>,  // need this field for checking initializer
+	pub fname  : String,                // full name
 	pub parent : Option<Parent>,
 	pub privs  : BTreeMap<String,Attr>, // orig type saved in syn_class
 	pub pubs   : BTreeMap<String,Attr>, 
@@ -141,8 +141,8 @@ impl TClass {
 		addl!("PARAMS:{:?}", self.params);
 		addl!("ARGS:{:?}", self.args);
 		match self.source {
-			None => addl!("PARENT: NO"),
-			_    => addl!("PARENT: YES")
+			None => addl!("SOURCE: NO"),
+			_    => addl!("SOURCE: YES")
 		}
 		addl!("PRIVS");
 		tabs.push(' ');

@@ -2,6 +2,7 @@ use syn::*;
 use bytecode::state::*;
 use bytecode::registers::*;
 use bytecode::cmd::*;
+use bytecode::global_conf::*;
 use bytecode::compile_expr as c_expr;
 
 pub fn compile(acts : &Vec<ActF>, state : &mut State, gc : &GlobalConf, cmds : &mut Vec<Cmd>) {
