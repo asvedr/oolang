@@ -17,6 +17,7 @@ typedef struct {
 	char          obj;
 	union {
 		GCObject *link;
+		void     *plink;
 		int       inum;
 		double    fnum;
 	};
@@ -41,6 +42,7 @@ typedef struct {
 #define VAL(v) ((v).link -> data)
 #define VINT(v) (v.inum)
 #define VREAL(v) (v.fnum)
+#define PLINK(v) (v.plink)
 
 GCObject* newVarGC(Destructor);
 
@@ -56,6 +58,10 @@ GCObject* newVarGC(Destructor);
 #define NEWREAL(var,n) {\
 	var.obj = 0;\
 	var.fnum = n;\
+}
+#define NEWPRIMLINK(var, l) {\
+	var.obj = 0;\
+	var.plink = l;\
 }
 
 //extern Var VNULL;

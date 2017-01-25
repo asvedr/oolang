@@ -98,7 +98,7 @@ impl Checker {
 		res
 	}
 	// this is only one public fun for checking
-	pub fn check_mod(&self, smod : &mut SynMod) -> CheckRes {
+	pub fn check_mod(&self, smod : &mut SynMod, mod_name : &Vec<String>) -> CheckRes {
 		let mut pack = Pack::new();
 		for c in self.std.pack.cls.keys() {
 			pack.out_cls.insert(c.clone(), &*self.std.pack);
@@ -182,7 +182,7 @@ impl Checker {
 				_ => None
 			};
 			// GETTING 'TClass'
-			let tcls = TClass::from_syn(c, par)?;
+			let tcls = TClass::from_syn(c, par, &mod_name)?;
 			// ADDING TO ENV
 			//println!("ADD TO ENV {}", c.name);
 			match pack.cls.insert(c.name.clone(), tcls) {

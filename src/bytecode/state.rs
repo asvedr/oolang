@@ -1,8 +1,10 @@
 use bytecode::registers::*;
 use std::collections::HashMap;
 use std::fmt::Write;
+use std::rc::Rc;
 use syn::type_sys::*;
 use syn::utils::Show;
+use type_check::tclass::*;
 
 pub struct Env {
 	pub out   : HashMap<String,u8>, // grabbed environment
@@ -49,13 +51,15 @@ impl ExcKeys {
 }
 
 pub struct GlobalConf {
-	pub excepts : ExcKeys
+	pub excepts : ExcKeys,
+	pub classes : HashMap<String, Rc<TClass>>
 }
 
 impl GlobalConf {
 	pub fn new(c : usize) -> GlobalConf {
 		GlobalConf{
-			excepts : ExcKeys::new(c)
+			excepts : ExcKeys::new(c),
+			classes : HashMap::new()
 		}
 	}
 }
