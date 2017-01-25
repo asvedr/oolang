@@ -119,41 +119,6 @@ impl Type {
 			_ => panic!()
 		}
 	}
-	/*pub fn c_name(&self) -> &String {
-		match *self {
-			Type::Class(_,ref a,_) => a, 
-			_ => panic!()
-		}
-	}
-	pub fn c_prefix(&self) -> &Vec<String> {
-		match *self {
-			Type::Class(ref a,_,_) => a,
-			_ => panic!()
-		}
-	}
-	pub fn c_params(&self) -> Option<&Vec<RType>> {
-		match *self {
-			Type::Class(_,_,Some(ref v)) => Some(v),
-			_ => None
-		}
-	}*/
-	/*pub fn components(&self, res : &mut Vec<*const Type>) {
-		match *self {
-			Type::Arr(ref a) => res.push(&a[0]),
-			Type::Class(_,_,Some(ref v)) => {
-				for t in v.iter() {
-					res.push(t)
-				}
-			},
-			Type::Fn(_, ref args, ref res_t) => {
-				res.push(&**res_t);
-				for t in args.iter() {
-					res.push(t);
-				}
-			},
-			_ => ()
-		}
-	}*/
 }
 
 impl fmt::Debug for Type {

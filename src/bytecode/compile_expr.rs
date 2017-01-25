@@ -237,7 +237,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 				for i in pref.iter() {
 					c_name = format!("{}{}_", c_name, i);
 				}
-				c_name = format!("{}c_{}", c_name, name);
+				c_name = format!("{}_C_{}", c_name, name);
 			}
 			let mut c_args = vec![];
 			for a in args.iter() {

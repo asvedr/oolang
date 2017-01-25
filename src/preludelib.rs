@@ -2,7 +2,7 @@ use type_check::tclass::*;
 use type_check::pack::*;
 use std::rc::Rc;
 use syn::type_sys::*;
-use std::collections::BTreeMap;
+//use std::collections::BTreeMap;
 
 pub struct Prelude {
 	pub pack : Box<Pack>
@@ -24,8 +24,10 @@ impl Prelude {
 			($n:expr, $arg:expr) => {pack.excepts.insert($n.to_string(), Some($arg))};
 			($n:expr) => {pack.excepts.insert($n.to_string(), None)};
 		}
-		macro_rules! newc {($name:expr, $p:expr, $acnt:expr) => {{
-			let c = TClass{source : None, parent : None, privs : BTreeMap::new(), pubs : BTreeMap::new(), params : $p, args : $acnt};
+		macro_rules! newc {($name:expr, $fname:expr, $p:expr, $acnt:expr) => {{
+			let mut c = TClass::new($fname.to_string());//{source : None, name : $fname.to_string(), parent : None, privs : BTreeMap::new(), pubs : BTreeMap::new(), params : $p, args : $acnt};
+			c.params = $p;
+			c.args = $acnt;
 			//let lnk : *mut TClass = &mut clss[clss.len() - 1];
 			pack.cls.insert($name.to_string(), c);
 			pack.cls.get_mut($name).unwrap()
@@ -43,21 +45,21 @@ impl Prelude {
 			unsafe { (*$cls).pubs.insert($name.to_string(), Attr::method(/*newf_loc!($t)*/$t, $noexc)); }
 		}};}
 		{
-		let arr : *mut TClass = newc!("%arr", vec!["a".to_string()], vec![]);
+		let arr : *mut TClass = newc!("%arr", "_std_arr", vec!["a".to_string()], vec![]);
 		meth!(arr, "len", type_fn!(vec![], Type::int()), true);
 		meth!(arr, "get", type_fn!(vec![Type::int()], type_c!("a".to_string())), false);
-		let asc : *mut TClass = newc!("Asc", vec!["a".to_string(),"b".to_string()], vec![]);
+		let asc : *mut TClass = newc!("Asc", "_std_asc", vec!["a".to_string(),"b".to_string()], vec![]);
 		meth!(asc, "len", type_fn!(vec![], Type::int()), true);
 		meth!(asc, "keys", type_fn!(vec![], Type::arr(type_c!("a".to_string()))), true);
 		meth!(asc, "get", type_fn!(vec![type_c!("a".to_string())], type_c!("b".to_string())), false);
 		meth!(asc, "set", type_fn!(vec![type_c!("a".to_string()), type_c!("b".to_string())], Type::void()), false);
 		meth!(asc, "has_key", type_fn!(vec![type_c!("a".to_string())], Type::bool()), true);
-		let str_s : *mut TClass = newc!("%str", vec![], vec![]);
+		let str_s : *mut TClass = newc!("%str", "_std_str", vec![], vec![]);
 		meth!(str_s, "len", type_fn!(vec![], Type::int()), true);
 		meth!(str_s, "get", type_fn!(vec![Type::int()], Type::char()), false);
 		meth!(str_s, "set", type_fn!(vec![Type::int(),Type::char()], Type::void()), false);
 		meth!(str_s, "add", type_fn!(vec![Type::str()], Type::void()), false);
-		let except : *mut TClass = newc!("Exception", vec![], vec![Type::str()]);
+		let except : *mut TClass = newc!("Exception", "_std_exc", vec![], vec![Type::str()]);
 		meth!(except, "param", type_fn!(vec![], Type::str()), true);
 		newf!("print",  type_fn!(vec![Type::str()], Type::void()));
 		newf!("readln", type_fn!(vec![], Type::str()));

@@ -1,7 +1,7 @@
 use syn::type_sys::*;
 use syn::class::*;
 use syn::reserr::*;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
 pub struct Parent {
@@ -21,7 +21,8 @@ impl Parent {
 pub struct Attr {
 	pub _type     : RType,
 	pub is_method : bool,
-	pub is_no_exc : bool
+	pub is_no_exc : bool, // for methods VIRTUAL CAN'T BE NOEXCEPT
+	pub is_virt   : bool  // for methods
 }
 
 impl Attr {
@@ -29,28 +30,97 @@ impl Attr {
 		Attr{
 			_type : t,
 			is_method : true,
-			is_no_exc : noexc
+			is_no_exc : noexc,
+			is_virt   : false
 		}
 	}
 	pub fn prop(t : RType) -> Attr {
 		Attr {
 			_type : t,
 			is_method : false,
-			is_no_exc : false
+			is_no_exc : false,
+			is_virt   : false
 		}
 	}
 }
 
 pub struct TClass {
-	pub source : Option<*const Class>,
+	pub source : Option<*const Class>,  // need this field for checking initializer
+	pub fname  : String,                // full name
 	pub parent : Option<Parent>,
 	pub privs  : BTreeMap<String,Attr>, // orig type saved in syn_class
 	pub pubs   : BTreeMap<String,Attr>, 
 	pub params : Vec<String>,           // template
-	pub args   : Vec<RType>             // constructor 
+	pub args   : Vec<RType>,            // constructor 
+
+	prop_cnt   : usize,
+	virt_cnt   : usize,
+	// FOR BYTECODE
+	pub props_i : HashMap<String,usize>,
+	pub virts_i : HashMap<String,usize>
 }
 
 impl TClass {
+	pub fn new(name : String) -> TClass {
+		TClass {
+			source   : None,
+			fname    : name,
+			parent   : None,
+			privs    : BTreeMap::new(),
+			pubs     : BTreeMap::new(), 
+			params   : Vec::new(),
+			args     : Vec::new(),
+			prop_cnt : 0,
+			virt_cnt : 0,
+			props_i  : HashMap::new(),
+			virts_i  : HashMap::new()
+		}
+	}
+	pub fn get_prop_i(&self, name : &String) -> Option<usize> {
+		unsafe {
+			let mut cls : *const TClass = &*self;
+			loop {
+				match (*cls).props_i.get(name) {
+					Some(a) => return Some(*a),
+					_ => match (*cls).parent {
+						Some(ref p) => cls = p.class,
+						_ => return None
+					}
+				}
+			}
+		}
+	}
+	pub fn get_virt_i(&self, name : &String) -> Option<usize> {
+		unsafe {
+			let mut cls : *const TClass = &*self;
+			loop {
+				match (*cls).virts_i.get(name) {
+					Some(a) => return Some(*a),
+					_ => match (*cls).parent {
+						Some(ref p) => cls = p.class,
+						_ => return None
+					}
+				}
+			}
+		}
+	}
+	pub fn method2name(&self, name : &String) -> Option<String> {
+		unsafe {
+			let mut cls : *const TClass = &*self;
+			loop {
+				match (*cls).pubs.get(name) {
+					Some(_) => return Some(format!("{}_M_{}", (*cls).fname, name)),
+					_ => match (*cls).privs.get(name) {
+						Some(_) => return Some(format!("{}_M_{}", (*cls).fname, name)),
+						_ => match (*cls).parent {
+							Some(ref p) => cls = p.class,
+							_ => return None
+						}
+					}
+				}
+			}
+		}
+	}
 	pub fn print(&self) {
 		let mut tabs = String::new();
 		macro_rules! addl {($($args:expr),+)  => {println!("{}{}",tabs,format!($($args,)+))};}
@@ -67,11 +137,12 @@ impl TClass {
 		};}
 		addl!("CLASS");
 		tabs.push(' ');
+		addl!("FULL_NAME: {}", self.fname);
 		addl!("PARAMS:{:?}", self.params);
 		addl!("ARGS:{:?}", self.args);
 		match self.source {
-			None => addl!("PARENT: NO"),
-			_    => addl!("PARENT: YES")
+			None => addl!("SOURCE: NO"),
+			_    => addl!("SOURCE: YES")
 		}
 		addl!("PRIVS");
 		tabs.push(' ');
@@ -86,53 +157,48 @@ impl TClass {
 		}
 	}
 
-	pub fn from_syn(cls : &Class, parent : Option<Parent>) -> Result<TClass,Vec<SynErr>> {
+	pub fn from_syn(cls : &Class, parent : Option<Parent>, pref : &Vec<String>) -> Result<TClass,Vec<SynErr>> {
 		let mut privs : BTreeMap<String, Attr> = BTreeMap::new();
 		let mut pubs  : BTreeMap<String, Attr> = BTreeMap::new();
+		let mut fname = String::new();
+		let mut prop_cnt = 0;
+		let mut virt_cnt = 0;
+		let mut props_i  = HashMap::new();
+		let mut virts_i  = HashMap::new();
+		unsafe {
+			match parent {
+				Some(ref par) => {
+					prop_cnt = (*par.class).prop_cnt;
+					virt_cnt = (*par.class).virt_cnt;
+				},
+				_ => ()
+			}
+		}
+		for p in pref.iter() {
+			fname.push_str(&**p);
+			fname.push('_');
+		}
+		fname.push_str(&*cls.name);
 		macro_rules! make {($par:expr) => {{
-		//	let fname = format!("init");
-		//	match privs.get(&fname) {
-		//		Some(_) => syn_throw!("initializer must be pub", cls.addres),
-		//		_ => {
-					/* let args = match pubs.get(&fname) {
-						Some(t) => {
-							match **t {
-								Type::Fn(_,ref args_src,ref ret) => {
-									let mut args : Vec<Type> = vec![];
-									for a in args_src.iter() {
-										args.push(a.clone());
-									}
-									if ret.is_void() {
-										// ok
-										args
-									} else {
-										syn_throw!("initializer must be void", cls.addres)
-									}
-								},
-								_ =>
-									syn_throw!(format!("initializer must be function, but it {:?}", **t), cls.addres)
-							}
-						},
-						_ => {
-							// ok
-							Vec::new()
-						}
-					}; */
-					// returning value
-					return Ok(TClass {
-						source : Some(&*cls),
-						parent : $par,
-						privs  : privs,
-						pubs   : pubs,
-						params : cls.template.clone(),
-						args   : vec![]//args
-					});
-		//		}
-		//	}
+			return Ok(TClass {
+				fname    : fname,
+				source   : Some(&*cls),
+				parent   : $par,
+				privs    : privs,
+				pubs     : pubs,
+				params   : cls.template.clone(),
+				args     : vec![], //args,
+				prop_cnt : prop_cnt,
+				virt_cnt : virt_cnt,
+				props_i  : props_i,
+				virts_i  : virts_i
+			});
 		}}; }
 		macro_rules! foreach_prop{
 			($seq_src:ident, $seq_dst:expr, $parent:expr) => {
 				for prop in cls.$seq_src.iter() {
+					props_i.insert(prop.name.clone(), prop_cnt);
+					prop_cnt += 1;
 					if (*$parent).exist_attr(&prop.name) {
 						syn_throw!("this prop exist in parent", prop.addres)
 					} else {
@@ -145,6 +211,8 @@ impl TClass {
 			};
 			($seq_src:ident, $seq_dst:expr) => {
 				for prop in cls.$seq_src.iter() {
+					props_i.insert(prop.name.clone(), prop_cnt);
+					prop_cnt += 1;
 					match $seq_dst.insert(prop.name.clone(), Attr::prop(prop.ptype.clone())) {
 						Some(_) => syn_throw!(format!("this prop already exist"), prop.addres),
 						_ => ()
@@ -155,6 +223,10 @@ impl TClass {
 		macro_rules! foreach_meth{
 			($seq_src:ident, $seq_dst:expr, $parent:expr) => {
 				for prop in cls.$seq_src.iter() {
+					if prop.is_virt {
+						virts_i.insert(prop.func.name.clone(), virt_cnt);
+						virt_cnt += 1;
+					}
 					if (*$parent).exist_attr(&prop.func.name) {
 						syn_throw!("this prop exist in parent", prop.func.addr)
 					} else {
@@ -167,6 +239,10 @@ impl TClass {
 			};
 			($seq_src:ident, $seq_dst:expr) => {
 				for prop in cls.$seq_src.iter() {
+					if prop.is_virt {
+						virts_i.insert(prop.func.name.clone(), virt_cnt);
+						virt_cnt += 1;
+					}
 					match $seq_dst.insert(prop.func.name.clone(), Attr::method(prop.ftype.clone(), prop.func.no_except)) {
 						Some(_) => syn_throw!(format!("this prop already exist"), prop.func.addr),
 						_ => ()
