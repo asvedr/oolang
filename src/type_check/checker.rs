@@ -152,8 +152,9 @@ impl Checker {
 			// CHECK PARENT
 			let par = match c.parent {
 				Some(ref mut tp) => unsafe {
-					let tp : &mut (&mut Type) = mem::transmute(tp);
-					match **tp {
+					//let tp : &mut (&mut Type) = mem::transmute(tp);
+					let tp : &mut Type = mem::transmute(&**tp);
+					match *tp {
 						Type::Class(ref mut pref, ref name, ref mut pars) => {
 							let p_ref : Option<*const Vec<RType>> =
 								match *pars {
@@ -836,7 +837,7 @@ impl Checker {
 						/*for a in args.iter_mut() {
 							check!(a);
 						}*/
-						let mut type_known = false;
+						//let mut type_known = false;
 						// TYPING
 						match *f.kind {
 							Type::Fn(ref tmpl_t, ref args_t, ref res_t) => {
@@ -858,7 +859,7 @@ impl Checker {
 									}
 									expr.kind = res_t.clone();
 								}
-								type_known = true;
+								//type_known = true;
 							},
 							Type::Unk => unk_count += 1,
 							ref t => {

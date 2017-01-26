@@ -3,7 +3,6 @@ use syn::reserr::*;
 use type_check::tclass::*;
 use std::fmt::Write;
 use std::collections::{HashMap, BTreeMap, BTreeSet};
-use std::ops::Deref;
 
 macro_rules! pack_of {
 	($_self:expr, $pref:expr) => {{

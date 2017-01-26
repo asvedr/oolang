@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(mutable_transmutes)]
 
 extern crate getopts;
 #[macro_use]

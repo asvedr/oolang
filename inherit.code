@@ -1,0 +1,10 @@
+class A {
+	pub a : int;
+	pub b : int;
+}
+
+class B : A {
+	pub fn f1() : () {
+	}
+}
+

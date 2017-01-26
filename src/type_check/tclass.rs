@@ -4,7 +4,6 @@ use syn::reserr::*;
 use std::collections::{BTreeMap, HashMap};
 pub use std::rc::Rc;
 pub use std::cell::RefCell;
-use std::ops::Deref;
 
 pub type RTClass = Rc<RefCell<TClass>>;
 
@@ -354,7 +353,7 @@ impl TClass {
 					return true
 				} else {
 					match (*lnk).parent {
-						Some(ref par) => lnk = par.class.borrow().deref(),
+						Some(ref par) => lnk = &*par.class.borrow(),
 						_ => return false
 					}
 				}

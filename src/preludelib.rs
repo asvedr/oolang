@@ -25,7 +25,7 @@ impl Prelude {
 			($n:expr) => {pack.excepts.insert($n.to_string(), None)};
 		}
 		macro_rules! newc {($name:expr, $fname:expr, $p:expr, $acnt:expr) => {{
-			let mut c = TClass::new($fname.to_string());
+			let c = TClass::new($fname.to_string());
 			{
 				let mut c = c.borrow_mut(); 
 				c.params = $p;
@@ -45,7 +45,7 @@ impl Prelude {
 			}};
 		}
 		macro_rules! meth {($cls:expr, $name:expr, $t:expr, $noexc:expr) => {{
-			unsafe { (*$cls).pubs.insert($name.to_string(), Attr::method(/*newf_loc!($t)*/$t, $noexc)); }
+			(*$cls).pubs.insert($name.to_string(), Attr::method(/*newf_loc!($t)*/$t, $noexc));
 		}};}
 		{
 			let mut arr = newc!("%arr", "_std_arr", vec!["a".to_string()], vec![]);
