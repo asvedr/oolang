@@ -54,8 +54,10 @@ fn main() {
 					_ => m.print()
 				}
 			}
-			let cfun = compile_fun::compile(&m.funs[0]);
-			cfun.print()
+			if m.funs.len() > 0 {
+				let cfun = compile_fun::compile(&m.funs[0]);
+				cfun.print()
+			}
 		},
 		Err(vec) => {
 			for e in vec {

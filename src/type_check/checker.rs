@@ -195,6 +195,7 @@ impl Checker {
 				if f {
 					unsafe{ self.check_type_pack(&pack, &c.template, &mut meth.func.ftype, &meth.func.addr)? };
 					meth.ftype = meth.func.ftype.clone();
+					println!("INITIALIZER FOUND, tp:{:?}", meth.ftype);
 					break;
 				}
 			}

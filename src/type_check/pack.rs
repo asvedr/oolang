@@ -126,9 +126,9 @@ impl Pack {
 		}
 		return out;
 	}
-	pub fn get_cls(&self, pref : &Vec<String>, name : &String) -> Option<&TClass> {
+	pub fn get_cls(&self, pref : &Vec<String>, name : &String) -> Option<*const TClass> {
 		match get_obj!(self, pref, name, cls, out_cls) {
-			Some(t) => Some(t.borrow().deref()),
+			Some(t) => Some(&*t.borrow()),
 			_ => None
 		}
 	}

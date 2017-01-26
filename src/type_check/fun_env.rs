@@ -284,7 +284,7 @@ impl FunEnv {
 		}
 	}*/
 	// return Option<(methodType, isMethod)>
-	pub fn get_cls(&self, cls : &Type) -> Option<&TClass> {
+	pub fn get_cls(&self, cls : &Type) -> Option<*const TClass> {
 		unsafe {
 			match *cls {
 				Type::Class(ref pref, ref cname, ref params) => {

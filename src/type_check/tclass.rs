@@ -93,39 +93,45 @@ impl TClass {
 		}
 	}
 	pub fn get_prop_i(&self, name : &String) -> Option<usize> {
-		let mut cls : &TClass = self;
-		loop {
-			match cls.props_i.get(name) {
-				Some(a) => return Some(*a),
-				_ => match cls.parent {
-					Some(ref p) => cls = p.class.borrow().deref(),
-					_ => return None
+		unsafe {
+			let mut cls : *const TClass = self;
+			loop {
+				match (*cls).props_i.get(name) {
+					Some(a) => return Some(*a),
+					_ => match (*cls).parent {
+						Some(ref p) => cls = &*p.class.borrow(),
+						_ => return None
+					}
 				}
 			}
 		}
 	}
 	pub fn get_virt_i(&self, name : &String) -> Option<usize> {
-		let mut cls : &TClass = self;
-		loop {
-			match cls.virts_i.get(name) {
-				Some(a) => return Some(*a),
-				_ => match cls.parent {
-					Some(ref p) => cls = p.class.borrow().deref(),
-					_ => return None
+		unsafe {
+			let mut cls : *const TClass = self;
+			loop {
+				match (*cls).virts_i.get(name) {
+					Some(a) => return Some(*a),
+					_ => match (*cls).parent {
+						Some(ref p) => cls = &*p.class.borrow(),
+						_ => return None
+					}
 				}
 			}
 		}
 	}
 	pub fn method2name(&self, name : &String) -> Option<String> {
-		let mut cls : &TClass = self;
-		loop {
-			match cls.pubs.get(name) {
-				Some(_) => return Some(format!("{}_M_{}", cls.fname, name)),
-				_ => match cls.privs.get(name) {
-					Some(_) => return Some(format!("{}_M_{}", cls.fname, name)),
-					_ => match cls.parent {
-						Some(ref p) => cls = p.class.borrow().deref(),
-						_ => return None
+		unsafe {
+			let mut cls : *const TClass = self;
+			loop {
+				match (*cls).pubs.get(name) {
+					Some(_) => return Some(format!("{}_M_{}", (*cls).fname, name)),
+					_ => match (*cls).privs.get(name) {
+						Some(_) => return Some(format!("{}_M_{}", (*cls).fname, name)),
+						_ => match (*cls).parent {
+							Some(ref p) => cls = &*p.class.borrow(),
+							_ => return None
+						}
 					}
 				}
 			}
@@ -261,11 +267,13 @@ impl TClass {
 		}
 		match parent {
 			Some(par) => {
-				let c = par.class.borrow();
-				foreach_prop!(priv_prop, privs, c);
-				foreach_prop!(pub_prop, pubs, c);
-				foreach_meth!(priv_fn, privs, c);
-				foreach_meth!(pub_fn, pubs, c);
+				{
+					let c = par.class.borrow();
+					foreach_prop!(priv_prop, privs, c);
+					foreach_prop!(pub_prop, pubs, c);
+					foreach_meth!(priv_fn, privs, c);
+					foreach_meth!(pub_fn, pubs, c);
+				}
 				make!(Some(par))
 			},
 			None => {
@@ -284,11 +292,33 @@ impl TClass {
 			_ => panic!()
 		};
 		match self.privs.get(&fname) {
-			Some(_) => syn_throw!("initializer must be pub", cls.addres),
+			Some(_) => syn_throw!(format!("initializer of {} must be pub", cls.name), cls.addres),
 			_ => {
-				let args : Vec<RType> = match self.pubs.get(&fname) {
-					Some(t) => {
-						match *(t._type) {
+				let mut args : Vec<RType> = Vec::new();
+				match self.pubs.get(&fname) {
+					Some(/*t*/_) => {
+						for meth in cls.pub_fn.iter() {
+							if meth.func.name == fname {
+								match *meth.ftype {
+									Type::Fn(_,ref args_src, ref ret) => {		
+										/*let mut args : Vec<RType> = vec![];
+										for a in args_src.iter() {
+											args.push(a.clone());
+										}*/
+										if ret.is_void() {
+											// ok
+											args = args_src.clone()
+										} else {
+											syn_throw!("initializer must return void", meth.func.addr)
+										}
+									},
+									_ => 
+										syn_throw!(format!("initializer must be function, but it {:?}", meth.ftype), meth.func.addr)
+								}
+								break
+							}
+						}
+						/*match *(t._type) {
 							Type::Fn(_,ref args_src,ref ret) => {
 								let mut args : Vec<RType> = vec![];
 								for a in args_src.iter() {
@@ -298,16 +328,16 @@ impl TClass {
 									// ok
 									args
 								} else {
-									syn_throw!("initializer must be void", cls.addres)
+									syn_throw!(format!("initializer of {} must be void", cls.name), cls.addres)
 								}
 							},
 							_ =>
-								syn_throw!(format!("initializer must be function, but it {:?}", *(t._type)), cls.addres)
-						}
+								syn_throw!(format!("initializer of {} must be function, but it {:?}", cls.name, *(t._type)), cls.addres)
+						}*/
 					},
 					_ => {
 						// ok
-						Vec::new()
+						//Vec::new()
 					}
 				};
 				// setting args
@@ -317,14 +347,16 @@ impl TClass {
 		}
 	}
 	fn exist_attr(&self, name : &String) -> bool {
-		let mut lnk : &TClass = self;
-		loop {
-			if (*lnk).privs.contains_key(name) || (*lnk).pubs.contains_key(name) {
-				return true
-			} else {
-				match (*lnk).parent {
-					Some(ref par) => lnk = par.class.borrow().deref(),
-					_ => return false
+		unsafe {
+			let mut lnk : *const TClass = self;
+			loop {
+				if (*lnk).privs.contains_key(name) || (*lnk).pubs.contains_key(name) {
+					return true
+				} else {
+					match (*lnk).parent {
+						Some(ref par) => lnk = par.class.borrow().deref(),
+						_ => return false
+					}
 				}
 			}
 		}
@@ -365,36 +397,40 @@ impl TClass {
 	}
 	// true if attr is method, false if prop. there is no check for existing here
 	pub fn is_method(&self, name : &String) -> bool {
-		let mut lnk : &TClass = self;
-		loop {
-			match (*lnk).pubs.get(name) {
-				Some(p) => return p.is_method,
-				_ =>
-					match (*lnk).privs.get(name) {
-						Some(p) => return p.is_method,
-						_ =>
-							match (*lnk).parent {
-								Some(ref par) => lnk = par.class.borrow().deref(),
-								_ => panic!()
-							}
-					}
+		unsafe {
+			let mut lnk : *const TClass = self;
+			loop {
+				match (*lnk).pubs.get(name) {
+					Some(p) => return p.is_method,
+					_ =>
+						match (*lnk).privs.get(name) {
+							Some(p) => return p.is_method,
+							_ =>
+								match (*lnk).parent {
+									Some(ref par) => lnk = &*par.class.borrow(),
+									_ => panic!()
+								}
+						}
+				}
 			}
 		}
 	}
 	pub fn is_method_noexc(&self, name : &String) -> bool {
-		let mut lnk : &TClass = self;
-		loop {
-			match (*lnk).pubs.get(name) {
-				Some(p) => return p.is_no_exc,
-				_ =>
-					match (*lnk).privs.get(name) {
-						Some(p) => return p.is_no_exc,
-						_ =>
-							match (*lnk).parent {
-								Some(ref par) => lnk = par.class.borrow().deref(),
-								_ => panic!()
-							}
-					}
+		unsafe {
+			let mut lnk : *const TClass = self;
+			loop {
+				match (*lnk).pubs.get(name) {
+					Some(p) => return p.is_no_exc,
+					_ =>
+						match (*lnk).privs.get(name) {
+							Some(p) => return p.is_no_exc,
+							_ =>
+								match (*lnk).parent {
+									Some(ref par) => lnk = &*par.class.borrow(),
+									_ => panic!()
+								}
+						}
+				}
 			}
 		}
 	}
