@@ -1,8 +1,8 @@
 use bytecode::registers::*;
-use bytecode::global_conf::*;
+//use bytecode::global_conf::*;
 use std::collections::HashMap;
 use std::fmt::Write;
-use std::rc::Rc;
+//use std::rc::Rc;
 use syn::type_sys::*;
 use syn::utils::Show;
 

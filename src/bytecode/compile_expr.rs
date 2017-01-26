@@ -3,7 +3,7 @@ use bytecode::registers::*;
 use bytecode::cmd::*;
 use syn::expr::*;
 use syn::type_sys::*;
-use syn::utils::Show;
+//use syn::utils::Show;
 
 //             expr       any-stats           compiled-out             reg-with-last-value
 pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
@@ -305,7 +305,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 			if val.kind == *tp {
 				reg
 			} else {
-				let mut out = if tp.is_int() {
+				let out = if tp.is_int() {
 					Reg::TempI
 				} else if tp.is_real() {
 					Reg::TempR

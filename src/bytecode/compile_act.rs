@@ -129,7 +129,7 @@ fn set_last_mov(cmds : &mut Vec<Cmd>, dst : Reg) {
 		let i = cmds.len() - 1;
 		match cmds[i] {
 			Cmd::Mov(ref in_reg,_) => {
-				if i - 1 >= 0 {
+				if /*i - 1 >= 0*/i >= 1 {
 					match cmds[i-1].get_out() {
 						Some(reg) =>
 							if reg == in_reg {

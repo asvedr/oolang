@@ -1,4 +1,4 @@
-use bytecode::func::*;
+//use bytecode::func::*;
 use bytecode::cmd::*;
 use bytecode::registers::*;
 use bytecode::state::*;
