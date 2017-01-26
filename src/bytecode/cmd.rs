@@ -15,7 +15,7 @@ pub enum Cmd {
 	WithItem(Box<WithItem>),
 	//       self mname dst
 	MethMake(Reg,String,Reg), // it works like make-clos
-	MethCall(Box<Call>, String), // call.func - ptr to self string - mname
+	MethCall(Box<Call>, Reg), // call.func - ptr to self. Reg - register with func
 	MakeClos(Box<MakeClos>),
 	//   obj  ind  dst
 	Prop(Reg,usize,Reg),
@@ -67,8 +67,9 @@ impl Cmd {
 				}
 			},
 			Cmd::MethMake(ref obj, _, _) => add!(*obj),
-			Cmd::MethCall(ref cal, _) => {
+			Cmd::MethCall(ref cal, ref r) => {
 				add!(cal.func);
+				add!(*r);
 				for a in cal.args.iter() {
 					add!(*a);
 				}
@@ -154,12 +155,12 @@ impl Show for Cmd {
 					vec![format!("{}SET ITEM<{:?}> {:?} [{:?}] <= {:?}", tab, obj.cont_type, obj.container, obj.index, obj.value)] 
 				},
 			Cmd::MethMake(ref obj, ref name, ref dst) => vec![format!("{}MAKE_M {} self:{:?} => {:?}", tab, name, obj, dst)],
-			Cmd::MethCall(ref cal, ref mname) => {
+			Cmd::MethCall(ref cal, ref meth) => {
 				let ctch = match cal.catch_block {
 					Some(ref c) => c.clone(),
 					_ => "_".to_string()
 				};
-				vec![format!("{}CALL_M {} [catch:{}] self:{:?} {:?} => {:?}", tab, mname, ctch, cal.func, cal.args, cal.dst)]
+				vec![format!("{}CALL_M {:?} [catch:{}] self:{:?} {:?} => {:?}", tab, meth, ctch, cal.func, cal.args, cal.dst)]
 			},
 			Cmd::MakeClos(ref cls) => vec![format!("{}{:?}", tab, **cls)],
 			Cmd::Prop(ref obj, ref n, ref dst) => vec![format!("{}PROP {:?} [{:?}] => {:?}", tab, obj, n, dst)],

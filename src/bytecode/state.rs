@@ -1,5 +1,5 @@
 use bytecode::registers::*;
-//use bytecode::global_conf::*;
+use bytecode::global_conf::*;
 use std::collections::HashMap;
 use std::fmt::Write;
 //use std::rc::Rc;
@@ -19,6 +19,7 @@ pub struct State {
 	pub mod_name : String,
 	pub env      : Env,
 	pub exc_off  : bool,
+	pub gc       : &GlobalConf,
 	catches   : Vec<u8>, // READONLY current stack of catch blocks
 	loops     : Vec<u8>, // READONLY current stack of loops
 	//pub max_i  : u8,
@@ -47,9 +48,10 @@ macro_rules! pop{($_self:expr, $st:ident) => {{
 }};}
 
 impl State {
-	pub fn new(e : Env, mod_name : String) -> State {
+	pub fn new(e : Env, gc : &GlobalConf, mod_name : String) -> State {
 		State{
 			mod_name  : mod_name,
+			gc        : gc,
 			env       : e,
 			stack_i   : 0,
 			stack_r   : 0,
@@ -149,6 +151,46 @@ impl State {
 	pub fn break_label(&self, skip : usize) -> String {
 		let n = self.loops[self.loops.len() - skip];
 		format!("LOOP_END{}", n)
+	}
+	// out in Reg::Temp
+	pub fn call_method(&self, cname : &String, mname : &String, obj : Reg, args : Vec<Reg>, out : &mut Vec<Cmd>) {
+		let mut ctch =
+			if self.exc_off {
+				None
+			} else {
+				Some(self.try_catch_label())
+			};
+		let cls = self.gc.get(cname);
+		match cls.get_virt_i(mname) {
+			Some(i) => {
+				let tmp = self.push_v();
+				self.pop_v();
+				out.push(Cmd::Prop(obj.clone(), i, tmp.clone()));
+				let cal = Call {
+					func  : obj,
+					args  : args,
+					dst   : Reg::Temp,
+					catch : ctch
+				};
+				out.push(Cmd::MethCall(cal, tmp);
+			},
+			_ => {
+				let reg = match cls.method2name(mname) {
+					Some(n) => Reg::Name(n),
+					_ => panic!()
+				};
+				if cls.is_method_noexc(mname) {
+					ctch = None
+				}
+				let cal = Call {
+					func  : obj, // object
+					args  : args, 
+					dst   : Reg::Temp,
+					catch : ctch
+				};
+				out.push(Cmd::MethCall(cal, reg));
+			}
+		}
 	}
 }
 
