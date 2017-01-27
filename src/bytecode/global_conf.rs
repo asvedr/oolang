@@ -8,14 +8,16 @@ use std::collections::HashMap;
 
 pub struct GlobalConf {
 	pub excepts : ExcKeys,
-	pub classes : HashMap<String,RTClass>
+	pub classes : HashMap<String,RTClass>,
+	pub fns     : HashMap<String,String> // map of full names
 }
 
 impl GlobalConf {
-	pub fn new(c : usize) -> GlobalConf {
+	pub fn new() -> GlobalConf {
 		GlobalConf{
-			excepts : ExcKeys::new(c),
-			classes : HashMap::new()
+			excepts : ExcKeys::new(0),
+			classes : HashMap::new(),
+			fns     : HashMap::new()
 		}
 	}
 	pub fn add_class(&mut self, class : RTClass) {

@@ -93,6 +93,17 @@ impl Pack {
 			excepts   : BTreeMap::new()
 		}
 	}
+	#[inline]
+	pub fn full_name(&self) -> String {
+		let mut acc = String::new();
+		for n in self.name.iter() {
+			if acc.len() > 0 {
+				acc.push('_');
+			}
+			acc.push_str(&*n);
+		}
+		acc
+	}
 	pub fn show(&self) -> String {
 		let mut out = String::new();
 		let _ = write!(out, "pack: {:?}\n", self.name);

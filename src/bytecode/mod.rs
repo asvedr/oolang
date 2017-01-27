@@ -5,6 +5,7 @@ pub mod state;
 pub mod compile_expr;
 pub mod compile_act;
 pub mod compile_fun;
+pub mod compiler;
 pub mod global_conf;
 pub mod exc_keys;
 

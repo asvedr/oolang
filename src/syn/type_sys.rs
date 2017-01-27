@@ -70,11 +70,6 @@ lazy_static! {
 //static stat_int : *mut Type = 0 as *mut Type;
 
 impl Type {
-	/*pub fn init() {
-		unsafe {
-			stat_int = mem::transmute(Rc::new(Type::Int));
-		}
-	}*/
 	pub fn unk()  -> RType { STAT_UNK.store.clone()  }
 	pub fn int()  -> RType { STAT_INT.store.clone()  }
 	pub fn real() -> RType { STAT_REAL.store.clone() }
@@ -206,7 +201,7 @@ pub fn parse_type(lexer : &Lexer, curs : &Cursor) -> SynRes<RType> {
 		},
 		"("    => { // VOID
 			let rest = lex!(lexer, &ans.cursor, ")");
-			syn_ok!(Rc::new(Type::Void), rest)
+			syn_ok!(Type::void(), rest)
 		},
 		_      => { // CLASS
 			// this may be 'Class' or 'Class<A,B...>

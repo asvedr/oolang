@@ -1,24 +1,17 @@
 use type_check::tclass::*;
 use type_check::pack::*;
-//use std::rc::Rc;
 use syn::type_sys::*;
-//use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 pub struct Prelude {
-	pub pack : Box<Pack>
+	pub pack : Box<Pack>,
+	pub cfns : HashMap<String,String>
 }
 
 impl Prelude {
 	pub fn new() -> Prelude {
-		//let mut fns  = Box::new(vec![]);
-		//let mut clss = vec![];
 		let mut pack = Box::new(Pack::new());
-		//let mut res = Box::new(Prelude{fns : Rc::new(RefCell::new(vec![])), pack : Pack::new()}); 
-		//res.pack.name.push("%std".to_string());
-		/*macro_rules! newf_loc {($t:expr) => {{
-			res.fns.borrow_mut().push($t);
-			&res.fns.borrow()[res.fns.borrow().len() - 1]
-		}}; }*/
+		let mut cfns = HashMap::new();
 		pack.name.push("%std".to_string());
 		macro_rules! newe {
 			($n:expr, $arg:expr) => {pack.excepts.insert($n.to_string(), Some($arg))};
@@ -31,21 +24,22 @@ impl Prelude {
 				c.params = $p;
 				c.args = $acnt;
 			}
-			//let lnk : *mut TClass = &mut clss[clss.len() - 1];
 			pack.cls.insert($name.to_string(), c);
 			pack.cls.get($name).unwrap().borrow_mut()
 		}}; }
 		macro_rules! newf {
-			($name:expr, $t:expr) => {{
+			($name:expr, $cname:expr, $t:expr) => {{
 				pack.fns.insert($name.to_string(), $t);
+				cfns.insert($name.to_string(), $cname.to_string());
 			}};
-			($name:expr, $t:expr, $noexc:expr) => {{
+			($name:expr, $cname:expr, $t:expr, $noexc:expr) => {{
 				pack.fns.insert($name.to_string(), $t);
 				pack.fns_noex.insert($name.to_string());
+				cfns.insert($name, $cname);
 			}};
 		}
 		macro_rules! meth {($cls:expr, $name:expr, $t:expr, $noexc:expr) => {{
-			(*$cls).pubs.insert($name.to_string(), Attr::method(/*newf_loc!($t)*/$t, $noexc));
+			(*$cls).pubs.insert($name.to_string(), Attr::method($t, $noexc));
 		}};}
 		{
 			let mut arr = newc!("%arr", "_std_arr", vec!["a".to_string()], vec![]);
@@ -67,16 +61,17 @@ impl Prelude {
 			meth!(str_s, "set", type_fn!(vec![Type::int(),Type::char()], Type::void()), false);
 			meth!(str_s, "add", type_fn!(vec![Type::str()], Type::void()), false);
 		}
-		{
+		/*{
 			let mut except = newc!("Exception", "_std_exc", vec![], vec![Type::str()]);
 			meth!(except, "param", type_fn!(vec![], Type::str()), true);
-		}
+		}*/
 		{
-			newf!("print",  type_fn!(vec![Type::str()], Type::void()));
-			newf!("readln", type_fn!(vec![], Type::str()));
+			newf!("print", "_std_print", type_fn!(vec![Type::str()], Type::void()));
+			newf!("readln", "_std_readln", type_fn!(vec![], Type::str()));
+			newe!("Exception", Type::str());
 			newe!("IndexError");
 			newe!("NullPtr");
 		}
-		Prelude{pack : pack}
+		Prelude{pack : pack, cfns : cfns}
 	}
 }

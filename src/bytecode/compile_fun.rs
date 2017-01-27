@@ -45,7 +45,7 @@ impl Show for CFun {
 	}
 }
 
-pub fn compile(fun : &SynFn/*, dst : &mut Vec<CodeFn>, */) -> CFun {
+pub fn compile(fun : &SynFn, gc : &GlobalConf) -> CFun {
 	let mut env = Env{
 		out   : HashMap::new(),
 		args  : HashMap::new(),
@@ -54,7 +54,7 @@ pub fn compile(fun : &SynFn/*, dst : &mut Vec<CodeFn>, */) -> CFun {
 		loc_v : HashMap::new()
 	};
 	make_env(fun, &mut env);
-	let gc = GlobalConf::new(6);
+	//let gc = GlobalConf::new(6);
 	let mut state = State::new(env, &gc, "main".to_string());
 	state.exc_off = fun.no_except;
 	let mut body = vec![];

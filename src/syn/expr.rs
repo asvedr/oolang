@@ -236,7 +236,7 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
 					curs = ans.cursor;
 				},
 				LexTP::Str  => {
-					obj = expr!(EVal::Str(ans.val), curs, Rc::new(Type::Str));
+					obj = expr!(EVal::Str(ans.val), curs, Type::str());
 					curs = ans.cursor;
 				},
 				LexTP::Char => {
