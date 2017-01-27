@@ -1,7 +1,7 @@
 use type_check::tclass::*;
 use bytecode::exc_keys::*;
-use bytecode::registers::*;
-use bytecode::cmd::*;
+//use bytecode::registers::*;
+//use bytecode::cmd::*;
 //use std::rc::Rc;
 pub use std::cell::Ref;
 use std::collections::HashMap;
@@ -20,7 +20,7 @@ impl GlobalConf {
 	}
 	pub fn add_class(&mut self, class : RTClass) {
 		let name = {
-			let mut c = class.borrow_mut();
+			let c = class.borrow_mut();
 			// XXX cause of info about #NoExcept
 			//c.prepare_to_translation();
 			c.fname.clone()

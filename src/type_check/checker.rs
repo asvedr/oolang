@@ -886,9 +886,19 @@ impl Checker {
 													_ => panic!()
 												}
 											},
-											Type::Arr(ref item) => {
+											Type::Arr(_) => {
 												let pref = vec!["%std".to_string()];
 												let name = "%arr".to_string();
+												match env.pack().get_cls(&pref, &name) {
+													Some(cls_ptr) => unsafe {
+														*noexc = (*cls_ptr).is_method_noexc(prop_name)
+													},
+													_ => panic!()
+												}
+											},
+											Type::Str => {
+												let pref = vec!["%std".to_string()];
+												let name = "%str".to_string();
 												match env.pack().get_cls(&pref, &name) {
 													Some(cls_ptr) => unsafe {
 														*noexc = (*cls_ptr).is_method_noexc(prop_name)

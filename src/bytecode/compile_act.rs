@@ -2,10 +2,10 @@ use syn::*;
 use bytecode::state::*;
 use bytecode::registers::*;
 use bytecode::cmd::*;
-use bytecode::global_conf::*;
+//use bytecode::global_conf::*;
 use bytecode::compile_expr as c_expr;
 
-pub fn compile(acts : &Vec<ActF>, state : &mut State, gc : &GlobalConf, cmds : &mut Vec<Cmd>) {
+pub fn compile(acts : &Vec<ActF>, state : &mut State, /*gc : &GlobalConf,*/cmds : &mut Vec<Cmd>) {
 	for a in acts.iter() {
 		state.clear_stacks();
 		match a.val {
@@ -66,7 +66,7 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, gc : &GlobalConf, cmds : &
 				let res = c_expr::compile(cond, state, cmds);
 				state.clear_stacks();
 				let mut body = vec![];
-				compile(act, state, gc, &mut body);
+				compile(act, state,/* gc,*/ &mut body);
 				body.push(Cmd::Goto(state.loop_in_label()));
 				let cmd = Cmd::If(res, body, vec![Cmd::Goto(state.loop_out_label())]);
 				cmds.push(cmd);
@@ -79,10 +79,10 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, gc : &GlobalConf, cmds : &
 				let res = c_expr::compile(cond, state, cmds);
 				state.clear_stacks();
 				let mut ok_body = vec![];
-				compile(ok, state, gc, &mut ok_body);
+				compile(ok, state,/* gc,*/ &mut ok_body);
 				if fail.len() > 0 {
 					let mut no_body = vec![];
-					compile(fail, state, gc, &mut no_body);
+					compile(fail, state,/* gc,*/ &mut no_body);
 					cmds.push(Cmd::If(res, ok_body, no_body));
 				} else {
 					cmds.push(Cmd::If(res, ok_body, vec![]));
@@ -91,19 +91,19 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, gc : &GlobalConf, cmds : &
 			ActVal::Try(ref body, ref ctchs) => {
 				state.push_trycatch();
 				let ok = state.try_ok_label();
-				compile(body, state, gc, cmds);
+				compile(body, state,/* gc,*/ cmds);
 				cmds.push(Cmd::Goto(ok.clone()));
 				cmds.push(Cmd::Label(state.try_catch_label()));
 				state.pop_trycatch();
 				let mut ctchs_res = vec![];
 				for c in ctchs.iter() {
-					let id = gc.excepts.get(&c.epref, &c.ekey);
+					let id = state.gc.excepts.get(&c.epref, &c.ekey);
 					let mut code = vec![];
 					match c.vname {
 						Some(ref name) => code.push(Cmd::Mov(Reg::Exc,state.env.get_loc_var(name, &c.vtype))),
 						_ => ()
 					}
-					compile(&c.act, state, gc, &mut code);
+					compile(&c.act, state,/* gc,*/ &mut code);
 					code.push(Cmd::Goto(ok.clone()));
 					ctchs_res.push(Catch {
 						key  : id,

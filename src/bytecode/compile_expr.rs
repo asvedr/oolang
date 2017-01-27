@@ -98,7 +98,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 									dst  : dst.clone(),
 									catch_block : if *noexc || state.exc_off {None} else {Some(state.try_catch_label())}
 								});
-								cmds.push(Cmd::MethCall(call, mname));
+								cmds.push(Cmd::MethCall(call, Reg::Name(Box::new(mname))));
 							},
 							_ => panic!()
 						}

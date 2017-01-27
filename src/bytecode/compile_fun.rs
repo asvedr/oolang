@@ -54,12 +54,12 @@ pub fn compile(fun : &SynFn/*, dst : &mut Vec<CodeFn>, */) -> CFun {
 		loc_v : HashMap::new()
 	};
 	make_env(fun, &mut env);
-	let mut state = State::new(env, "main".to_string());
-	state.exc_off = fun.no_except;
 	let gc = GlobalConf::new(6);
+	let mut state = State::new(env, &gc, "main".to_string());
+	state.exc_off = fun.no_except;
 	let mut body = vec![];
 	state.push_trycatch();
-	c_act::compile(&fun.body, &mut state, &gc, &mut body);
+	c_act::compile(&fun.body, &mut state, &mut body);
 	if body.len() == 0 || match body[body.len() - 1] {Cmd::Ret(_) => false, _ => true} {
 		body.push(Cmd::Ret(Reg::Null))
 	}

@@ -287,7 +287,7 @@ impl FunEnv {
 	pub fn get_cls(&self, cls : &Type) -> Option<*const TClass> {
 		unsafe {
 			match *cls {
-				Type::Class(ref pref, ref cname, ref params) => {
+				Type::Class(ref pref, ref cname, _) => {
 					if pref.len() == 0 || pref[0] == "%mod" {
 						// PREFIX NOT EXIST OR IT'S A TEMPLATE TYPE
 						if self.templates.contains(cname) {
@@ -302,8 +302,13 @@ impl FunEnv {
 						(*self.global).get_cls(pref, cname)
 					}
 				},
-				Type::Arr(ref params) => {
-					let cname = format!("%arr");
+				Type::Arr(_) => {
+					let cname = "%arr".to_string();
+					let p = Vec::new();
+					(*self.global).get_cls(&p, &cname)
+				},
+				Type::Str => {
+					let cname = "%str".to_string();
 					let p = Vec::new();
 					(*self.global).get_cls(&p, &cname)
 				},

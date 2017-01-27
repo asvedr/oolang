@@ -1,5 +1,6 @@
 use bytecode::registers::*;
 use bytecode::global_conf::*;
+use bytecode::cmd::*;
 use std::collections::HashMap;
 use std::fmt::Write;
 //use std::rc::Rc;
@@ -15,11 +16,11 @@ pub struct Env {
 	//fargs : usize                 // count vars for fun args
 }
 
-pub struct State {
+pub struct State<'a> {
 	pub mod_name : String,
 	pub env      : Env,
 	pub exc_off  : bool,
-	pub gc       : &GlobalConf,
+	pub gc       : &'a GlobalConf,
 	catches   : Vec<u8>, // READONLY current stack of catch blocks
 	loops     : Vec<u8>, // READONLY current stack of loops
 	//pub max_i  : u8,
@@ -47,8 +48,8 @@ macro_rules! pop{($_self:expr, $st:ident) => {{
 	return $_self.$st + 1;
 }};}
 
-impl State {
-	pub fn new(e : Env, gc : &GlobalConf, mod_name : String) -> State {
+impl<'a> State<'a> {
+	pub fn new(e : Env, gc : &'a GlobalConf, mod_name : String) -> State {
 		State{
 			mod_name  : mod_name,
 			gc        : gc,
@@ -153,7 +154,7 @@ impl State {
 		format!("LOOP_END{}", n)
 	}
 	// out in Reg::Temp
-	pub fn call_method(&self, cname : &String, mname : &String, obj : Reg, args : Vec<Reg>, out : &mut Vec<Cmd>) {
+	pub fn call_method(&mut self, cname : &String, mname : &String, obj : Reg, args : Vec<Reg>, out : &mut Vec<Cmd>) {
 		let mut ctch =
 			if self.exc_off {
 				None
@@ -163,31 +164,31 @@ impl State {
 		let cls = self.gc.get(cname);
 		match cls.get_virt_i(mname) {
 			Some(i) => {
-				let tmp = self.push_v();
+				let tmp = Reg::VStack(self.push_v());
 				self.pop_v();
 				out.push(Cmd::Prop(obj.clone(), i, tmp.clone()));
-				let cal = Call {
-					func  : obj,
-					args  : args,
-					dst   : Reg::Temp,
-					catch : ctch
-				};
-				out.push(Cmd::MethCall(cal, tmp);
+				let cal = Box::new(Call {
+					func        : obj,
+					args        : args,
+					dst         : Reg::Temp,
+					catch_block : ctch
+				});
+				out.push(Cmd::MethCall(cal, tmp));
 			},
 			_ => {
 				let reg = match cls.method2name(mname) {
-					Some(n) => Reg::Name(n),
+					Some(n) => Reg::Name(Box::new(n)),
 					_ => panic!()
 				};
 				if cls.is_method_noexc(mname) {
 					ctch = None
 				}
-				let cal = Call {
-					func  : obj, // object
-					args  : args, 
-					dst   : Reg::Temp,
-					catch : ctch
-				};
+				let cal = Box::new(Call {
+					func        : obj, // object
+					args        : args, 
+					dst         : Reg::Temp,
+					catch_block : ctch
+				});
 				out.push(Cmd::MethCall(cal, reg));
 			}
 		}
