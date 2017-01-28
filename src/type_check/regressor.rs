@@ -5,7 +5,6 @@ use type_check::utils::*;
 use std::mem;
 use std::rc::Rc;
 
-// TODO: Prop
 pub fn regress_expr(env : &mut LocEnv, expr : &mut Expr, e_type : RType) -> CheckRes {
 	macro_rules! regress {($e:expr, $t:expr) => {try!(regress_expr(env, $e, $t))}; }
 	match expr.val {

@@ -361,8 +361,8 @@ impl TClass {
 		}
 	}
 	pub fn look_in_all(&self, name : &String, tmpl : Option<&Vec<RType>>) -> Option<RType> {
-		// TODO: rec to loop
-		let lnk = match self.pubs.get(name) {
+		// TODO check: rec to loop
+		/*let lnk = match self.pubs.get(name) {
 			Some(lnk) => &lnk._type,
 			None =>
 				match self.privs.get(name) {
@@ -373,22 +373,63 @@ impl TClass {
 							None => return None
 						}
 				}
-		};
+		};*/
+		let lnk : &RType;
+		unsafe {
+			let mut cls : *const TClass = self;
+			loop {
+				match (*cls).pubs.get(name) {
+					Some(attr) => {
+						lnk = &attr._type;
+						break
+					},
+					_ =>
+						match (*cls).privs.get(name) {
+							Some(attr) => {
+								lnk = &attr._type;
+								break
+							},
+							_ =>
+								match (*cls).parent {
+									Some(ref p) => cls = &*p.class.borrow(),
+									_ => return None
+								}
+						}
+				}
+			}
+		}
 		match tmpl {
 			Some(vec) => Some(self.replace_type(lnk, vec, true)),
 			_ => Some(lnk.clone())
 		}
 	}
 	pub fn look_in_pub(&self, name : &String, tmpl : Option<&Vec<RType>>) -> Option<RType> {
-		// TODO: rec to loop
-		let lnk = match self.pubs.get(name) {
+		// TODO check: rec to loop
+		/*let lnk = match self.pubs.get(name) {
 			Some(lnk) => &lnk._type,
 			None =>
 				match self.parent {
 					Some(ref lnk) => return lnk.class.borrow().look_in_pub(name, tmpl),
 					None => return None
 				}
-		};
+		};*/
+		let lnk : &RType;
+		unsafe {
+			let mut cls : *const TClass = self;
+			loop {
+				match (*cls).pubs.get(name) {
+					Some(attr) => {
+						lnk = &attr._type;
+						break
+					},
+					_ =>
+						match self.parent {
+							Some(ref p) => cls = &*p.class.borrow(),
+							_ => return None
+						}
+				}
+			}
+		}
 		match tmpl {
 			Some(vec) => Some(self.replace_type(lnk, vec, true)),
 			_ => Some(lnk.clone())
