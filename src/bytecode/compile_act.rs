@@ -46,7 +46,16 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, /*gc : &GlobalConf,*/cmds 
 						_ => panic!()
 					}
 				} else { // is attr
-					panic!()
+					let reg_val = c_expr::compile(val, state, cmds);
+					match var.val {
+						EVal::Attr(ref obj, ref pname, _) => {
+							let reg_var = c_expr::compile(var, state, cmds);
+							let cname = obj.kind.class_name();
+							let ind = state.property(&cname, pname);
+							cmds.push(Cmd::SetProp(reg_var, ind, reg_val));
+						}
+						_ => panic!()
+					}
 				}
 			},
 			ActVal::Ret(ref e) =>

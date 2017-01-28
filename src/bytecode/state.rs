@@ -32,6 +32,7 @@ pub struct State<'a> {
 	lambda_n  : usize,  // counter for making names for local funs
 	c_counter : u8, // id generator for catch sections
 	l_counter : u8, // id generator for loop sections
+	init_name : String // for classes
 }
 
 macro_rules! push {($_self:expr, $st:ident, $mx:ident) => {{
@@ -62,7 +63,8 @@ impl<'a> State<'a> {
 			catches   : vec![],
 			loops     : vec![],
 			l_counter : 0,
-			c_counter : 0
+			c_counter : 0,
+			init_name : "init".to_string()
 		}
 	}
 	pub fn push_i(&mut self) -> u8 {
@@ -191,6 +193,64 @@ impl<'a> State<'a> {
 				});
 				out.push(Cmd::MethCall(cal, reg));
 			}
+		}
+	}
+	pub fn closure_method(&mut self, cname : &String, mname : &String, obj : Reg, cmds : &mut Vec<Cmd>) -> Reg {
+		let cls = self.gc.get(cname);
+		// cmds.push(Cmd::MethMake(obj, format!("{}_M_{}", cname, name), tmp.clone()));
+		match cls.get_virt_i(mname) {
+			Some(i) => cmds.push(Cmd::Prop(obj.clone(),i,Reg::Temp)),
+			_ => {
+				let name = match cls.method2name(mname) {
+					Some(n) => n,
+					_ => panic!()
+				};
+				cmds.push(Cmd::Mov(Reg::Name(Box::new(name)), Reg::Temp))
+			}
+		}
+		let out = Reg::VStack(self.push_v());
+		cmds.push(Cmd::MethMake(obj, Reg::Temp, out.clone()));
+		out
+	}
+	pub fn property(&self, cname : &String, pname : &String) -> usize {
+		match self.gc.classes.get(cname) {
+			Some(tcls) => {
+				match tcls.borrow().props_i.get(pname) {
+					Some(i) => *i,
+					_ => panic!()
+				}
+			},
+			_ => panic!()
+		}
+	}
+	pub fn init_class(&mut self, cname : &String, args : Vec<Reg>, cmds : &mut Vec<Cmd>) -> Reg {
+		match self.gc.classes.get(cname) {
+			Some(tcls) => {
+				let c = tcls.borrow();
+				//let out = Reg::VStack(self.push_v());
+				cmds.push(Cmd::NewObj(c.prop_cnt, c.virt_cnt, Reg::Temp));
+				let fname = match c.method2name(&self.init_name) {
+					Some(a) => a,
+					_ => panic!()
+				};
+				let ctch =
+					if self.exc_off || c.is_method_noexc(&self.init_name) {
+						None
+					} else {
+						Some(self.try_catch_label())
+					};
+				let call = Call {
+					func        : Reg::Temp,//Reg::Name(Box::new(fname)),
+					args        : args,
+					dst         : Reg::Null,
+					catch_block : ctch
+				};
+				cmds.push(Cmd::MethCall(Box::new(call), Reg::Name(Box::new(fname))));
+				let out = Reg::VStack(self.push_v());
+				cmds.push(Cmd::Mov(Reg::Temp, out.clone()));
+				out
+			},
+			_ => panic!()
 		}
 	}
 }

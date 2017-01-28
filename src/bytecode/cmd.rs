@@ -13,15 +13,18 @@ pub enum Cmd {
 	SetR(f64,Reg),
 	SetS(String,Reg),
 	WithItem(Box<WithItem>),
-	//       self mname dst
-	MethMake(Reg,String,Reg), // it works like make-clos
+	//       obj meth dst
+	MethMake(Reg,Reg,Reg), // it works like make-clos
 	MethCall(Box<Call>, Reg), // call.func - ptr to self. Reg - register with func
 	MakeClos(Box<MakeClos>),
 	//   obj  ind  dst
 	Prop(Reg,usize,Reg),
+	//      obj  ind  val
+	SetProp(Reg,usize,Reg),
 	//ObjToObj(),
 	Conv(Reg,Convert,Reg),
 	//NewCls(Box<NewCls>),
+	NewObj(usize,usize,Reg), // NewObj(prop_count, virt_count, out)
 
 	Throw(usize,Option<Reg>), // try optimize it: if catch in this function, just use simple goto
 	Ret(Reg),
@@ -40,6 +43,7 @@ impl Cmd {
 		store.clear();
 		macro_rules! add {($e:expr) => {store.push(&$e)}; }
 		match *self {
+			Cmd::NewObj(_,_,ref a) => add!(*a),
 			Cmd::Mov(ref a, _) => add!(*a),
 			Cmd::IOp(ref opr) => {
 				add!(opr.a);
@@ -66,7 +70,10 @@ impl Cmd {
 					add!(obj.value);
 				}
 			},
-			Cmd::MethMake(ref obj, _, _) => add!(*obj),
+			Cmd::MethMake(ref obj, ref m, _) => {
+				add!(*obj);
+				add!(*m);
+			},
 			Cmd::MethCall(ref cal, ref r) => {
 				add!(cal.func);
 				add!(*r);
@@ -79,13 +86,18 @@ impl Cmd {
 					add!(*r);
 				},
 			Cmd::Prop(ref obj, _, _) => add!(*obj),
+			Cmd::SetProp(ref obj, _, ref val) => {
+				add!(*obj);
+				add!(*val)
+			},
 			Cmd::Conv(ref a, _, _) => add!(*a),
 			Cmd::Ret(ref val) => add!(*val),
 			_ => ()
 		}
 	}
 	pub fn get_out(&self) -> Option<&Reg> {
-		match *self {		
+		match *self {
+			Cmd::NewObj(_,_,ref a) => Some(a),
 			Cmd::Mov(_,ref a) => Some(a),
 			Cmd::IOp(ref o) => Some(&o.dst),
 			Cmd::ROp(ref o) => Some(&o.dst),
@@ -109,7 +121,8 @@ impl Cmd {
 		}
 	}
 	pub fn set_out(&mut self, out : Reg) {
-		match *self {		
+		match *self {
+			Cmd::NewObj(_,_,ref mut a) => *a = out,
 			Cmd::Mov(_,ref mut a) => *a = out,
 			Cmd::IOp(ref mut o) => o.dst = out,
 			Cmd::ROp(ref mut o) => o.dst = out,
@@ -154,7 +167,8 @@ impl Show for Cmd {
 				} else {
 					vec![format!("{}SET ITEM<{:?}> {:?} [{:?}] <= {:?}", tab, obj.cont_type, obj.container, obj.index, obj.value)] 
 				},
-			Cmd::MethMake(ref obj, ref name, ref dst) => vec![format!("{}MAKE_M {} self:{:?} => {:?}", tab, name, obj, dst)],
+			Cmd::MethMake(ref obj, ref name, ref dst) =>
+				vec![format!("{}MAKE_M {:?} self:{:?} => {:?}", tab, name, obj, dst)],
 			Cmd::MethCall(ref cal, ref meth) => {
 				let ctch = match cal.catch_block {
 					Some(ref c) => c.clone(),
@@ -163,9 +177,13 @@ impl Show for Cmd {
 				vec![format!("{}CALL_M {:?} [catch:{}] self:{:?} {:?} => {:?}", tab, meth, ctch, cal.func, cal.args, cal.dst)]
 			},
 			Cmd::MakeClos(ref cls) => vec![format!("{}{:?}", tab, **cls)],
-			Cmd::Prop(ref obj, ref n, ref dst) => vec![format!("{}PROP {:?} [{:?}] => {:?}", tab, obj, n, dst)],
+			Cmd::Prop(ref obj, ref n, ref dst) => vec![format!("{}PROP {:?} [{}] => {:?}", tab, obj, n, dst)],
+			Cmd::SetProp(ref obj, ref n, ref val) =>
+				vec![(format!("{}SET PROP {:?} [{}] <= {:?}", tab, obj, n, val))],
 			Cmd::Conv(ref a, ref cnv, ref dst) => vec![format!("{}CONV {:?} : {:?} => {:?}", tab, a, cnv, dst)],
 			//Cmd::NewCls(ref cls) => vec![format!("{}{:?}", tab, cls)],
+			Cmd::NewObj(ref cnt, ref virt, ref out) =>
+				vec![format!("{}NEW OBJ {} {} => {:?}", tab, cnt, virt, out)],
 			Cmd::Throw(ref n, ref v) => vec![format!("{}THROW {:?} {:?}", tab, n, v)],
 			Cmd::Ret(ref val) => vec![format!("{}RETURN {:?}", tab, val)],
 			Cmd::Goto(ref lab) => vec![format!("{}GOTO {}", tab, lab)],

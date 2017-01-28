@@ -98,7 +98,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 									dst  : dst.clone(),
 									catch_block : if *noexc || state.exc_off {None} else {Some(state.try_catch_label())}
 								});
-								cmds.push(Cmd::MethCall(call, Reg::Name(Box::new(mname))));
+								cmds.push(Cmd::MethCall(call, mname));
 							},
 							_ => panic!()
 						}
@@ -158,44 +158,53 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 									out
 								} else { // real
 									let out = Reg::RStack(state.push_r());
-									cmds.push(Cmd::ROp(Box::new(Opr{a : a, b : b, dst : out.clone(), opr : name.clone(), is_f : false})));
+									let opr = Opr{a : a, b : b, dst : out.clone(), opr : name.clone(), is_f : false};
+									cmds.push(Cmd::ROp(Box::new(opr)));
 									out
 								},
 							"%" => {
 								let out = Reg::IStack(state.push_i());
-								cmds.push(Cmd::IOp(Box::new(Opr{a : a, b : b, dst : out.clone(), opr : name.clone(), is_f : false})));
+								let opr = Opr{a : a, b : b, dst : out.clone(), opr : name.clone(), is_f : false};
+								cmds.push(Cmd::IOp(Box::new(opr)));
 								out
 							},
 							"**" => {
 								let out = Reg::RStack(state.push_r());
-								cmds.push(Cmd::ROp(Box::new(Opr{a : a, b : b, dst : out.clone(), opr : "pow".to_string(), is_f : true})));
+								let opr = Opr{a : a, b : b, dst : out.clone(), opr : "pow".to_string(), is_f : true};
+								cmds.push(Cmd::ROp(Box::new(opr)));
 								out
 							},
 							"<"|">"|"<="|">=" =>
 								if args[0].kind.is_int() {
 									let out = Reg::IStack(state.push_i());
-									cmds.push(Cmd::IOp(Box::new(Opr{a : a, b : b, dst : out.clone(), opr : name.clone(), is_f : false})));
+									let opr = Opr{a : a, b : b, dst : out.clone(), opr : name.clone(), is_f : false};
+									cmds.push(Cmd::IOp(Box::new(opr)));
 									out
 								} else { // real
 									let out = Reg::RStack(state.push_r());
-									cmds.push(Cmd::ROp(Box::new(Opr{a : a, b : b, dst : out.clone(), opr : name.clone(), is_f : false})));
+									let opr = Opr{a : a, b : b, dst : out.clone(), opr : name.clone(), is_f : false};
+									cmds.push(Cmd::ROp(Box::new(opr)));
 									out
 								},
 							"=="|"!=" =>
 								match *args[0].kind {
 									Type::Int|Type::Char|Type::Bool => {
 										let out = Reg::IStack(state.push_i());
-										cmds.push(Cmd::IOp(Box::new(Opr{a : a, b : b, dst : out.clone(), opr : name.clone(), is_f : false})));
+										let opr = Opr{a : a, b : b, dst : out.clone(), opr : name.clone(), is_f : false};
+										cmds.push(Cmd::IOp(Box::new(opr)));
 										out
 									},
 									Type::Real => {
 										let out = Reg::IStack(state.push_i());
-										cmds.push(Cmd::ROp(Box::new(Opr{a : a, b : b, dst : out.clone(), opr : name.clone(), is_f : false})));
+										let opr = Opr{a : a, b : b, dst : out.clone(), opr : name.clone(), is_f : false};
+										cmds.push(Cmd::ROp(Box::new(opr)));
 										out
 									},
 									Type::Str => {
 										let out = Reg::IStack(state.push_i());
-										cmds.push(Cmd::VOp(Box::new(Opr{a : a, b : b, dst : out.clone(), opr : "_std_strCmp".to_string(), is_f : true})));
+										let name = "_std_strCmp".to_string();
+										let opr = Opr{a : a, b : b, dst : out.clone(), opr : name, is_f : true};
+										cmds.push(Cmd::VOp(Box::new(opr)));
 										out
 									},
 									Type::Fn(_,_,_) => {
@@ -205,13 +214,16 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 									},
 									_ => {
 										let out = Reg::IStack(state.push_i());
-										cmds.push(Cmd::VOp(Box::new(Opr{a : a, b : b, dst : out.clone(), opr : "_std_addrCmp".to_string(), is_f : true})));
+										let name = "_std_addrCmp".to_string();
+										let opr = Opr{a : a, b : b, dst : out.clone(), opr : name, is_f : true};
+										cmds.push(Cmd::VOp(Box::new(opr)));
 										out
 									}
 								},
 							"&&"|"||" => {
 								let out = Reg::IStack(state.push_i());
-								cmds.push(Cmd::IOp(Box::new(Opr{a : a, b : b, dst : out.clone(), is_f : false, opr : name.clone()})));
+								let opr = Opr{a : a, b : b, dst : out.clone(), is_f : false, opr : name.clone()};
+								cmds.push(Cmd::IOp(Box::new(opr)));
 								out
 							},
 							_ => panic!("bad %opr: {}", name)
@@ -229,16 +241,18 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 			}
 		},
 		EVal::NewClass(_, ref pref, ref name, ref args) => {
-			let mut c_name;
+			let mut c_name = String::new();
 			if pref[0] == "%std" {
-				c_name = "std_c_".to_string();
+				c_name.push_str("_std_");
 			} else {
-				c_name = String::new();
 				for i in pref.iter() {
-					c_name = format!("{}{}_", c_name, i);
+					c_name.push_str(&**i); //= format!("{}{}_", c_name, i);
+					c_name.push('_');
 				}
-				c_name = format!("{}_C_{}", c_name, name);
+				c_name.push_str(&*name);
+				//c_name = format!("{}_C_{}", c_name, name);
 			}
+			//let obj_reg = state.init_class(
 			let mut c_args = vec![];
 			for a in args.iter() {
 				c_args.push(compile(a, state, cmds));
@@ -252,7 +266,8 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 					state.pop_v();
 				}
 			}
-			let call = Cmd::Call(Box::new(Call {
+			state.init_class(&c_name, c_args, cmds)
+			/*let call = Cmd::Call(Box::new(Call {
 				func        : Reg::Name(Box::new(c_name)),
 				args        : c_args,
 				dst         : Reg::Temp,
@@ -261,7 +276,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 			cmds.push(call);
 			let out = Reg::VStack(state.push_v());
 			cmds.push(Cmd::Mov(Reg::Temp, out.clone()));
-			out
+			out*/
 		},
 		EVal::Item(ref arr, ref index) => {
 			let arr_c = compile(arr, state, cmds);
@@ -368,7 +383,24 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 		EVal::Arr(_) => panic!(),
 		EVal::Asc(_) => panic!(),
 		EVal::Attr(ref e, ref name, ref is_meth) => {
+			// is in this branch then it's not ASSIGMENT left part and not METHOD CALL
 			if *is_meth {
+				let obj = compile(e, state, cmds);
+				state.pop_v();
+				let cname = e.kind.class_name();
+				state.closure_method(&cname, name, obj, cmds);
+				let out = Reg::VStack(state.push_v());
+				cmds.push(Cmd::Mov(Reg::Temp, out.clone()));
+				out
+			} else {
+				let cls = e.kind.class_name();
+				let prop = state.property(&cls, name);
+				let out = Reg::VStack(state.push_v());
+				let obj = compile(e, state, cmds);
+				cmds.push(Cmd::Prop(obj, prop, out.clone()));
+				out
+			}
+			/*if *is_meth {
 				let obj = compile(e, state, cmds);
 				state.pop_this_stack(&obj);
 				let cname = e.kind.class_name();
@@ -379,7 +411,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 				out
 			} else {
 				panic!()
-			}
+			}*/
 		}
 	}
 }

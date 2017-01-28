@@ -56,11 +56,11 @@ pub struct TClass {
 	pub params : Vec<String>,           // template
 	pub args   : Vec<RType>,            // constructor 
 
-	prop_cnt   : usize,
-	virt_cnt   : usize,
 	// FOR BYTECODE
-	pub props_i : HashMap<String,usize>,
-	pub virts_i : HashMap<String,usize>
+	pub prop_cnt : usize,
+	pub virt_cnt : usize,
+	pub props_i  : HashMap<String,usize>,
+	pub virts_i  : HashMap<String,usize>
 }
 
 impl TClass {

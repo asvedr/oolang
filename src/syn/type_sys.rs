@@ -133,9 +133,13 @@ impl Type {
 			Type::Class(ref pref, ref name, _) => {
 				let mut res = String::new();
 				for p in pref.iter() {
-					res = format!("{}{}_", res, p);
+					//res = format!("{}{}_", res, p);
+					res.push_str(&*p);
+					res.push('_');
 				}
-				format!("{}{}", res, name)
+				//format!("{}{}", res, name)
+				res.push_str(&*name);
+				res
 			},
 			Type::Arr(_) => "_std_vec".to_string(),
 			Type::Str => "_std_str".to_string(),
