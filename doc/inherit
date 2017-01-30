@@ -1,0 +1,34 @@
+inheriting from class
+
+if parent 'init' has no params then you don't need think about it
+
+class SimpleParent {
+	pub param1 : T1;
+	pub fn meth1(...){...}
+}
+
+class SimpleParentChild {
+	pub fn init(...) {
+		...
+	}
+}
+
+else if parent 'init' has params you must explicitly call parent initializer in child
+for this use keyword 'parent'
+
+class KnottyParent {
+	pub param1 : int;
+	pub param2 : int;
+	pub fn init(a : int, b : int) : () {
+		self.param1 = a;
+		self.param2 = b;
+		...
+	}
+}
+
+class KnottyChild {
+	pub fn init() {
+		parent(1,2); // THIS IS A CALL FOR PARENT INITIALIZER
+		...
+	}
+}

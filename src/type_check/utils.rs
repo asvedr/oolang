@@ -364,32 +364,35 @@ pub fn put_inherit_init(seq : &mut Vec<ActF>, pos : Cursor) {
 					val     : EVal::Var(vec![], "%parent".to_string()),
 					kind    : Type::unk(),
 					addres  : p2,
-					op_flag : false
+					op_flag : 0
 				}),
-				vec![]
+				vec![],
+				false
 			),
 			kind    : Type::unk(),
 			addres  : pos,
-			op_flag : false
+			op_flag : 0
 		}),
 		addres : p1
 	});
-	for a in seq {
-		new_seq.push(a);
-	}
+	new_seq.append(seq);
 	*seq = new_seq;
 }
 
-pub replace_inherit_init(seq : &mut Vec<ActF>) -> bool {
+pub fn replace_inherit_init(seq : &mut Vec<ActF>) -> bool {
 	if seq.len() > 0 {
 		match seq[0].val {
 			ActVal::Expr(ref mut e) =>
 				match e.val {
-					EVal::Call(_, ref mut name, _) => {
-						let mut n : &mut String = **name;
-						if n == "init_parent" {
-							*n = "%parent".to_string()
-							return true
+					EVal::Call(_, ref mut fnc, _, _) => {
+						match fnc.val {
+							EVal::Var(_, ref mut name) => {
+								if *name == "init_parent" {
+									*name = "%parent".to_string();
+									return true
+								}
+							},
+							_ => ()
 						}
 					},
 					_ => ()

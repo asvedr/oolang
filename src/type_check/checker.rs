@@ -258,6 +258,11 @@ impl Checker {
 		for prop in class.pub_prop.iter_mut() {
 			unsafe{ self.check_type_pack(&pack, tmpl, &mut prop.ptype, &prop.addres)? }
 		}
+		let pref = vec![];
+		let self_tclass = match pack.get_cls_rc(&pref, &class.name) {
+			Some(a) => a,
+			_ => panic!()
+		};
 		// CHECK METHODS
 		macro_rules! precheck_meth {($m:expr) => {{
 			// FIX TYPE
@@ -267,12 +272,21 @@ impl Checker {
 			$m.ftype = $m.func.ftype.clone();
 			// FIX INITIALIZER INHERITING
 			if $m.func.name == "init" {
-				let par_init = class.parent.class.borrow().args.clone();
-				let f = &mut $meth.func;
-				// in utils exist two funs
-				XXX
-				if par_init.len() == 0 {
-				} else {
+				match self_tclass.borrow().parent {
+					Some(ref par) => {
+						let par_init = par.class.borrow().args.clone();
+						let f = &mut $m.func;
+						let replaced = replace_inherit_init(&mut f.body);
+						if !replaced {
+							let pos = f.addr.clone();
+							if par_init.len() == 0 {
+								put_inherit_init(&mut f.body, pos);
+							} else {
+								throw!("initializer must include parent init call", pos)
+							}
+						}
+					},
+					_ => ()
 				}
 			}
 		}}; }

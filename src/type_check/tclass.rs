@@ -8,8 +8,8 @@ pub use std::cell::RefCell;
 pub type RTClass = Rc<RefCell<TClass>>;
 
 pub struct Parent {
-	class  : RTClass,//*const TClass,
-	params : Option<*const Vec<RType>>
+	pub class  : RTClass,//*const TClass,
+	pub params : Option<*const Vec<RType>>
 }
 
 impl Parent {
