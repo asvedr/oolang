@@ -1,6 +1,5 @@
 use syn::*;
 use type_check::pack::*;
-//use type_check::tclass::*;
 use type_check::fun_env::*;
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -42,10 +41,6 @@ macro_rules! get_fenv {
 			}
 		}}
 		res
-		/*match res {
-			Some(a) => a,
-			_ => panic!()
-		}*/
 	}};
 }
 
@@ -140,18 +135,8 @@ impl LocEnv {
 				}}
 			},
 			_ => panic!()
-			//LocEnv::SubEnv(ref mut se) => unsafe{ (*se.parent).add_outer(out) }
 		}
 	}
-	/*pub fn set_ret_type(&mut self, t : &Type) {
-		get_fenv_m!(self).set_ret_type(t)
-	}
-	pub fn check_ret_type(&self, t : &Type) -> bool {
-		get_fenv!(self).check_ret_type(t)
-	}
-	pub fn ret_type(&self) -> &Type {
-		get_fenv!(self).ret_type()
-	}*/
 	pub fn show(&self) -> String {
 		match *self {
 			LocEnv::FunEnv(ref fe) => fe.show(),
@@ -239,15 +224,6 @@ impl LocEnv {
 			}
 		}}
 	}
-	//pub fn check_class(&self, pref : &mut Vec<String>, name : &String, params : &Option<Vec<RType>>, pos : &Cursor) -> CheckRes {
-	//	get_fenv!(self).check_class(pref, name, params, pos)
-	//}
-	//pub fn get_class(&self, pref : &Vec<String>, name : &String) -> *const TClass {
-	//	get_fenv!(self).get_class(pref, name)
-	//}
-	//pub fn get_attrib(&self, cls : &RType, mname : &String, priv_too : bool) -> Option< (RType,bool) > {
-	//	get_fenv!(self).get_attrib(cls, mname, priv_too)
-	//}
 	pub fn add_loc_var(&mut self, name : &String, tp : Result<RType, *mut RType>, pos : &Cursor) -> CheckRes {
 		//let env = get_fenv_m!(self);
 		let local = match *self {
@@ -265,13 +241,6 @@ impl LocEnv {
 	pub fn fun_env_mut(&mut self) -> &mut FunEnv {
 		get_fenv_m!(self)
 	}
-	/*pub fn remove_loc_var(&mut self, name : &String) {
-		let local = match *self {
-			LocEnv::FunEnv(ref mut env) => &mut env.local,
-			LocEnv::SubEnv(ref mut env) => &mut env.local
-		};
-		local.remove(name);
-	}*/
 }
 
 #[macro_export]
@@ -379,4 +348,54 @@ pub fn find_unknown(body : &Vec<ActF>) -> &Cursor {
 		Some(a) => a,
 		_ => panic!()
 	}
+}
+
+// pub empty parent constructor
+pub fn put_inherit_init(seq : &mut Vec<ActF>, pos : Cursor) {
+	let mut new_seq = Vec::new();
+	new_seq.reserve(seq.len() + 1);
+	let p1 = pos.clone();
+	let p2 = p1.clone();
+	new_seq.push(Act{
+		val    : ActVal::Expr(Expr{
+			val     : EVal::Call(
+				None,
+				Box::new(Expr {
+					val     : EVal::Var(vec![], "%parent".to_string()),
+					kind    : Type::unk(),
+					addres  : p2,
+					op_flag : false
+				}),
+				vec![]
+			),
+			kind    : Type::unk(),
+			addres  : pos,
+			op_flag : false
+		}),
+		addres : p1
+	});
+	for a in seq {
+		new_seq.push(a);
+	}
+	*seq = new_seq;
+}
+
+pub replace_inherit_init(seq : &mut Vec<ActF>) -> bool {
+	if seq.len() > 0 {
+		match seq[0].val {
+			ActVal::Expr(ref mut e) =>
+				match e.val {
+					EVal::Call(_, ref mut name, _) => {
+						let mut n : &mut String = **name;
+						if n == "init_parent" {
+							*n = "%parent".to_string()
+							return true
+						}
+					},
+					_ => ()
+				},
+			_ => ()
+		}
+	}
+	return false;
 }

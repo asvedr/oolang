@@ -260,16 +260,21 @@ impl Checker {
 		}
 		// CHECK METHODS
 		macro_rules! precheck_meth {($m:expr) => {{
-			// GETTING NAME
-			/*let n = match $m.func.name {
-				Some(ref n) => n.clone(),
-				_ => panic!()
-			};*/
 			// FIX TYPE
 			unsafe{ self.check_type_pack(&pack, &tmpl, &mut $m.func.ftype, &$m.func.addr)? };
 			// FIX TMPL
 			$m.func.tmpl = tmpl.clone();
 			$m.ftype = $m.func.ftype.clone();
+			// FIX INITIALIZER INHERITING
+			if $m.func.name == "init" {
+				let par_init = class.parent.class.borrow().args.clone();
+				let f = &mut $meth.func;
+				// in utils exist two funs
+				XXX
+				if par_init.len() == 0 {
+				} else {
+				}
+			}
 		}}; }
 		for m in class.priv_fn.iter_mut() {
 			precheck_meth!(m);
