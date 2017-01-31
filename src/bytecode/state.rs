@@ -7,6 +7,7 @@ use std::fmt::Write;
 use syn::type_sys::*;
 use syn::utils::Show;
 
+// local environment for function
 pub struct Env {
 	pub out   : HashMap<String,u8>, // grabbed environment
 	pub args  : HashMap<String,u8>, // fun args
@@ -16,6 +17,7 @@ pub struct Env {
 	//fargs : usize                 // count vars for fun args
 }
 
+// virtual machine state for fun-body
 pub struct State<'a> {
 	pub mod_name : String,
 	pub env      : Env,
@@ -163,7 +165,7 @@ impl<'a> State<'a> {
 			} else {
 				Some(self.try_catch_label())
 			};
-		let cls = self.gc.get(cname);
+		let cls = self.gc.get_class(cname);
 		match cls.get_virt_i(mname) {
 			Some(i) => {
 				let tmp = Reg::VStack(self.push_v());
@@ -196,7 +198,7 @@ impl<'a> State<'a> {
 		}
 	}
 	pub fn closure_method(&mut self, cname : &String, mname : &String, obj : Reg, cmds : &mut Vec<Cmd>) -> Reg {
-		let cls = self.gc.get(cname);
+		let cls = self.gc.get_class(cname);
 		// cmds.push(Cmd::MethMake(obj, format!("{}_M_{}", cname, name), tmp.clone()));
 		match cls.get_virt_i(mname) {
 			Some(i) => cmds.push(Cmd::Prop(obj.clone(),i,Reg::Temp)),

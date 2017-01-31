@@ -1,6 +1,7 @@
 use bytecode::global_conf::*;
 use bytecode::state::*;
 use bytecode::compile_fun::*;
+use bytecode::exc_keys::*;
 use preludelib::*;
 
 pub struct Compiler {
@@ -10,7 +11,7 @@ pub struct Compiler {
 
 impl Compiler {
 	pub fn new(std : &Prelude, dest_dir : String) -> Compiler {
-		let mut gc = GlobalConf::new();
+		let mut gc = GlobalConf::new(ExcKeys::new(0));
 		//gc.fns     = std.pack.fns.clone();
 		for (k,v) in std.cfns.iter() {
 			gc.fns.insert(k.clone(), v.clone());
@@ -22,7 +23,7 @@ impl Compiler {
 		for e in std.pack.excepts.keys() {
 			//let name = format!("{}_{}", std.full_name(), e);
 			//gc.excepts.add(name);
-			gc.excepts.add(&std.pack.name, e);
+			gc.excepts.borrow_mut().add(&std.pack.name, e);
 		}
 		Compiler {
 			gc       : gc,

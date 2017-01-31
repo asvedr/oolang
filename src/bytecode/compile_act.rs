@@ -106,7 +106,7 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, /*gc : &GlobalConf,*/cmds 
 				state.pop_trycatch();
 				let mut ctchs_res = vec![];
 				for c in ctchs.iter() {
-					let id = state.gc.excepts.get(&c.epref, &c.ekey);
+					let id = state.gc.get_exc(&c.epref, &c.ekey);//state.gc.excepts.get(&c.epref, &c.ekey);
 					let mut code = vec![];
 					match c.vname {
 						Some(ref name) => code.push(Cmd::Mov(Reg::Exc,state.env.get_loc_var(name, &c.vtype))),
