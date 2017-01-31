@@ -191,14 +191,21 @@ impl Checker {
 				_ => ()
 			}
 			// FIX INITIALIZER
+			let mut init_found = false;
 			for meth in c.pub_fn.iter_mut() {
 				let f = meth.func.name == "init";
 				if f {
 					unsafe{ self.check_type_pack(&pack, &c.template, &mut meth.func.ftype, &meth.func.addr)? };
 					meth.ftype = meth.func.ftype.clone();
-					println!("INITIALIZER FOUND, tp:{:?}", meth.ftype);
+					//println!("INITIALIZER FOUND, tp:{:?}", meth.ftype);
+					init_found = true;
 					break;
 				}
+			}
+			if !init_found {
+				let addr = c.addres.clone();
+				let has_parent = match c.parent {Some(_) => true, _ => false};
+				c.pub_fn.push(gen_default_init(has_parent, addr))
 			}
 			match pack.cls.get_mut(&c.name) {
 				Some(tcl) => {

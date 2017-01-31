@@ -237,6 +237,9 @@ impl TClass {
 		macro_rules! foreach_meth{
 			($seq_src:ident, $seq_dst:expr, $parent:expr) => {
 				for prop in cls.$seq_src.iter() {
+					if prop.func.name == "init" {
+						continue;
+					}
 					if prop.is_virt {
 						virts_i.insert(prop.func.name.clone(), virt_cnt);
 						virt_cnt += 1;
@@ -264,6 +267,8 @@ impl TClass {
 				}
 			};
 		}
+		//pubs.reserve(c.pub_prop.len() + c.pub_fn.len());
+		//privs.reserve(c.priv_prop.len() + c.priv_fn.len());
 		match parent {
 			Some(par) => {
 				{

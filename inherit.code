@@ -4,7 +4,5 @@ class A {
 }
 
 class B : A {
-	pub fn f1() : () {
-	}
 }
 

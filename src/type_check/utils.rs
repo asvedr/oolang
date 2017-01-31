@@ -3,6 +3,7 @@ use type_check::pack::*;
 use type_check::fun_env::*;
 use std::collections::BTreeMap;
 use std::fmt::Write;
+use std::rc::Rc;
 
 #[macro_export]
 macro_rules! throw {
@@ -369,7 +370,7 @@ pub fn put_inherit_init(seq : &mut Vec<ActF>, pos : Cursor) {
 				vec![],
 				false
 			),
-			kind    : Type::unk(),
+			kind    : Type::void(),
 			addres  : pos,
 			op_flag : 0
 		}),
@@ -401,4 +402,48 @@ pub fn replace_inherit_init(seq : &mut Vec<ActF>) -> bool {
 		}
 	}
 	return false;
+}
+
+pub fn gen_default_init(has_parent : bool, addr : Cursor) -> Method {
+	macro_rules! parent {() => {
+		Act {
+			val    : ActVal::Expr(Expr{
+				val     : EVal::Call(
+					None,
+					Box::new(Expr {
+						val     : EVal::Var(vec![], "%parent".to_string()),
+						kind    : Type::unk(),
+						addres  : addr.clone(),
+						op_flag : 0
+					}),
+					vec![],
+					false
+				),
+				kind    : Type::void(),
+				addres  : addr.clone(),
+				op_flag : 0
+			}),
+			addres : addr.clone()
+		}
+	};}
+	let body = if has_parent {vec![parent!()]} else {vec![]};
+	let t = type_fn!(vec![], Type::void());
+	let f = SynFn {
+		name        : "init".to_string(),
+		tmpl        : vec![],
+		args        : vec![],
+		rettp       : Type::void(),
+		body        : body,
+		addr        : addr,
+		can_be_clos : false,
+		has_named   : false,
+		ftype       : t.clone(),
+		outers      : vec![],
+		no_except   : false
+	};
+	Method {
+		is_virt : false,
+		func : f,
+		ftype : t
+	}
 }
