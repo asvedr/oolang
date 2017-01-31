@@ -2,7 +2,7 @@ class A {
 	pub a : int;
 	pub b : int;
 	pub fn init(a : int) : () {
-		//print(a as str);
+		print(a as str);
 	}
 }
 
