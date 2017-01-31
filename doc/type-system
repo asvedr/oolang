@@ -5,18 +5,30 @@ primes types:
 	bool
 GC not used for primes
 
-class types:
+std class types:
 	- str
 	- [type] - (array of 'type')
 	- Asc<key,val> - hash map 
-	- user defined classes 'A'
-	- user defined templates classes 'A<P1,P2...>
+
+user defined class
+	class A {
+		pub param1 : int;
+		pub param2 : int;
+		...
+	}
+user defined templates
+	class A<T> {
+		pub param1 : T;
+		pub param2 : int;
+		...
+	}
+
 GC used for classes
 
 using coersing:
 	obj.call() as Type
 
-coersing with transmutation:
+coersing with transmutation using 'as':
 int to str
 int to real
 int to bool

@@ -206,10 +206,7 @@ impl Pack {
 			}
 		} else {
 			match self.get_cls(pref, name) {
-				None => {
-					println!("4!");
-					syn_throw!(format!("class {:?}{} not found", pref, name), pos)
-				},
+				None => syn_throw!(format!("class {:?}{} not found", pref, name), pos),
 				Some(cls) => cls
 			}
 		};

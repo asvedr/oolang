@@ -1,0 +1,25 @@
+defining function
+
+	fn factoreal(a : int) : int {
+		if a <= 1 {
+			return 1
+		} else {
+			return factoreal(a - 1) * a
+		}
+	}
+
+define closure
+
+	fn addABdivC(a : int, b : int) : Fn(int):int {
+		var sum = a + b;
+		fn clos(int c) : int {
+			return sum / c;
+		}
+		return clos;
+	}
+
+implicit void return-type
+
+	fn print_int(a : int) {
+		print(a as str)
+	}

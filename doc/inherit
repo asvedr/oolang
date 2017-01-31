@@ -28,7 +28,7 @@ class KnottyParent {
 
 class KnottyChild {
 	pub fn init() {
-		parent(1,2); // THIS IS A CALL FOR PARENT INITIALIZER
+		init_parent(1,2); // THIS IS A CALL FOR PARENT INITIALIZER
 		...
 	}
 }

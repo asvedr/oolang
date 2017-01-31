@@ -125,6 +125,7 @@ impl LocEnv {
 							for t in fe.templates.iter() {
 								loc_env.templates.insert(t.clone());
 							}
+							break;
 						},
 						LocEnv::SubEnv(ref se) => {
 							for name in se.local.keys() {
