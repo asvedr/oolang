@@ -140,10 +140,21 @@ pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 		}
 	}
 	// ret type
-	curs = lex!(lexer, &args.cursor, ":");
-	let tp = try!(parse_type(lexer, &curs));
+	//curs = lex!(lexer, &args.cursor, ":");
+	let ans = lex!(lexer, &args.cursor);
+	let tp;
+	if ans.val == ":" {
+		let ans = try!(parse_type(lexer, &ans.cursor));
+		curs = ans.cursor;
+		tp = ans.val;
+	} else if ans.val == "{" {
+		tp = Type::void();
+		curs = args.cursor.clone();
+	} else {
+		syn_throw!("expected ':' or '{'", args.cursor);
+	}
 	// body
-	let body = try!(parse_act_list(lexer, &tp.cursor, &parse_fn_full));
+	let body = try!(parse_act_list(lexer, /*&tp.cursor*/&curs, &parse_fn_full));
 	// type
 	let mut atypes = vec![];
 	for a in args.val.iter() {
@@ -151,15 +162,15 @@ pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 	}
 	let ftype =
 		if tmpl.len() == 0 {
-			Rc::new(Type::Fn(None, atypes, tp.val.clone()))
+			Rc::new(Type::Fn(None, atypes, tp./*val.*/clone()))
 		} else {
-			Rc::new(Type::Fn(Some(tmpl.clone()), atypes, tp.val.clone()))
+			Rc::new(Type::Fn(Some(tmpl.clone()), atypes, tp./*val.*/clone()))
 		};
 	let res = SynFn {
 		name        : name.val,
 		tmpl        : tmpl,
 		args        : args.val,
-		rettp       : tp.val,
+		rettp       : tp/*.val*/,
 		body        : body.val,
 		addr        : orig,
 		can_be_clos : can_be_clos,

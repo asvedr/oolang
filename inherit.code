@@ -1,7 +1,7 @@
 class A {
 	pub a : int;
 	pub b : int;
-	pub fn init(a : int) : () {
+	pub fn init(a : int) {
 		print(a as str);
 	}
 }
