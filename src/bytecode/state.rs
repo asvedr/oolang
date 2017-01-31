@@ -69,6 +69,8 @@ impl<'a> State<'a> {
 			init_name : "init".to_string()
 		}
 	}
+	// push_X, pop_X - change value of local stack vars
+	// there are 3 stacks: INT, REAL and VAR
 	pub fn push_i(&mut self) -> u8 {
 		push!(self, stack_i, max_i)
 	}
@@ -87,6 +89,7 @@ impl<'a> State<'a> {
 	pub fn pop_v(&mut self) -> u8 {
 		pop!(self, stack_v)
 	}
+	// autouse pop_i, pop_r, pop_v
 	pub fn pop_this_stack(&mut self, reg : &Reg) {
 		if reg.is_stack() {
 			if reg.is_int() {
@@ -98,6 +101,7 @@ impl<'a> State<'a> {
 			}
 		}
 	}
+	// autouse push_i, push_r, push_v
 	pub fn push_this_stack(&mut self, tp : &Type) -> Reg {
 		if tp.is_int() || tp.is_bool() || tp.is_char() {
 			Reg::IStack(self.push_i())
@@ -107,6 +111,7 @@ impl<'a> State<'a> {
 			Reg::VStack(self.push_v())
 		}
 	}
+	// autouse temp(Temp, TempI, TempR)
 	pub fn this_temp(&mut self, tp : &Type) -> Reg {
 		if tp.is_int() {
 			Reg::TempI
@@ -116,11 +121,13 @@ impl<'a> State<'a> {
 			Reg::Temp
 		}
 	}
+	// clear stacks of local vars
 	pub fn clear_stacks(&mut self) {
 		self.stack_i = 0;
 		self.stack_r = 0;
 		self.stack_v = 0;
 	}
+	// loop labels stack
 	pub fn push_loop(&mut self) -> u8 {
 		self.loops.push(self.l_counter);
 		self.l_counter += 1;
@@ -129,6 +136,7 @@ impl<'a> State<'a> {
 	pub fn pop_loop(&mut self) {
 		self.loops.pop();
 	}
+	// try-catch labels stack
 	pub fn push_trycatch(&mut self) -> u8 {
 		self.catches.push(self.c_counter);
 		self.c_counter += 1;
@@ -197,6 +205,7 @@ impl<'a> State<'a> {
 			}
 		}
 	}
+	// make closure from method and return register with value
 	pub fn closure_method(&mut self, cname : &String, mname : &String, obj : Reg, cmds : &mut Vec<Cmd>) -> Reg {
 		let cls = self.gc.get_class(cname);
 		// cmds.push(Cmd::MethMake(obj, format!("{}_M_{}", cname, name), tmp.clone()));
@@ -225,6 +234,7 @@ impl<'a> State<'a> {
 			_ => panic!()
 		}
 	}
+	// init object of class and return register with value
 	pub fn init_class(&mut self, cname : &String, args : Vec<Reg>, cmds : &mut Vec<Cmd>) -> Reg {
 		match self.gc.classes.get(cname) {
 			Some(tcls) => {
