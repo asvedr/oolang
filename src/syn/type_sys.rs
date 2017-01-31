@@ -53,19 +53,23 @@ impl RcStore {
 	fn new(t : Type) -> RcStore {
 		RcStore{store : Rc::new(t)}
 	}
+	fn new_rc(t : RType) -> RcStore {
+		RcStore{store : t}
+	}
 }
 
 unsafe impl Send for RcStore {}
 unsafe impl Sync for RcStore {}
 
 lazy_static! {
-	static ref STAT_UNK   : RcStore = RcStore::new(Type::Unk);
-	static ref STAT_INT   : RcStore = RcStore::new(Type::Int);
-	static ref STAT_REAL  : RcStore = RcStore::new(Type::Real);
-	static ref STAT_CHAR  : RcStore = RcStore::new(Type::Char);
-	static ref STAT_STR   : RcStore = RcStore::new(Type::Str);
-	static ref STAT_BOOL  : RcStore = RcStore::new(Type::Bool);
-	static ref STAT_VOID  : RcStore = RcStore::new(Type::Void);
+	static ref STAT_UNK      : RcStore = RcStore::new(Type::Unk);
+	static ref STAT_INT      : RcStore = RcStore::new(Type::Int);
+	static ref STAT_REAL     : RcStore = RcStore::new(Type::Real);
+	static ref STAT_CHAR     : RcStore = RcStore::new(Type::Char);
+	static ref STAT_STR      : RcStore = RcStore::new(Type::Str);
+	static ref STAT_BOOL     : RcStore = RcStore::new(Type::Bool);
+	static ref STAT_VOID     : RcStore = RcStore::new(Type::Void);
+	static ref STAT_DEF_INIT : RcStore = RcStore::new_rc(type_fn!(vec![], Type::void()));
 }
 //static stat_int : *mut Type = 0 as *mut Type;
 
@@ -77,6 +81,7 @@ impl Type {
 	pub fn str()  -> RType { STAT_STR.store.clone()  }
 	pub fn bool() -> RType { STAT_BOOL.store.clone() }
 	pub fn void() -> RType { STAT_VOID.store.clone() }
+	pub fn def_init() -> RType { STAT_DEF_INIT.store.clone() }
 	pub fn arr(a : RType) -> RType { Rc::new(Type::Arr(vec![a])) }
 //	Class(Vec<String>,String,Option<Vec<RType>>),
 	//  (template)?         args        result

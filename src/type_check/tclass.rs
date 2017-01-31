@@ -48,13 +48,14 @@ impl Attr {
 }
 
 pub struct TClass {
-	pub source : Option<*const Class>,  // need this field for checking initializer
-	pub fname  : String,                // full name
-	pub parent : Option<Parent>,
-	pub privs  : HashMap<String,Attr>, // orig type saved in syn_class
-	pub pubs   : HashMap<String,Attr>, 
-	pub params : Vec<String>,           // template
-	pub args   : Vec<RType>,            // constructor 
+	pub source  : Option<*const Class>,  // need this field for checking initializer
+	pub fname   : String,                // full name
+	pub parent  : Option<Parent>,
+	pub privs   : HashMap<String,Attr>, // orig type saved in syn_class
+	pub pubs    : HashMap<String,Attr>, 
+	pub params  : Vec<String>,           // template
+	pub args    : Vec<RType>,            // constructor
+	pub initer  : RType,
 
 	// FOR BYTECODE
 	pub prop_cnt : usize,
@@ -76,7 +77,8 @@ impl TClass {
 			prop_cnt : 0,
 			virt_cnt : 0,
 			props_i  : HashMap::new(),
-			virts_i  : HashMap::new()
+			virts_i  : HashMap::new(),
+			initer   : Type::def_init()
 		}))
 	}
 	// rm link to source and clear containers that used only for type-check
@@ -180,6 +182,7 @@ impl TClass {
 		let mut virt_cnt = 0;
 		let mut props_i  = HashMap::new();
 		let mut virts_i  = HashMap::new();
+		//let mut c_args = vec![];
 		match parent {
 			Some(ref par) => {
 				let c = par.class.borrow();
@@ -194,6 +197,7 @@ impl TClass {
 		}
 		fname.push_str(&*cls.name);
 		macro_rules! make {($par:expr) => {{
+			//let initer = type_fn!(args.clone(), Type::void());
 			return Ok(Rc::new(RefCell::new(TClass {
 				fname    : fname,
 				source   : Some(&*cls),
@@ -201,11 +205,12 @@ impl TClass {
 				privs    : privs,
 				pubs     : pubs,
 				params   : cls.template.clone(),
-				args     : vec![], //args,
+				args     : vec![], // set in check_initializer
 				prop_cnt : prop_cnt,
 				virt_cnt : virt_cnt,
 				props_i  : props_i,
-				virts_i  : virts_i
+				virts_i  : virts_i,
+				initer   : Type::def_init() // set in check_initialzer
 			})));
 		}}; }
 		macro_rules! foreach_prop{
@@ -296,60 +301,26 @@ impl TClass {
 			Some(ptr) => &*ptr,
 			_ => panic!()
 		};
-		match self.privs.get(&fname) {
-			Some(_) => syn_throw!(format!("initializer of {} must be pub", cls.name), cls.addres),
-			_ => {
-				let mut args : Vec<RType> = Vec::new();
-				match self.pubs.get(&fname) {
-					Some(/*t*/_) => {
-						for meth in cls.pub_fn.iter() {
-							if meth.func.name == fname {
-								match *meth.ftype {
-									Type::Fn(_,ref args_src, ref ret) => {		
-										/*let mut args : Vec<RType> = vec![];
-										for a in args_src.iter() {
-											args.push(a.clone());
-										}*/
-										if ret.is_void() {
-											// ok
-											args = args_src.clone()
-										} else {
-											syn_throw!("initializer must return void", meth.func.addr)
-										}
-									},
-									_ => 
-										syn_throw!(format!("initializer must be function, but it {:?}", meth.ftype), meth.func.addr)
-								}
-								break
-							}
+		for meth in cls.pub_fn.iter() {
+			if meth.func.name == fname {
+				match *meth.ftype {
+					Type::Fn(_,ref args_src, ref ret) => {		
+						if ret.is_void() {
+							// ok
+							self.args = args_src.clone();
+							self.initer = type_fn!(args_src.clone(), Type::void());
+							return Ok(())
+						} else {
+							syn_throw!("initializer must return void", meth.func.addr)
 						}
-						/*match *(t._type) {
-							Type::Fn(_,ref args_src,ref ret) => {
-								let mut args : Vec<RType> = vec![];
-								for a in args_src.iter() {
-									args.push(a.clone());
-								}
-								if ret.is_void() {
-									// ok
-									args
-								} else {
-									syn_throw!(format!("initializer of {} must be void", cls.name), cls.addres)
-								}
-							},
-							_ =>
-								syn_throw!(format!("initializer of {} must be function, but it {:?}", cls.name, *(t._type)), cls.addres)
-						}*/
 					},
-					_ => {
-						// ok
-						//Vec::new()
-					}
-				};
-				// setting args
-				self.args = args;
-				Ok(())
+					_ => 
+						syn_throw!(format!("initializer must be function, but it {:?}", meth.ftype), meth.func.addr)
+				}
+				break
 			}
 		}
+		panic!("init not found")
 	}
 	fn exist_attr(&self, name : &String) -> bool {
 		unsafe {
@@ -367,19 +338,7 @@ impl TClass {
 		}
 	}
 	pub fn look_in_all(&self, name : &String, tmpl : Option<&Vec<RType>>) -> Option<RType> {
-		// TODO check: rec to loop
-		/*let lnk = match self.pubs.get(name) {
-			Some(lnk) => &lnk._type,
-			None =>
-				match self.privs.get(name) {
-					Some(lnk) => &lnk._type,
-					None =>
-						match self.parent {
-							Some(ref lnk) => return lnk.class.borrow().look_in_all(name, tmpl),
-							None => return None
-						}
-				}
-		};*/
+		// TODO change tmpl when going to parent
 		let lnk : &RType;
 		unsafe {
 			let mut cls : *const TClass = self;
@@ -410,15 +369,7 @@ impl TClass {
 		}
 	}
 	pub fn look_in_pub(&self, name : &String, tmpl : Option<&Vec<RType>>) -> Option<RType> {
-		// TODO check: rec to loop
-		/*let lnk = match self.pubs.get(name) {
-			Some(lnk) => &lnk._type,
-			None =>
-				match self.parent {
-					Some(ref lnk) => return lnk.class.borrow().look_in_pub(name, tmpl),
-					None => return None
-				}
-		};*/
+		// TODO change tmpl when going to parent
 		let lnk : &RType;
 		unsafe {
 			let mut cls : *const TClass = self;
@@ -439,6 +390,12 @@ impl TClass {
 		match tmpl {
 			Some(vec) => Some(self.replace_type(lnk, vec, true)),
 			_ => Some(lnk.clone())
+		}
+	}
+	pub fn initer_type(&self, tmpl : Option<&Vec<RType>>) -> RType {
+		match tmpl {
+			Some(vec) => self.replace_type(&self.initer, vec, true),
+			_ => self.initer.clone()
 		}
 	}
 	// true if attr is method, false if prop. there is no check for existing here

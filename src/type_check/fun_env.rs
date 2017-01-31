@@ -39,6 +39,25 @@ impl FunEnv {
 			self_val    : _self
 		}
 	}
+	pub fn parent_init(&self) -> RType {
+		match self.self_val {
+			None => panic!(),
+			Some(ref tp) =>
+				match **tp {
+					Type::Class(ref pref, ref name, ref param) => unsafe {
+						match (*self.global).get_cls_rc(pref, name){
+							Some(cls) =>
+								match cls.borrow().parent {
+									Some(ref par) => par.class.borrow().initer.clone(),
+									_ => panic!()
+								},
+							_ => panic!()
+						}
+					},
+					_ => panic!()
+				}
+		}
+	}
 	pub fn add_outer(&mut self, out : &FunEnv) {
 		for name in out.local.keys() {
 			self.outers.insert(name.clone(), out.local.get(name).unwrap().clone());

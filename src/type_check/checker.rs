@@ -305,7 +305,11 @@ impl Checker {
 			}
 		}}; }
 		for m in class.priv_fn.iter_mut() {
-			precheck_meth!(m);
+			if m.func.name == "init" {
+				syn_throw!("init must be public", m.func.addr);
+			} else {
+				precheck_meth!(m);
+			}
 		}
 		for m in class.pub_fn.iter_mut() {
 			precheck_meth!(m);
@@ -357,9 +361,6 @@ impl Checker {
 				} else {
 					// TYPING OK
 					// NOT NEED fun.outers TOP LEVEL HAS NULL
-					/*for n in env.fun_env().local.keys() {
-						fun.locals.push(n.clone());
-					}*/
 					return Ok(0)
 				}
 			}
@@ -370,9 +371,6 @@ impl Checker {
 			for n in fenv.used_outers.iter() {
 				fun.outers.push(n.clone());
 			}
-			/*for n in fenv.local.iter() {
-				fun.locals.push(n.clone());
-			}*/
 			return Ok(cnt)
 		}
 	}
@@ -1023,15 +1021,21 @@ impl Checker {
 			EVal::Var(ref mut pref, ref name) => { // namespace, name
 				//println!("GET VAR FOR {:?} {}", pref, name);
 				//println!("{}", env.show());
-				try!(env.get_var(pref, name, &mut expr.kind, &expr.addres));
-				//println!("GET VAR OK: {:?}", pref);
-				if pref[0] == "%out" {
-					env.fun_env_mut().used_outers.insert(name.clone());
-				}
-				/* MUST RECUSRIVE CHECK FOR COMPONENTS */
-				match *expr.kind {
-					Type::Unk => return Ok(1),
-					_ => return Ok(0)
+				if name == "%parent" {
+					if expr.kind.is_unk() {
+						expr.kind = env.fun_env().parent_init();
+					}
+				} else {
+					try!(env.get_var(pref, name, &mut expr.kind, &expr.addres));
+					//println!("GET VAR OK: {:?}", pref);
+					if pref[0] == "%out" {
+						env.fun_env_mut().used_outers.insert(name.clone());
+					}
+					/* MUST RECUSRIVE CHECK FOR COMPONENTS */
+					match *expr.kind {
+						Type::Unk => return Ok(1),
+						_ => return Ok(0)
+					}
 				}
 			},
 			EVal::Arr(ref mut items) => {
