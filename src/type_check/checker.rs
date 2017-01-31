@@ -1021,7 +1021,7 @@ impl Checker {
 			EVal::Var(ref mut pref, ref name) => { // namespace, name
 				//println!("GET VAR FOR {:?} {}", pref, name);
 				//println!("{}", env.show());
-				if name == "%parent" {
+				if name == "%init" {
 					if expr.kind.is_unk() {
 						expr.kind = env.fun_env().parent_init();
 					}

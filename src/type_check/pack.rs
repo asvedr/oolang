@@ -169,7 +169,8 @@ impl Pack {
 				let pack = pack_of!(self, pref);
 				match pack {
 					Some(ptr) => (*ptr).fns_noex.contains(name),
-					_ => panic!()
+					// None can be found if it's 'init'
+					None => false //panic!()
 				}
 			}
 		}

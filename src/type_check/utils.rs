@@ -362,7 +362,7 @@ pub fn put_inherit_init(seq : &mut Vec<ActF>, pos : Cursor) {
 			val     : EVal::Call(
 				None,
 				Box::new(Expr {
-					val     : EVal::Var(vec!["%cls".to_string()], "%parent".to_string()),
+					val     : EVal::Var(vec!["%parent".to_string()], "%init".to_string()),
 					kind    : Type::unk(),
 					addres  : p2,
 					op_flag : 0
@@ -386,19 +386,21 @@ pub fn replace_inherit_init(seq : &mut Vec<ActF>) -> bool {
 			ActVal::Expr(ref mut e) =>
 				match e.val {
 					EVal::Call(_, ref mut fnc, _, _) => {
-						let yes = match fnc.val {
+						let change = match fnc.val {
 							EVal::Var(_, ref name) => {
-								*name == "init_parent"
-								/*if *name == "init_parent" {
-									*name = "%parent".to_string();
-									*pref = vec!["%cls".to_string()];
-									return true
-								}*/
+								if *name == "init_parent" {
+									true
+								} else if *name == "%init" {
+									return true;
+								} else {
+									false
+								}
 							},
 							_ => false
 						};
-						if yes {
-							fnc.val = EVal::Var(vec!["%cls".to_string()], "%parent".to_string())
+						if change {
+							fnc.val = EVal::Var(vec!["%parent".to_string()], "%init".to_string());
+							return true;
 						}
 					},
 					_ => ()
@@ -416,7 +418,7 @@ pub fn gen_default_init(has_parent : bool, addr : Cursor) -> Method {
 				val     : EVal::Call(
 					None,
 					Box::new(Expr {
-						val     : EVal::Var(vec!["%cls".to_string()], "%parent".to_string()),
+						val     : EVal::Var(vec!["%parent".to_string()], "%init".to_string()),
 						kind    : Type::unk(),
 						addres  : addr.clone(),
 						op_flag : 0

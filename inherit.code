@@ -1,8 +1,14 @@
 class A {
 	pub a : int;
 	pub b : int;
+	pub fn init(a : int) : () {
+		print(a as str);
+	}
 }
 
 class B : A {
+	pub fn init() : () {
+		init_parent(1)
+	}
 }
 
