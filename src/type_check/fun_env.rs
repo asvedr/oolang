@@ -1,7 +1,7 @@
 use syn::*;
 use type_check::pack::*;
 use type_check::tclass::*;
-use std::collections::{HashSet, BTreeMap};
+use std::collections::{HashSet, BTreeMap, BTreeSet};
 use std::fmt::Write;
 
 macro_rules! throw {
@@ -19,7 +19,7 @@ pub struct FunEnv {
 	pub global      : *const Pack,
 	pub local       : VMap, 
 	pub outers      : VMap,
-	pub used_outers : HashSet<String>,
+	pub used_outers : BTreeSet<String>,
 	pub templates   : HashSet<String>,      // local templates
 	pub ret_type    : Option<RType>,
 	pub loop_labels : Vec<*const String>,   // for 'break' cmd
@@ -35,7 +35,7 @@ impl FunEnv {
 			templates   : HashSet::new(),
 			ret_type    : None,
 			loop_labels : Vec::new(),
-			used_outers : HashSet::new(),
+			used_outers : BTreeSet::new(),
 			self_val    : _self
 		}
 	}

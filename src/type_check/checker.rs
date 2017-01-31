@@ -100,16 +100,23 @@ impl Checker {
 	// this is only one public fun for checking
 	pub fn check_mod(&self, smod : &mut SynMod, mod_name : &Vec<String>) -> CheckRes {
 		let mut pack = Pack::new();
+		pack.out_cls.reserve(self.std.pack.cls.len());
 		for c in self.std.pack.cls.keys() {
 			pack.out_cls.insert(c.clone(), &*self.std.pack);
 		}
+		pack.out_fns.reserve(self.std.pack.fns.len());
 		for f in self.std.pack.fns.keys() {
 			pack.out_fns.insert(f.clone(), &*self.std.pack);
 		}
+		pack.out_exc.reserve(self.std.pack.excepts.len());
 		for e in self.std.pack.excepts.keys() {
 			pack.out_exc.insert(e.clone(), &*self.std.pack);
 		}
+		pack.packs.reserve(smod.imports.len());
 		pack.packs.insert("%std".to_string(), &*self.std.pack);
+		pack.cls.reserve(smod.classes.len());
+		pack.fns.reserve(smod.funs.len() + smod.c_fns.len());
+		pack.excepts.reserve(smod.excepts.len());
 		// ADD FUNS TO ENV
 		for f in smod.funs.iter_mut() {
 			// GETTING NAME

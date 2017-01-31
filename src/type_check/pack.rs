@@ -2,7 +2,7 @@ use syn::type_sys::*;
 use syn::reserr::*;
 use type_check::tclass::*;
 use std::fmt::Write;
-use std::collections::{HashMap, BTreeMap, BTreeSet};
+use std::collections::{HashMap, HashSet};
 
 macro_rules! pack_of {
 	($_self:expr, $pref:expr) => {{
@@ -71,12 +71,12 @@ pub struct Pack {
 	pub name     : Vec<String>,
 	pub packs    : HashMap<String,*const Pack>,  // imports
 	pub out_cls  : HashMap<String,*const Pack>,  // imports *
-	pub out_fns  : BTreeMap<String,*const Pack>, // imports *
-	pub out_exc  : BTreeMap<String,*const Pack>, // imports *
+	pub out_fns  : HashMap<String,*const Pack>, // imports *
+	pub out_exc  : HashMap<String,*const Pack>, // imports *
 	pub cls      : HashMap<String,RTClass>,
-	pub fns      : BTreeMap<String,RType>,
-	pub fns_noex : BTreeSet<String>,             // optimizator noexcept flag
-	pub excepts  : BTreeMap<String,Option<RType>>
+	pub fns      : HashMap<String,RType>,
+	pub fns_noex : HashSet<String>,             // optimizator noexcept flag
+	pub excepts  : HashMap<String,Option<RType>>
 }
 
 impl Pack {
@@ -85,12 +85,12 @@ impl Pack {
 			name      : Vec::new(),
 			packs     : HashMap::new(),
 			out_cls   : HashMap::new(),
-			out_fns   : BTreeMap::new(),
-			out_exc   : BTreeMap::new(),
+			out_fns   : HashMap::new(),
+			out_exc   : HashMap::new(),
 			cls       : HashMap::new(),
-			fns       : BTreeMap::new(),
-			fns_noex  : BTreeSet::new(),
-			excepts   : BTreeMap::new()
+			fns       : HashMap::new(),
+			fns_noex  : HashSet::new(),
+			excepts   : HashMap::new()
 		}
 	}
 	#[inline]

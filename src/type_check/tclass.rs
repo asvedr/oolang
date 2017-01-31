@@ -1,7 +1,7 @@
 use syn::type_sys::*;
 use syn::class::*;
 use syn::reserr::*;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 pub use std::rc::Rc;
 pub use std::cell::RefCell;
 
@@ -51,8 +51,8 @@ pub struct TClass {
 	pub source : Option<*const Class>,  // need this field for checking initializer
 	pub fname  : String,                // full name
 	pub parent : Option<Parent>,
-	pub privs  : BTreeMap<String,Attr>, // orig type saved in syn_class
-	pub pubs   : BTreeMap<String,Attr>, 
+	pub privs  : HashMap<String,Attr>, // orig type saved in syn_class
+	pub pubs   : HashMap<String,Attr>, 
 	pub params : Vec<String>,           // template
 	pub args   : Vec<RType>,            // constructor 
 
@@ -69,8 +69,8 @@ impl TClass {
 			source   : None,
 			fname    : name,
 			parent   : None,
-			privs    : BTreeMap::new(),
-			pubs     : BTreeMap::new(), 
+			privs    : HashMap::new(),
+			pubs     : HashMap::new(), 
 			params   : Vec::new(),
 			args     : Vec::new(),
 			prop_cnt : 0,
@@ -173,8 +173,8 @@ impl TClass {
 	}
 
 	pub fn from_syn(cls : &Class, parent : Option<Parent>, pref : &Vec<String>) -> Result<RTClass,Vec<SynErr>> {
-		let mut privs : BTreeMap<String, Attr> = BTreeMap::new();
-		let mut pubs  : BTreeMap<String, Attr> = BTreeMap::new();
+		let mut privs : HashMap<String, Attr> = HashMap::new();
+		let mut pubs  : HashMap<String, Attr> = HashMap::new();
 		let mut fname = String::new();
 		let mut prop_cnt = 0;
 		let mut virt_cnt = 0;
@@ -267,8 +267,9 @@ impl TClass {
 				}
 			};
 		}
-		//pubs.reserve(c.pub_prop.len() + c.pub_fn.len());
-		//privs.reserve(c.priv_prop.len() + c.priv_fn.len());
+		pubs.reserve(cls.pub_prop.len() + cls.pub_fn.len());
+		privs.reserve(cls.priv_prop.len() + cls.priv_fn.len());
+		props_i.reserve(cls.pub_prop.len() + cls.priv_prop.len());
 		match parent {
 			Some(par) => {
 				{
