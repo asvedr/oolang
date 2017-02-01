@@ -1,9 +1,8 @@
 use std::collections::{HashMap, BTreeMap};
-use std::rc::Rc;
-use std::cell::RefCell;
 use std::io::{Read, Write, Result, Error, ErrorKind};
 use std::fs::File;
 use std::str::FromStr;
+use syn::SynMod;
 
 // all exception keys are the numbers in C
 // must make one NAME-CODE map for all modules in application
@@ -19,19 +18,23 @@ pub type RExcKeys = Box<ExcKeys>;
 
 macro_rules! make_name{($pref:expr, $name:expr, $res:expr) => {{
 	for i in $pref.iter() {
-		$res = format!("{}{}_", $res, i);
+		//$res = format!("{}{}_", $res, i);
+		$res.push_str(&**i);
+		$res.push('_');
 	}
-	$res = format!("{}{}_", $res, $name);
+	$res.push_str(&*$name);
+	//$res = format!("{}{}_", $res, $name);
 }};}
 
 impl ExcKeys {
 	#[inline(always)]
 	pub fn get(&self, pref : &Vec<String>, name : &String) -> usize {
+		//println!("get: {:?} {}", pref, name);
 		let mut res = String::new();
 		make_name!(pref, name, res);
 		match self.map.get(&res) {
 			Some(a) => *a,
-			_ => panic!("bad exception key: {}", name)
+			_ => panic!("bad exception key: {}", res)
 		}
 	}
 	pub fn add(&mut self, pref : &Vec<String>, name : &String) {
@@ -39,6 +42,18 @@ impl ExcKeys {
 		make_name!(pref, name, res);
 		self.map.insert(res, self.cnt);
 		self.cnt += 1;
+	}
+	pub fn register_mod(&mut self, smod : &SynMod, mname : &Vec<String>) {
+		let mut mod_name = String::new();
+		for p in mname.iter() {
+			mod_name.push_str(&**p);
+			mod_name.push('_');
+		}
+		self.map.reserve(smod.excepts.len());
+		for e in smod.excepts.iter() {
+			self.map.insert(format!("{}{}", mod_name, e.name), self.cnt);
+			self.cnt += 1;
+		}
 	}
 	pub fn new(c : usize) -> RExcKeys {
 		Box::new(ExcKeys {
@@ -48,11 +63,11 @@ impl ExcKeys {
 	}
 	pub fn from_stream<In : Read>(input : &mut In) -> Result<RExcKeys> {
 		let mut buf = String::new();
-		input.read_to_string(&mut buf);
+		input.read_to_string(&mut buf)?;
 		macro_rules! err {() => { return Err(Error::new(ErrorKind::InvalidData, "ExcKeys reading stream")) }}
 		let mut lines = buf.split('\n');
 		let cnt = match lines.next() {
-			Some(l) =>
+			Some(_) =>
 				match usize::from_str(&*buf) {
 					Ok(n) => n,
 					_ => err!()

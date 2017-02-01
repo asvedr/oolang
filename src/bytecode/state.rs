@@ -148,24 +148,39 @@ impl<'a> State<'a> {
 		self.catches.pop();
 	}
 	pub fn try_catch_label(&self) -> String {
-		let n = self.catches[self.catches.len() - 1];
-		format!("TRY_CATCH{}", n)
+		//let n = self.catches[self.catches.len() - 1];
+		match self.catches.last() {
+			Some(n) => format!("TRY_CATCH{}", n),
+			_ => panic!("try-catch empty")
+		}
 	}
 	pub fn try_ok_label(&self) -> String {
-		let n = self.catches[self.catches.len() - 1];
-		format!("TRY_OK{}", n)
+		//let n = self.catches[self.catches.len() - 1];
+		match self.catches.last() {
+			Some(n) => format!("TRY_OK{}", n),
+			_ => panic!("try-ok empty")
+		}
 	}
 	pub fn loop_in_label(&self) -> String {
-		let n = self.loops[self.loops.len() - 1];
-		format!("LOOP_BEGIN{}", n)
+		//let n = self.loops[self.loops.len() - 1];
+		match self.loops.last() {
+			Some(n) => format!("LOOP_BEGIN{}", n),
+			_ => panic!("loop-in empty")
+		}
 	}
 	pub fn loop_out_label(&self) -> String {
-		let n = self.loops[self.loops.len() - 1];
-		format!("LOOP_END{}", n)
+		//let n = self.loops[self.loops.len() - 1];
+		match self.loops.last() {
+			Some(n) => format!("LOOP_END{}", n),
+			_ => panic!("loop-out label")
+		}
 	}
 	pub fn break_label(&self, skip : usize) -> String {
-		let n = self.loops[self.loops.len() - skip];
-		format!("LOOP_END{}", n)
+		//let n = self.loops[self.loops.len() - skip];
+		match self.loops.last() {
+			Some(n) => format!("LOOP_END{}", n),
+			_ => panic!("break label")
+		}
 	}
 	// out in Reg::Temp
 	pub fn call_method(&mut self, cname : &String, mname : &String, obj : Reg, args : Vec<Reg>, out : &mut Vec<Cmd>) {

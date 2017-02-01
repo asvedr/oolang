@@ -1,5 +1,4 @@
 use bytecode::global_conf::*;
-use bytecode::state::*;
 use bytecode::compile_fun as c_fun;
 use bytecode::exc_keys::*;
 use syn::{Show, SynFn, SynMod};
@@ -44,8 +43,8 @@ struct FunQueueItem<'a> {
 }
 
 impl Compiler {
-	pub fn new(std : &Prelude, dest_dir : String) -> Compiler {
-		let mut gc = GlobalConf::new(ExcKeys::new(0));
+	pub fn new(std : &Prelude, excs : RExcKeys, mod_name : Vec<String>, dest_dir : String) -> Compiler {
+		let mut gc = GlobalConf::new(excs, mod_name);
 		//gc.fns     = std.pack.fns.clone();
 		for (k,v) in std.cfns.iter() {
 			gc.fns.insert(k.clone(), v.clone());
@@ -64,13 +63,16 @@ impl Compiler {
 			dest_dir : dest_dir
 		}
 	}
-	pub fn compile_mod(&self, smod : &SynMod, name : &Vec<String>) -> CMod {
+	pub fn destroy(self) -> RExcKeys {
+		self.gc.destroy()
+	}
+	pub fn compile_mod(&self, smod : &SynMod) -> CMod {
 		let mut pub_f = vec![];
 		let mut priv_f = vec![];
 		
 		let mut queue = vec![];
 		let mut mod_name = String::new();
-		for i in name.iter() {
+		for i in self.gc.mod_name.iter() {
 			if mod_name.len() == 0 {
 				mod_name.push_str(&**i);
 			} else {

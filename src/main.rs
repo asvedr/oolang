@@ -18,6 +18,7 @@ use std::fs::File;
 use syn::*;
 use type_check::checker::*;
 use bytecode::compiler::*;
+use bytecode::exc_keys::*;
 use preludelib::*;
 
 fn main() {
@@ -44,10 +45,10 @@ fn main() {
 	//let curs = Cursor::new();
 	match parse_mod(&lxr) {
 		Ok(mut m) => {
+			let mod_name = vec!["main".to_string()];
 			{
 				let ch = Checker::new();
-				let pref = vec!["main".to_string()];
-				match ch.check_mod(&mut m, &pref) {
+				match ch.check_mod(&mut m, &mod_name) {
 					Err(e) => {
 						println!("TCHECK ERR ON line: {} column: {}", e[0].line + 1, e[0].column + 1);
 						println!("{}", e[0].mess);
@@ -56,10 +57,13 @@ fn main() {
 					_ => m.print()
 				}
 			}
+			let mut excs = ExcKeys::new(0);
+			excs.register_mod(&m, &mod_name);
 			let prelude = Prelude::new();
-			let cmplr = Compiler::new(&prelude, "c_out".to_string());
-			let mod_name = vec!["main".to_string()];
-			let cmod = cmplr.compile_mod(&m, &mod_name);
+			let cmplr = Compiler::new(&prelude, excs, mod_name.clone(), "c_out".to_string());
+			//let mod_name = vec!["main".to_string()];
+			let cmod = cmplr.compile_mod(&m);
+			excs = cmplr.destroy();
 			cmod.print();
 			//if m.funs.len() > 0 {
 			//	let cfun = compile_fun::compile(&m.funs[0]);

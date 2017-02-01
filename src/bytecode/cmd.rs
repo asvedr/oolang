@@ -209,7 +209,7 @@ impl Show for Cmd {
 			Cmd::Catch(ref lst, ref next) => {
 				let mut acc = vec![format!("{}CATCH next:'{}'", tab, next)];
 				for ctch in lst.iter() {
-					acc.push(format!("{}CASE {}", tab, ctch.key));
+					acc.push(format!("{}CASE {:?}", tab, ctch.key));
 					for cmd in ctch.code.iter() {
 						for val in cmd.show(layer + 1) {
 							acc.push(val);
@@ -274,7 +274,7 @@ pub struct MakeClos {
 }*/
 
 pub struct Catch {
-	pub key  : usize,
+	pub key  : Option<usize>,
 	pub code : Vec<Cmd>
 }
 

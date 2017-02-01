@@ -5,17 +5,19 @@ use std::collections::HashMap;
 
 // global values for module
 pub struct GlobalConf {
-	pub excepts : RExcKeys,
-	pub classes : HashMap<String,RTClass>,
-	pub fns     : HashMap<String,String> // map of full names
+	pub excepts  : RExcKeys,
+	pub classes  : HashMap<String,RTClass>,
+	pub mod_name : Vec<String>,
+	pub fns      : HashMap<String,String> // map of full names
 }
 
 impl GlobalConf {
-	pub fn new(exc : RExcKeys) -> GlobalConf {
+	pub fn new(exc : RExcKeys, mname : Vec<String>) -> GlobalConf {
 		GlobalConf{
-			excepts : exc,//ExcKeys::new(0),
-			classes : HashMap::new(),
-			fns     : HashMap::new()
+			excepts  : exc,//ExcKeys::new(0),
+			classes  : HashMap::new(),
+			fns      : HashMap::new(),
+			mod_name : mname
 		}
 	}
 	pub fn add_class(&mut self, class : RTClass) {
@@ -49,11 +51,11 @@ impl GlobalConf {
 	}
 	#[inline(always)]
 	pub fn get_exc(&self, pref : &Vec<String>, name : &String) -> usize {
-		/*match self.excepts.borrow().map.get(name) {
-			Some(n) => *n,
-			_ => panic!()
-		}*/
-		self.excepts./*borrow().*/get(pref,name)
+		if pref.len() == 0 || pref[0] == "%mod" {
+			self.excepts.get(&self.mod_name, name)
+		} else {
+			self.excepts.get(pref,name)
+		}
 	}
 	#[inline(always)]
 	pub fn destroy(self) -> RExcKeys {

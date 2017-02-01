@@ -4,7 +4,6 @@ use syn::reserr::*;
 use syn::type_sys::*;
 use std::str::FromStr;
 use std::mem;
-use std::rc::Rc;
 
 #[derive(Clone)]
 pub enum EVal {

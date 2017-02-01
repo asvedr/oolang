@@ -111,16 +111,20 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 						});
 						cmds.push(Cmd::Call(call));
 					}
-					let res_reg;
-					if dst.is_int() {
-						res_reg = Reg::IStack(state.push_i());
-					} else if dst.is_real() {
-						res_reg = Reg::RStack(state.push_r());
+					if dst == Reg::Null {
+						dst
 					} else {
-						res_reg = Reg::VStack(state.push_v());
+						let res_reg;
+						if dst.is_int() {
+							res_reg = Reg::IStack(state.push_i());
+						} else if dst.is_real() {
+							res_reg = Reg::RStack(state.push_r());
+						} else {
+							res_reg = Reg::VStack(state.push_v());
+						}
+						cmds.push(Cmd::Mov(dst, res_reg.clone()));
+						res_reg
 					}
-					cmds.push(Cmd::Mov(dst, res_reg.clone()));
-					res_reg
 				}}
 			}
 			match fun.val {
@@ -280,7 +284,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 		},
 		EVal::Item(ref arr, ref index) => {
 			let arr_c = compile(arr, state, cmds);
-			let ind_c = compile(arr, state, cmds);
+			let ind_c = compile(index, state, cmds);
 			state.pop_v();
 			state.pop_i();
 			macro_rules! make_cmd{($a:expr,$i:expr,$d:expr) => {{
@@ -337,7 +341,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 						catch_block : if state.exc_off {None} else {Some(state.try_catch_label())}
 					};
 					let call : Box<Call> = Box::new(call);
-					cmds.push(Cmd::Call(call))
+					cmds.push(Cmd::Call(call));
 				}};}
 				match *val.kind {
 					Type::Int  => 
@@ -375,6 +379,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 						},
 					_ => return reg
 				}
+				// XXX CHANGE TO STACK VAL
 				out
 			}
 		},

@@ -4,7 +4,6 @@ use type_check::tclass::*;
 use type_check::pack::*;
 use std::collections::{HashMap/*, HashSet, BTreeMap*/};
 use std::mem;
-//use std::rc::Rc;
 use type_check::regressor::*;
 use preludelib::*;
 

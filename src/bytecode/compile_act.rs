@@ -7,6 +7,7 @@ use bytecode::compile_expr as c_expr;
 
 pub fn compile<'a>(acts : &'a Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd>, loc_funs : &mut Vec<&'a SynFn>) {
 	for a in acts.iter() {
+		//a.print();
 		state.clear_stacks();
 		match a.val {
 			ActVal::Expr(ref e) => {
@@ -23,12 +24,12 @@ pub fn compile<'a>(acts : &'a Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd
 				for (name,tp) in df.outers.iter() {
 					outers.push(state.env.get_loc_var(name, tp))
 				}
-				let mkClos = MakeClos {
+				let mk_clos = MakeClos {
 					func   : fname,
 					to_env : outers,
 					dst    : reg
 				};
-				cmds.push(Cmd::MakeClos(Box::new(mkClos)));
+				cmds.push(Cmd::MakeClos(Box::new(mk_clos)));
 			},
 			ActVal::DVar(ref name, ref tp, ref val) => {
 				let reg = state.env.get_loc_var(name, &**tp);
@@ -110,6 +111,7 @@ pub fn compile<'a>(acts : &'a Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd
 				}
 			},
 			ActVal::Try(ref body, ref ctchs) => {
+				//println!("ACT BEGIN");
 				state.push_trycatch();
 				let ok = state.try_ok_label();
 				compile(body, state,/* gc,*/ cmds, loc_funs);
@@ -118,7 +120,12 @@ pub fn compile<'a>(acts : &'a Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd
 				state.pop_trycatch();
 				let mut ctchs_res = vec![];
 				for c in ctchs.iter() {
-					let id = state.gc.get_exc(&c.epref, &c.ekey);//state.gc.excepts.get(&c.epref, &c.ekey);
+					let id =
+						if c.ekey.len() != 0 {
+							Some(state.gc.get_exc(&c.epref, &c.ekey))
+						} else {
+							None
+						};
 					let mut code = vec![];
 					match c.vname {
 						Some(ref name) => code.push(Cmd::Mov(Reg::Exc,state.env.get_loc_var(name, &c.vtype))),
@@ -133,9 +140,11 @@ pub fn compile<'a>(acts : &'a Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd
 				};
 				cmds.push(Cmd::Catch(ctchs_res, state.try_catch_label()));
 				cmds.push(Cmd::Label(ok));
+				//println!("ACT END");
 			}
 			ActVal::For(_, _, _, _, _) => panic!(),
-			ActVal::Foreach(_, ref vname, ref vtp, ref cont, ref body) => {
+			//ActVal::Foreach(_, ref vname, ref vtp, ref cont, ref body) =>
+			ActVal::Foreach(_, _, _, _, _) => {
 				panic!()
 				/*state.push_loop();
 				let reg  = state.push_this_stack(vtp);
@@ -193,5 +202,5 @@ fn set_last_mov(cmds : &mut Vec<Cmd>, dst : Reg) {
 	}
 	// SETTING OUT
 	let len = cmds.len();
-	cmds[len - 1].set_out(dst)
+	cmds[len - 1].set_out(dst);
 }

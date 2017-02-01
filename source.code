@@ -1,27 +1,21 @@
 exception EInt : int;
 
-/*
-
-fn main() : () {
-	//try {
-		var a = readln() as int;
-		var b = readln() as int;
-		//var c = [1,2,3,4];
-		//c.len();
-		//c.get(2);
-		print((a * b + 1 * 2) as str);
-		//throw EInt 5;
-		//throw NullPtr;
-	//} catch EInt a {
-	//	print("error found")
-	//}
+fn curry(a : int) : Fn(int):int {
+	fn clos(b : int) : int {
+		return a + b;
+	};
+	return clos;
 }
 
-*/
-
 fn main() : () {
-	var a = readln();
-	var b = readln();
-	a.add(b);
-	print(a);
+	try {
+		var a = readln();
+		var b = readln();
+		a.add(b);
+		print(a);
+	} catch EInt a {
+		print(a as str)
+	} catch {
+		print("error exist")
+	}
 }
