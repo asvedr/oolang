@@ -23,7 +23,7 @@ impl Compiler {
 		for e in std.pack.excepts.keys() {
 			//let name = format!("{}_{}", std.full_name(), e);
 			//gc.excepts.add(name);
-			gc.excepts.borrow_mut().add(&std.pack.name, e);
+			gc.excepts./*borrow_mut().*/add(&std.pack.name, e);
 		}
 		Compiler {
 			gc       : gc,

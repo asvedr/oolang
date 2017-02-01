@@ -53,7 +53,11 @@ impl GlobalConf {
 			Some(n) => *n,
 			_ => panic!()
 		}*/
-		self.excepts.borrow().get(pref,name)
+		self.excepts./*borrow().*/get(pref,name)
+	}
+	#[inline(always)]
+	pub fn destroy(self) -> RExcKeys {
+		self.excepts
 	}
 }
 
