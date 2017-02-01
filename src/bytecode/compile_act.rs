@@ -160,6 +160,7 @@ pub fn compile<'a>(acts : &'a Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd
 				state.pop_loop();*/
 			},
 			ActVal::Throw(ref pref, ref name, ref param) => {
+				//state.no_throw = false;
 				let num = state.gc.get_exc(pref, name);
 				let param = match *param {
 					Some(ref val) => Some(c_expr::compile(val, state, cmds)),

@@ -1,5 +1,6 @@
 exception EInt : int;
 
+#NoExcept
 fn curry(a : int) : Fn(int):int {
 	fn clos(b : int) : int {
 		return a + b;

@@ -22,7 +22,8 @@ pub struct State<'a> {
 	pub mod_name     : String,
 	pub pref_for_loc : String, // prefix for local functions
 	pub env          : Env,
-	pub exc_off      : bool,
+	pub exc_off      : bool, // (Manual)FORCE SET ALL EXCEPTIONS OFF
+	//pub no_throw     : bool, // (Calculated)this field will be true after fun check if throw doesn't used in func
 	pub gc           : &'a GlobalConf,
 	catches          : Vec<u8>, // READONLY current stack of catch blocks
 	loops            : Vec<u8>, // READONLY current stack of loops
@@ -63,6 +64,7 @@ impl<'a> State<'a> {
 			stack_r      : 0,
 			stack_v      : 0,
 			lambda_n     : 0,
+			//no_throw     : true,
 			exc_off      : false,
 			catches      : vec![],
 			loops        : vec![],

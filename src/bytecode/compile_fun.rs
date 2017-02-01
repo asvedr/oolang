@@ -17,6 +17,7 @@ pub struct CFun {
 	pub var_i   : u8,
 	pub var_r   : u8,
 	pub var_v   : u8,
+	//pub no_throw: bool,
 	pub body    : Vec<Cmd>
 }
 

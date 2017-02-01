@@ -58,7 +58,6 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 						c_args.push(compile(a, state, cmds));
 					}
 					let f;
-					// XXX
 					let mut is_attr = false;
 					match $fun_v {
 						Ok(v) => {
@@ -90,24 +89,38 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 					if is_attr {
 						cmds.pop(); // pop MOV
 						let mmake = cmds.pop().unwrap(); // pop MethMake
+						let c_block;
+						if *noexc || state.exc_off {
+							c_block = None;
+						} else {
+							c_block = Some(state.try_catch_label());
+							//state.no_throw = false;
+						}
 						match mmake {
 							Cmd::MethMake(obj, mname, _) => {
 								let call = Box::new(Call {
 									func : obj,
 									args : c_args,
 									dst  : dst.clone(),
-									catch_block : if *noexc || state.exc_off {None} else {Some(state.try_catch_label())}
+									catch_block : c_block
 								});
 								cmds.push(Cmd::MethCall(call, mname));
 							},
 							_ => panic!()
 						}
 					} else {
+						let c_block;
+						if *noexc || state.exc_off {
+							c_block = None
+						} else {
+							c_block = Some(state.try_catch_label());
+							//state.no_throw = false;
+						}
 						let call = Box::new(Call {
 							func        : f,
 							args        : c_args,
 							dst         : dst.clone(),
-							catch_block : if *noexc || state.exc_off {None} else {Some(state.try_catch_label())}
+							catch_block : c_block
 						});
 						cmds.push(Cmd::Call(call));
 					}
@@ -271,16 +284,6 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 				}
 			}
 			state.init_class(&c_name, c_args, cmds)
-			/*let call = Cmd::Call(Box::new(Call {
-				func        : Reg::Name(Box::new(c_name)),
-				args        : c_args,
-				dst         : Reg::Temp,
-				catch_block : if state.exc_off {None} else {Some(state.try_catch_label())}
-			}));
-			cmds.push(call);
-			let out = Reg::VStack(state.push_v());
-			cmds.push(Cmd::Mov(Reg::Temp, out.clone()));
-			out*/
 		},
 		EVal::Item(ref arr, ref index) => {
 			let arr_c = compile(arr, state, cmds);
@@ -334,11 +337,18 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 				macro_rules! fun {($fname:expr) => {{
 					let name = format!("_std_{}", $fname);
 					let args = vec![reg];
+					let c_block;
+					if state.exc_off {
+						c_block = None;
+					} else {
+						c_block = Some(state.try_catch_label());
+						//state.no_throw = false;
+					}
 					let call = Call {
 						func        : Reg::Name(Box::new(name)),
 						args        : args,
 						dst         : out.clone(),
-						catch_block : if state.exc_off {None} else {Some(state.try_catch_label())}
+						catch_block : c_block,//if state.exc_off {None} else {}
 					};
 					let call : Box<Call> = Box::new(call);
 					cmds.push(Cmd::Call(call));
