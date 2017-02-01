@@ -17,7 +17,8 @@ use std::io::Read;
 use std::fs::File;
 use syn::*;
 use type_check::checker::*;
-use bytecode::compile_fun;
+use bytecode::compiler::*;
+use preludelib::*;
 
 fn main() {
 	let args = match cmd_args::parse() {
@@ -55,6 +56,11 @@ fn main() {
 					_ => m.print()
 				}
 			}
+			let prelude = Prelude::new();
+			let cmplr = Compiler::new(&prelude, "c_out".to_string());
+			let mod_name = vec!["main".to_string()];
+			let cmod = cmplr.compile_mod(&m, &mod_name);
+			cmod.print();
 			//if m.funs.len() > 0 {
 			//	let cfun = compile_fun::compile(&m.funs[0]);
 			//	cfun.print()

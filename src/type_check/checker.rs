@@ -368,8 +368,14 @@ impl Checker {
 			let cnt = try!(self.check_actions(&mut env, &mut fun.body, false));
 			//fun.outers =
 			let fenv = env.fun_env();
-			for n in fenv.used_outers.iter() {
-				fun.outers.push(n.clone());
+			unsafe {
+				for (n,t) in fenv.outers.iter() {
+					let t = match *t {
+						Ok(ref t) => t.clone(),
+						Err(ref r) => (**r).clone()
+					};
+					fun.outers.insert(n.clone(), t);
+				}
 			}
 			return Ok(cnt)
 		}
@@ -534,7 +540,7 @@ impl Checker {
 						let _self = env.self_val();
 						unk_count += self.check_fn(pack, &mut **df, Some(env), _self)?;
 					}
-					for name in df.outers.iter() {
+					for name in df.outers.keys() {
 						let mut pref = Vec::new();
 						let mut tp = Type::unk();
 						let _ = env.get_var(&mut pref, name, &mut tp, &df.addr);

@@ -5,6 +5,7 @@ use syn::type_sys::*;
 //use lexer::*;
 use syn::reserr::*;
 use std::rc::Rc;
+use std::collections::BTreeMap;
 
 pub struct Arg {
 	pub name  : String,
@@ -24,7 +25,7 @@ pub struct SynFn {
 	pub has_named   : bool,            // does fun has named args
 	pub ftype       : RType,           // Fn(args) -> res
 	// COMPILE TIME
-	pub outers      : Vec<String>,
+	pub outers      : BTreeMap<String,RType>,
 	pub no_except   : bool             // force optimization flag #noexcept
 }
 
@@ -176,7 +177,7 @@ pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 		can_be_clos : can_be_clos,
 		has_named   : has_named,
 		ftype       : ftype,
-		outers      : Vec::new(),
+		outers      : BTreeMap::new(),//Vec::new(),
 		no_except   : false
 	};
 	syn_ok!(res, body.cursor)

@@ -45,7 +45,8 @@ impl Show for CFun {
 	}
 }
 
-pub fn compile(fun : &SynFn, gc : &GlobalConf) -> CFun {
+// TODO check local functions for recursion
+pub fn compile<'a>(fun : &'a SynFn, gc : &GlobalConf, mod_name : &String, pref : &Option<String>, loc_funs : &mut Vec<&'a SynFn>) -> CFun {
 	let mut env = Env{
 		out   : HashMap::new(),
 		args  : HashMap::new(),
@@ -55,11 +56,16 @@ pub fn compile(fun : &SynFn, gc : &GlobalConf) -> CFun {
 	};
 	make_env(fun, &mut env);
 	//let gc = GlobalConf::new(6);
-	let mut state = State::new(env, &gc, "main".to_string());
+	let spref = match *pref {
+		Some(ref p) => p.clone(),
+		_ => mod_name.clone()
+	};
+	let mut state = State::new(env, &gc, mod_name.clone(), spref);
 	state.exc_off = fun.no_except;
 	let mut body = vec![];
 	state.push_trycatch();
-	c_act::compile(&fun.body, &mut state, &mut body);
+	//let mut loc_funs = vec![];
+	c_act::compile(&fun.body, &mut state, &mut body, loc_funs);
 	if body.len() == 0 || match body[body.len() - 1] {Cmd::Ret(_) => false, _ => true} {
 		body.push(Cmd::Ret(Reg::Null))
 	}
@@ -74,7 +80,11 @@ pub fn compile(fun : &SynFn, gc : &GlobalConf) -> CFun {
 	let mut max_v = 0;
 	get_stacks_size(&body, &mut max_i, &mut max_r, &mut max_v);
 	CFun {	
-		name    : format!("{}_{}", state.mod_name, fun.name),
+		name    :
+			match *pref {
+				Some(ref p) => format!("{}_L_{}", p, fun.name),
+				_           => format!("{}_F_{}", mod_name, fun.name)
+			},
 		arg_cnt : fun.args.len() as u8,
 		out_cnt : fun.outers.len() as u8,
 		stack_i : max_i,
@@ -169,8 +179,10 @@ fn make_env(fun : &SynFn, env : &mut Env) {
 	for i in 0 .. fun.args.len() {
 		env.args.insert(fun.args[i].name.clone(), i as u8);
 	}
-	for i in 0 .. fun.outers.len() {
-		env.out.insert(fun.outers[i].clone(), i as u8);
+	let mut i = 0;
+	for n in fun.outers.keys() {
+		env.out.insert(/*fun.outers[i]*/n.clone(), i as u8);
+		i += 1;
 	}
 	fn act(action : &ActF, env : &mut Env) {
 		macro_rules! add {($store:expr, $name:expr) => {

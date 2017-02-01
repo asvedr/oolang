@@ -5,7 +5,7 @@ use bytecode::cmd::*;
 //use bytecode::global_conf::*;
 use bytecode::compile_expr as c_expr;
 
-pub fn compile(acts : &Vec<ActF>, state : &mut State, /*gc : &GlobalConf,*/cmds : &mut Vec<Cmd>) {
+pub fn compile<'a>(acts : &'a Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd>, loc_funs : &mut Vec<&'a SynFn>) {
 	for a in acts.iter() {
 		state.clear_stacks();
 		match a.val {
@@ -15,7 +15,21 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, /*gc : &GlobalConf,*/cmds 
 					set_last_mov(cmds, Reg::Null)
 				}
 			},
-			ActVal::DFun(_) => panic!(),
+			ActVal::DFun(ref df) => {
+				loc_funs.push(df);
+				let fname = format!("{}_L_{}", state.pref_for_loc, df.name);
+				let reg = state.env.get_loc_var(&df.name, &*df.ftype);
+				let mut outers = vec![];
+				for (name,tp) in df.outers.iter() {
+					outers.push(state.env.get_loc_var(name, tp))
+				}
+				let mkClos = MakeClos {
+					func   : fname,
+					to_env : outers,
+					dst    : reg
+				};
+				cmds.push(Cmd::MakeClos(Box::new(mkClos)));
+			},
 			ActVal::DVar(ref name, ref tp, ref val) => {
 				let reg = state.env.get_loc_var(name, &**tp);
 				match *val {
@@ -75,23 +89,21 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, /*gc : &GlobalConf,*/cmds 
 				let res = c_expr::compile(cond, state, cmds);
 				state.clear_stacks();
 				let mut body = vec![];
-				compile(act, state,/* gc,*/ &mut body);
+				compile(act, state,/* gc,*/ &mut body, loc_funs);
 				body.push(Cmd::Goto(state.loop_in_label()));
 				let cmd = Cmd::If(res, body, vec![Cmd::Goto(state.loop_out_label())]);
 				cmds.push(cmd);
 				cmds.push(Cmd::Label(state.loop_out_label()));
 				state.pop_loop();
 			},
-			//ActVal::For(Option<String>,String,Expr,Expr,Vec<Act<DF>>), // for i in range(a + 1, b - 2) {}
-			//ActVal::Foreach(Option<String>,String,RType, Expr,Vec<Act<DF>>),  // for i in array {}
 			ActVal::If(ref cond, ref ok, ref fail) => {
 				let res = c_expr::compile(cond, state, cmds);
 				state.clear_stacks();
 				let mut ok_body = vec![];
-				compile(ok, state,/* gc,*/ &mut ok_body);
+				compile(ok, state,/* gc,*/ &mut ok_body, loc_funs);
 				if fail.len() > 0 {
 					let mut no_body = vec![];
-					compile(fail, state,/* gc,*/ &mut no_body);
+					compile(fail, state,/* gc,*/ &mut no_body, loc_funs);
 					cmds.push(Cmd::If(res, ok_body, no_body));
 				} else {
 					cmds.push(Cmd::If(res, ok_body, vec![]));
@@ -100,7 +112,7 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, /*gc : &GlobalConf,*/cmds 
 			ActVal::Try(ref body, ref ctchs) => {
 				state.push_trycatch();
 				let ok = state.try_ok_label();
-				compile(body, state,/* gc,*/ cmds);
+				compile(body, state,/* gc,*/ cmds, loc_funs);
 				cmds.push(Cmd::Goto(ok.clone()));
 				cmds.push(Cmd::Label(state.try_catch_label()));
 				state.pop_trycatch();
@@ -112,7 +124,7 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, /*gc : &GlobalConf,*/cmds 
 						Some(ref name) => code.push(Cmd::Mov(Reg::Exc,state.env.get_loc_var(name, &c.vtype))),
 						_ => ()
 					}
-					compile(&c.act, state,/* gc,*/ &mut code);
+					compile(&c.act, state,/* gc,*/ &mut code, loc_funs);
 					code.push(Cmd::Goto(ok.clone()));
 					ctchs_res.push(Catch {
 						key  : id,
@@ -123,8 +135,29 @@ pub fn compile(acts : &Vec<ActF>, state : &mut State, /*gc : &GlobalConf,*/cmds 
 				cmds.push(Cmd::Label(ok));
 			}
 			ActVal::For(_, _, _, _, _) => panic!(),
-			ActVal::Foreach(_, _, _, _, _) => panic!(),
-			ActVal::Throw(_, _, _) => panic!()
+			ActVal::Foreach(_, ref vname, ref vtp, ref cont, ref body) => {
+				panic!()
+				/*state.push_loop();
+				let reg  = state.push_this_stack(vtp);
+				let iter = state.push_i();
+				let len  = state.push_i();
+				cmds.push(Cmd::SetI(0, iter));
+				let len_call = Call{
+					func : Reg::Name(Box::new("_std_vec_len".to_string())),
+					args : vec![
+					dst  : 
+					catch_block : if
+				};
+				state.pop_loop();*/
+			},
+			ActVal::Throw(ref pref, ref name, ref param) => {
+				let num = state.gc.get_exc(pref, name);
+				let param = match *param {
+					Some(ref val) => Some(c_expr::compile(val, state, cmds)),
+					_ => None
+				};
+				cmds.push(Cmd::Throw(num, param))
+			}
 		}
 	}
 }

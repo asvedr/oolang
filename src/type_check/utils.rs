@@ -446,7 +446,7 @@ pub fn gen_default_init(has_parent : bool, addr : Cursor) -> Method {
 		can_be_clos : false,
 		has_named   : false,
 		ftype       : t.clone(),
-		outers      : vec![],
+		outers      : BTreeMap::new(),
 		no_except   : false
 	};
 	Method {

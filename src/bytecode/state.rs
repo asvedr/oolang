@@ -19,22 +19,23 @@ pub struct Env {
 
 // virtual machine state for fun-body
 pub struct State<'a> {
-	pub mod_name : String,
-	pub env      : Env,
-	pub exc_off  : bool,
-	pub gc       : &'a GlobalConf,
-	catches   : Vec<u8>, // READONLY current stack of catch blocks
-	loops     : Vec<u8>, // READONLY current stack of loops
+	pub mod_name     : String,
+	pub pref_for_loc : String, // prefix for local functions
+	pub env          : Env,
+	pub exc_off      : bool,
+	pub gc           : &'a GlobalConf,
+	catches          : Vec<u8>, // READONLY current stack of catch blocks
+	loops            : Vec<u8>, // READONLY current stack of loops
 	//pub max_i  : u8,
 	//pub max_r  : u8,
 	//pub max_v  : u8,
-	stack_i   : u8,
-	stack_r   : u8,
-	stack_v   : u8,
-	lambda_n  : usize,  // counter for making names for local funs
-	c_counter : u8, // id generator for catch sections
-	l_counter : u8, // id generator for loop sections
-	init_name : String // for classes
+	stack_i          : u8,
+	stack_r          : u8,
+	stack_v          : u8,
+	lambda_n         : usize,  // counter for making names for local funs
+	c_counter        : u8, // id generator for catch sections
+	l_counter        : u8, // id generator for loop sections
+	init_name        : String // for classes
 }
 
 macro_rules! push {($_self:expr, $st:ident, $mx:ident) => {{
@@ -52,21 +53,22 @@ macro_rules! pop{($_self:expr, $st:ident) => {{
 }};}
 
 impl<'a> State<'a> {
-	pub fn new(e : Env, gc : &'a GlobalConf, mod_name : String) -> State {
+	pub fn new(e : Env, gc : &'a GlobalConf, mod_name : String, pref_for_loc : String) -> State {
 		State{
-			mod_name  : mod_name,
-			gc        : gc,
-			env       : e,
-			stack_i   : 0,
-			stack_r   : 0,
-			stack_v   : 0,
-			lambda_n  : 0,
-			exc_off   : false,
-			catches   : vec![],
-			loops     : vec![],
-			l_counter : 0,
-			c_counter : 0,
-			init_name : "init".to_string()
+			mod_name     : mod_name,
+			pref_for_loc : pref_for_loc,
+			gc           : gc,
+			env          : e,
+			stack_i      : 0,
+			stack_r      : 0,
+			stack_v      : 0,
+			lambda_n     : 0,
+			exc_off      : false,
+			catches      : vec![],
+			loops        : vec![],
+			l_counter    : 0,
+			c_counter    : 0,
+			init_name    : "init".to_string()
 		}
 	}
 	// push_X, pop_X - change value of local stack vars
