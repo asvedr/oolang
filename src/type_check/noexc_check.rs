@@ -67,37 +67,39 @@ pub fn calculate(mdl : &mut SynMod) {
 
 // some ways always returning false because it won't make function NOEXCEPT
 fn replace_to_noex(code : &mut Vec<ActF>, names : &mut Vec<*const String>) -> bool {
+    let mut res = false;
+    let mut force_false = false;
+    macro_rules! replace_expr {($e:expr) => {res = replace_expr($e, names) || res}; }
     for act in code.iter_mut() {
         match act.val {
-			ActVal::Expr(ref mut e) => replace_expr(e, names),
+			ActVal::Expr(ref mut e) => replace_expr!(e),
 			ActVal::DVar(_,_,ref mut oe) =>
                 match *oe {
-                    Some(ref mut e) => replace_expr(e, names),
-                    _ => false
+                    Some(ref mut e) => replace_expr!(e),
+                    _ => ()
                 },
             ActVal::Asg(ref mut a, ref mut b) => {
-                let a = replace_expr(a, names);
-                let b = replace_expr(b, names);
-                a || b;
+                replace_expr!(a);
+                replace_expr!(b);
             },
             ActVal::Ret(ref mut e) =>
                 match *e {
-                    Some(ref e) => replace_expr(e, names),
-                    _ => false
+                    Some(ref e) => replace_expr!(e),
+                    _ => ()
                 },
 	        ActVal::While(_, ref mut e, ref mut a) => {
-                let mut f = replace_expr(e, names);
-                replace_to_noex(a, names) || f
+                replace_expr!(e);
+                res = replace_to_noex(a, names) || res;
             },
 	        ActVal::For(_,_,ref a,ref b,ref c) => {
-                let a = replace_expr(a, names);
-                let b = replace_expr(b, names);
-                replace_to_noex(c, names) || a || b
+                replace_expr!(a);
+                replace_expr!(b);
+                res = replace_to_noex(c, names) || res;
             },
 	        ActVal::Foreach(_,_,_,ref mut c, ref mut a) => {
-                replace_expr(c, names);
-                replace_expr(a, names);
-                false
+                replace_expr!(c);
+                replace_expr!(a);
+                force_false = true
             },
 	        ActVal::If(ref mut e,ref mut a,ref mut b) => {
                 let e = replace_expr(e, names);
@@ -107,16 +109,21 @@ fn replace_to_noex(code : &mut Vec<ActF>, names : &mut Vec<*const String>) -> bo
 	        ActVal::Try(ref mut t, ref mut ctch) => {
                 replace_to_noex(t, names);
                 for c in ctch.iter_mut() {
-                    replace_to_noe(&mut c.act, names);
+                    replace_to_noex(&mut c.act, names);
                 }
-                false
+                force_false = true;
             },
 	        ActVal::Throw(_,_,ref mut e) => {
-                replace_expr(e, names);
-                false
+                replace_expr!(e);
+                force_false = true;
             }
             _ => ()
         }
+    }
+    if force_false {
+        false
+    } else {
+        res
     }
 }
 
@@ -134,7 +141,7 @@ unsafe fn replace_expr(expr : &mut Expr, names : &Vec<*const String>) -> bool {
                         if pref.len() > 0 && pref[0] == "%mod" {
                             let mut found = false;
                             for n in names.iter() {
-                                if **n == name {
+                                if **n == *name {
                                     found = true;
                                     break
                                 }
