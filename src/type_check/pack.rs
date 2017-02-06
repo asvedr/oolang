@@ -69,8 +69,8 @@ macro_rules! find_import {
 
 pub struct Pack {
 	pub name     : Vec<String>,
-	pub packs    : HashMap<String,*const Pack>,  // imports
-	pub out_cls  : HashMap<String,*const Pack>,  // imports *
+	pub packs    : HashMap<String,*const Pack>, // imports
+	pub out_cls  : HashMap<String,*const Pack>, // imports *
 	pub out_fns  : HashMap<String,*const Pack>, // imports *
 	pub out_exc  : HashMap<String,*const Pack>, // imports *
 	pub cls      : HashMap<String,RTClass>,

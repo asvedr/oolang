@@ -1,6 +1,7 @@
 use syn::*;
+use type_check::pack::*;
 
-pub fn calculate(mdl : &mut SynMod) {
+pub fn recalculate(mdl : &mut SynMod, pack : &mut Pack) {
     /*
      * 1 get all local funs of funs and meths
      * 2 check all funs. If found fun that change state to NOEXCEPT then
@@ -49,13 +50,31 @@ pub fn calculate(mdl : &mut SynMod) {
             for_all!(mut, f, {
                 replaced = replaced || replace_to_noex(&mut f.body, &new_free);
             });
-            for link in locals {
-                replace_to_noex(&mut (*link).body, &new_free);
+            for link in locals.iter_mut() {
+                replace_to_noex(&mut (**link).body, &new_free);
+            }
+        }
+        // SAVE TO PACK
+        unsafe {
+            for name in new_free {
+                pack.fns_noex.insert((*name).clone());
             }
         }
         new_free = Vec::new();
     }
     // CHECK METHODS
+    for c in mdl.classes.iter_mut() {
+        for m in c.priv_fn.iter_mut() {
+            if !can_throw_act(&m.func.body) {
+                m.func.no_except = true;
+            }
+        }
+        for m in c.pub_fn.iter_mut() {
+            if !can_throw_act(&m.func.body) {
+                m.func.no_except = true;
+            }
+        }
+    }
     // CHECK LOCALS
     unsafe {
         for f in locals {
@@ -66,7 +85,7 @@ pub fn calculate(mdl : &mut SynMod) {
 }
 
 // some ways always returning false because it won't make function NOEXCEPT
-fn replace_to_noex(code : &mut Vec<ActF>, names : &mut Vec<*const String>) -> bool {
+unsafe fn replace_to_noex(code : &mut Vec<ActF>, names : &Vec<*const String>) -> bool {
     let mut res = false;
     let mut force_false = false;
     macro_rules! replace_expr {($e:expr) => {res = replace_expr($e, names) || res}; }
@@ -84,27 +103,27 @@ fn replace_to_noex(code : &mut Vec<ActF>, names : &mut Vec<*const String>) -> bo
             },
             ActVal::Ret(ref mut e) =>
                 match *e {
-                    Some(ref e) => replace_expr!(e),
+                    Some(ref mut e) => replace_expr!(e),
                     _ => ()
                 },
 	        ActVal::While(_, ref mut e, ref mut a) => {
                 replace_expr!(e);
                 res = replace_to_noex(a, names) || res;
             },
-	        ActVal::For(_,_,ref a,ref b,ref c) => {
+	        ActVal::For(_,_,ref mut a,ref mut b,ref mut c) => {
                 replace_expr!(a);
                 replace_expr!(b);
                 res = replace_to_noex(c, names) || res;
             },
 	        ActVal::Foreach(_,_,_,ref mut c, ref mut a) => {
                 replace_expr!(c);
-                replace_expr!(a);
+                res = replace_to_noex(a, names) || res;
                 force_false = true
             },
 	        ActVal::If(ref mut e,ref mut a,ref mut b) => {
                 let e = replace_expr(e, names);
                 let a = replace_to_noex(a, names);
-                replace_to_noex(b, names) || a || e
+                res = replace_to_noex(b, names) || a || e || res
             },
 	        ActVal::Try(ref mut t, ref mut ctch) => {
                 replace_to_noex(t, names);
@@ -114,7 +133,10 @@ fn replace_to_noex(code : &mut Vec<ActF>, names : &mut Vec<*const String>) -> bo
                 force_false = true;
             },
 	        ActVal::Throw(_,_,ref mut e) => {
-                replace_expr!(e);
+                match *e {
+                    Some(ref mut e) => replace_expr!(e),
+                    _ => ()
+                };
                 force_false = true;
             }
             _ => ()
@@ -128,6 +150,7 @@ fn replace_to_noex(code : &mut Vec<ActF>, names : &mut Vec<*const String>) -> bo
 }
 
 // some ways always returning false because it won't make function NOEXCEPT
+//                     tree to change      new no-exc funcs in mod       is tree changed
 unsafe fn replace_expr(expr : &mut Expr, names : &Vec<*const String>) -> bool {
     match expr.val {
         EVal::Call(_,ref mut fun,ref mut args,ref mut noexc) => {
@@ -153,7 +176,7 @@ unsafe fn replace_expr(expr : &mut Expr, names : &Vec<*const String>) -> bool {
                     },
                     _ => false
                 };
-                *noexc = yes;
+                *noexc = yes; // CHANGING
                 yes
             } else {
                 f
@@ -180,7 +203,7 @@ unsafe fn replace_expr(expr : &mut Expr, names : &Vec<*const String>) -> bool {
             let mut f = false;
             for p in pairs.iter_mut() {
                 let a = replace_expr(&mut p.a, names);
-                f = replace_expr(&mut p.b, names) || f;
+                f = replace_expr(&mut p.b, names) || f || a;
             }
             f
         },
@@ -220,11 +243,11 @@ unsafe fn get_local_funs(code : &mut Vec<ActF>, result : &mut Vec<*mut SynFn>) {
     }
 }
 
-fn can_throw_act(code : &Vec<ActF>, store : &Vec<SynFn>) -> bool {
+fn can_throw_act(code : &Vec<ActF>/*, store : &Vec<SynFn>*/) -> bool {
     let mut res = false;
     macro_rules! can_throw {
-        ($e:expr) => {res = res || can_throw_expr($e, store)};
-        ($a:expr, ACT) => {res = res || can_throw_act($a, store)};
+        ($e:expr) => {res = res || can_throw_expr($e/*, store*/)};
+        ($a:expr, ACT) => {res = res || can_throw_act($a/*, store*/)};
     }
 	for act in code.iter() {
 		match act.val {
@@ -269,8 +292,8 @@ fn can_throw_act(code : &Vec<ActF>, store : &Vec<SynFn>) -> bool {
     return res;
 }
 
-fn can_throw_expr(e : &Expr, store : &Vec<SynFn>) -> bool {
-    macro_rules! rec {($e:expr) => {can_throw_expr($e, store)} }
+fn can_throw_expr(e : &Expr/*, store : &Vec<SynFn>*/) -> bool {
+    macro_rules! rec {($e:expr) => {can_throw_expr($e/*, store*/)} }
 	match e.val {
         EVal::Call(_, ref fun, ref args, ref noexc) => {
             let mut has = rec!(fun);
@@ -297,7 +320,7 @@ fn can_throw_expr(e : &Expr, store : &Vec<SynFn>) -> bool {
             }
             return false;
         },
-        EVal::Attr(ref e,_,_) => true,
+        EVal::Attr(_,_,_) => true,
         EVal::ChangeType(ref e, ref t) => {
             let ech = rec!(e);
             !safe_coerse(&*e.kind, &**t) || ech

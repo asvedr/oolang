@@ -2,6 +2,7 @@ use syn::*;
 use type_check::utils::*;
 use type_check::tclass::*;
 use type_check::pack::*;
+use type_check::noexc_check;
 use std::collections::{HashMap/*, HashSet, BTreeMap*/};
 use std::mem;
 use type_check::regressor::*;
@@ -246,6 +247,8 @@ impl Checker {
 		for f in smod.funs.iter_mut() {
 			self.check_fn(&pack, f, None, None)?;
 		}
+        // AUTOSET #NOEXCEPT FLAG
+        noexc_check::recalculate(smod, &mut pack);
 		ok!()
 	}
 	fn check_class(&self, pack : &Pack, class : &mut Class) -> CheckRes {
@@ -840,7 +843,8 @@ impl Checker {
 									tp = a.clone();
 								}
 								f.kind = type_fn!(vec![tp.clone(), tp], Type::bool());
-								expr.kind = Type::bool()
+								expr.kind = Type::bool();
+                                *noexc = true;
 							} else {
 								throw!(format!("expect {:?}, found {:?}", *a, *b), args[1].addres.clone())
 							}

@@ -8,6 +8,14 @@ fn curry(a : int) : Fn(int):int {
 	return clos;
 }
 
+fn divd(a : int, b : int) : int {
+	if(b == 0){
+		return b;
+	} else {
+		return a / b;
+	}
+}
+
 fn main() : () {
 	try {
 		var a = readln();
