@@ -16,7 +16,7 @@ static void destructor(void *data) {
 	free(s);
 }
 
-void strNew(Var* _,FunRes* res, Var vsize) {
+void strNew(Var* _ , Var vsize) {
 	Str *str = malloc(sizeof(Str));
 	int size = VINT(vsize);
 	str -> size = size;
@@ -28,10 +28,10 @@ void strNew(Var* _,FunRes* res, Var vsize) {
 		str -> data[i] = '\0';
 	Var var;
 	NEWOBJ(var, (void*)str, destructor);
-	RETURN(res, var);
+	RETURN(var);
 }
 
-void strFromRaw(Var* _,FunRes* res, char* seq, int size) {
+void strFromRaw(Var* _ , char* seq, int size) {
 	Str *str = malloc(sizeof(Str));
 	str -> size = size;
 	if(size == 0)
@@ -42,10 +42,10 @@ void strFromRaw(Var* _,FunRes* res, char* seq, int size) {
 		str -> data[i] = seq[i];
 	Var var;
 	NEWOBJ(var, (void*)str, destructor);
-	RETURN(res, var);
+	RETURN(var);
 }
 
-void strFromCStr(Var* _,FunRes* res, char* seq) {
+void strFromCStr(Var* _, char* seq) {
 	int size = strlen(seq);
 	Str *str = malloc(sizeof(Str));
 	str -> size = size;
@@ -57,7 +57,7 @@ void strFromCStr(Var* _,FunRes* res, char* seq) {
 		str -> data[i] = seq[i];
 	Var var;
 	NEWOBJ(var, (void*)str, destructor);
-	RETURN(res, var);
+	RETURN(var);
 }
 
 #ifdef DEBUG
@@ -73,19 +73,17 @@ void strPrint(Var s) {
 }
 #endif
 
-void strLen(Var* self,FunRes* res/*, Var v*/) {
+void strLen(Var* self /*, Var v*/) {
 	Var out;
-	//CHECKNULL(res, v);
 	NEWINT(out, ((Str*)VAL(*self)) -> size);
-	RETURN(res, out);
+	RETURN(out);
 }
 
-void strResize(Var* self,FunRes* res, /*Var s,*/Var sz) {
-	//CHECKNULL(res, s);
+void strResize(Var* self , /*Var s,*/Var sz) {
 	Str* str = (Str*)VAL(*self);
 	int size = VINT(sz);
 	if(size < 0)
-		THROW(res, INDEXERR);
+		THROW(INDEXERR);
 	if(str -> size < size) {
 		// JUST ADD NULLS
 		str -> data = realloc(str -> data, sizeof(char) * size);
@@ -95,41 +93,38 @@ void strResize(Var* self,FunRes* res, /*Var s,*/Var sz) {
 		// RESIZE
 		str -> data = realloc(str -> data, sizeof(Var) * size);
 	}
-	RETURNNULL(res);
+	RETURNNULL;
 }
 
-void strGet(Var* self,FunRes* res, /*Var s,*/ Var ind) {
+void strGet(Var* self , /*Var s,*/ Var ind) {
 	// TODO: CHECK OUT THROW
-	//CHECKNULL(res, s);
 	Str* str = (Str*)VAL(*self);
 	int index = VINT(ind);
 	if(index < 0 || index >= str -> size)
-		THROW(res, INDEXERR);
+		THROW( INDEXERR);
 	Var out;
 	NEWINT(out, str -> data[index]);
-	RETURN(res, out);
+	RETURN( out);
 }
 
-void strPut(Var* self,FunRes* res, /*Var s,*/ Var ind, Var val) {
+void strPut(Var* self , /*Var s,*/ Var ind, Var val) {
 	// TODO: CHECK OUT THROW
-	//CHECKNULL(res, s);
 	Str* str = (Str*)VAL(*self);
 	int index = VINT(ind);
 	if(index < 0 || index >= str -> size)
-		THROW(res, INDEXERR);
+		THROW( INDEXERR);
 	str -> data[index] = (char)VINT(val);
-	RETURNNULL(res);
+	RETURNNULL
 }
 
-void strSub(Var* self,FunRes* res, /*Var s,*/ Var vfrom, Var vto) {
+void strSub(Var* self , /*Var s,*/ Var vfrom, Var vto) {
 	// TODO: CHECK OUT THROW
-	//CHECKNULL(res, s);
 	Str* str = (Str*)VAL(*self);
 	int from = VINT(vfrom);
 	int to = VINT(vto);
 	int size = to - from;
 	if(from < 0 || from >= str -> size || to < from || to > str -> size)
-		THROW(res, INDEXERR);
+		THROW( INDEXERR);
 	Str* out = malloc(sizeof(Str));
 	out -> size = size;
 	if(size == 0)
@@ -141,12 +136,11 @@ void strSub(Var* self,FunRes* res, /*Var s,*/ Var vfrom, Var vto) {
 	
 	Var outv;
 	NEWOBJ(outv, out, destructor);
-	RETURN(res, outv);
+	RETURN( outv);
 }
 
-void strConc(Var* self,FunRes* res, /*Var a,*/ Var b) {
-	//CHECKNULL(res, a);
-	CHECKNULL(res, b);
+void strConc(Var* self , /*Var a,*/ Var b) {
+	CHECKNULL( b);
 	Str* str = (Str*)VAL(*self);
 	Str* add = (Str*)VAL(b);
 	int pt = str -> size;
@@ -155,5 +149,5 @@ void strConc(Var* self,FunRes* res, /*Var a,*/ Var b) {
 	for(int i=0; i<add -> size; ++i) {
 		str -> data[pt + i] = add -> data[i];
 	}
-	RETURNNULL(res);
+	RETURNNULL
 }

@@ -9,17 +9,17 @@ typedef struct {
 	int size;
 } Str;
 
-void strNew(Var*,FunRes*,Var);
-void strFromRaw(Var*,FunRes*,char*,int);
-void strFromCStr(Var*,FunRes*,char*);
+void strNew(Var*,Var);
+void strFromRaw(Var*,char*,int);
+void strFromCStr(Var*,char*);
 #ifdef DEBUG
 void strPrint(Var);
 #endif
-void strLen(Var*,FunRes* /*,Var*/);
-void strResize(Var*,FunRes* /*,Var*/,Var);
-void strGet(Var*,FunRes* /*,Var*/,Var); 
-void strPut(Var*,FunRes* /*,Var*/,Var,Var);
-void strSub(Var*,FunRes* /*,Var*/,Var,Var);
-void strConc(Var*,FunRes* /*,Var*/,Var);
+void strLen(Var*);
+void strResize(Var*,Var);
+void strGet(Var*,Var); 
+void strPut(Var*,Var,Var);
+void strSub(Var*,Var,Var);
+void strConc(Var*,Var);
 
 #endif

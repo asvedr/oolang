@@ -9,12 +9,12 @@ typedef struct {
 	int size;
 } Vector;
 
-void vectorNew(Var*,FunRes*,Var);
-void vectorResize(Var*,FunRes*,/*Var,*/Var);
-void vectorLen(Var*,FunRes* /*,Var*/);
-void vectorPush(Var*,FunRes* /*,Var*/,Var);
-void vectorPop(Var*,FunRes* /*,Var*/);
-void vectorGet(Var*,FunRes* /*,Var*/,Var); 
-void vectorPut(Var*,FunRes* /*,Var*/,Var,Var);
+void vectorNew(Var*,Var);
+void vectorResize(Var*,/*Var,*/Var);
+void vectorLen(Var* /*,Var*/);
+void vectorPush(Var* /*,Var*/,Var);
+void vectorPop(Var* /*,Var*/);
+void vectorGet(Var* /*,Var*/,Var); 
+void vectorPut(Var* /*,Var*/,Var,Var);
 
 #endif

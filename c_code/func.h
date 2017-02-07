@@ -21,8 +21,20 @@ typedef struct {
 #define NEWFRES(name) FunRes name; NEWINT(name.val, 0); name -> errKey = 0;
 #define CHECKNULL(ptr, _val) if(!_val.obj) THROW(ptr, NULLPTRERR)
 */
+// WARNING!!!
+// ON RETURN
+// linkcounter in value DOES NOT INCED when value moved in _reg_result
+// AND DOES NOT DECED when value moved from _reg_result
+// ON THROW USED REGULAR MACROS "ASSIGN"
+
+#define RETURNNULL {_reg_err_key = 0; return;}
+#define THROWP(code,val) {_reg_err_key = code; ASSIGN(_reg_exc_val, val); return;}
+#define THROW(code) {_reg_err_key = code; return;}
+#define RETURN(a) {_reg_err_key = 0; _reg_result = (a); return;}
+#define CHECKNULL(_val) if(!_val.obj) THROW(NULLPTRERR)
 
 extern unsigned int _reg_err_key;
+extern Var _reg_exc_val;
 extern Var _reg_result;
 void initFRegs();
 //extern int _i_result;
@@ -45,13 +57,13 @@ void initFRegs();
 */
 
 //                   env,   res,  args ...
-typedef void(*CFun0)(Var*,/*FunRes* */);
-typedef void(*CFun1)(Var*,/*FunRes* */,Var);
-typedef void(*CFun2)(Var*,/*FunRes* */,Var,Var);
-typedef void(*CFun3)(Var*,/*FunRes* */,Var,Var,Var);
-typedef void(*CFun4)(Var*,/*FunRes* */,Var,Var,Var,Var);
-typedef void(*CFun5)(Var*,/*FunRes* */,Var,Var,Var,Var,Var);
-typedef void(*CFunM)(Var*,/*FunRes* */,...);
+typedef void(*CFun0)(Var* /*FunRes* */);
+typedef void(*CFun1)(Var*,/*FunRes*,*/Var);
+typedef void(*CFun2)(Var*,/*FunRes*,*/Var,Var);
+typedef void(*CFun3)(Var*,/*FunRes*,*/Var,Var,Var);
+typedef void(*CFun4)(Var*,/*FunRes*,*/Var,Var,Var,Var);
+typedef void(*CFun5)(Var*,/*FunRes*,*/Var,Var,Var,Var,Var);
+typedef void(*CFunM)(Var*,/*FunRes*,*/...);
 
 typedef struct {
 	Var  *env; // environment of func. array of vars. can be NULL

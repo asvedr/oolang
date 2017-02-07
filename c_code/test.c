@@ -54,25 +54,6 @@ int main() {
 }
 */
 
-#include <setjmp.h>
-
-jmp_buf LABEL;
-
-void throw() {
-	longjmp(LABEL, 1);
-}
-
-void tryCatch0() {
-	if(setjmp(LABEL) == 0) {
-		print("IN TRY\n");
-		throw();
-		printf("CAN'T SEE ME\n");
-	} else {
-		// CATCH
-	}
-
-}
-
 int main() {
 	return 0;
 }

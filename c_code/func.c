@@ -3,10 +3,12 @@
 
 unsigned int _reg_err_key;
 Var _reg_result;
+Var _reg_exc_val;
 
 void initFRegs() {
 	_reg_err_key = 0;
 	NEWINT(_reg_result, 0);
+	NEWINT(_reg_exc_val, 0);
 }
 
 static void destructorClos(void *link) {
