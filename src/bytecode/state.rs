@@ -178,11 +178,12 @@ impl<'a> State<'a> {
 		}
 	}
 	pub fn break_label(&self, skip : usize) -> String {
-		//let n = self.loops[self.loops.len() - skip];
-		match self.loops.last() {
-			Some(n) => format!("LOOP_END{}", n),
-			_ => panic!("break label")
-		}
+		let n = self.loops[self.loops.len() - skip];
+        format!("LOOP_END{}", n)
+		//match self.loops.last() {
+		//	Some(n) => format!("LOOP_END{}", n),
+		//	_ => panic!("break label")
+		//}
 	}
 	// out in Reg::Temp
 	pub fn call_method(&mut self, cname : &String, mname : &String, obj : Reg, args : Vec<Reg>, out : &mut Vec<Cmd>) {
