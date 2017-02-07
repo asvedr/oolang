@@ -71,10 +71,10 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
                 match call.catch_block {
                     Some(ref label) => {
                         write!(out, "if (_reg_err_key) goto {};\n{}else ", label, tab)?;
-                        set(&call.dst, &reg_res);
+                        set_res(&call.dst, &reg_res, out);
                     },
                     _ => {
-                        set(&call.dst, &reg_res);
+                        set_res(&call.dst, &reg_res, out);
                     }
                 }
             },
@@ -85,8 +85,18 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
                     write!(out, "{} = {}", reg(r), val)?
                 }
             },
-	        SetR(f64,Reg),
-    	    SetS(String,Reg),
+	        Cmd::SetR(ref val, ref r) => {
+                if reg.is_var() {
+                    write!(out, "DECVAL({});\n{}NEWREAL({},{})", reg(r), tab, reg(r), val)?
+                } else {
+                    write!(out, "{} = {}", reg(r), val)?
+                }
+            },
+    	    Cmd::SetS(ref s, ref r) => {
+                write!(out, "_std_str_fromRaw({}, {});\n", s, s.len())?;
+                write!(out, "{}", space)?;
+                set_res(r, &reg_res)?
+            },
     	    WithItem(Box<WithItem>),
         	MethMake(Reg,Reg,Reg),
 	        MethCall(Box<Call>, Reg),
@@ -95,13 +105,30 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
     	    SetProp(Reg,usize,Reg),
     	    Conv(Reg,Convert,Reg),
         	NewObj(usize,usize,Reg),
-	        Throw(usize,Option<Reg>),
-        	Ret(Reg),
-	        Goto(String),
+	        Cmd::Throw(ref code, ref arg, ref lab) =>
+                match *arg {
+                    Some(ref val) => {
+                        write!("THROWP_NORET({},{})", code, reg(val))?;
+                        write!(";\n{}goto {}", space, lab)?;
+                    },
+                    _ => {
+                        write!("THROW_NORET({})", code)?;
+                        write!(";\n{}goto {}", space, lab);
+                    }
+                },
+        	Cmd::Ret(ref val) =>
+                match *val {
+                    Some(ref v) => {
+                        set_res(&reg_res, v)?;
+                        write!(";\n{}RETURNJUST", space)?
+                    },
+                    _ => write!(out, "RETURNNULL")?
+                },
+	        Cmd::Goto(ref lab) => write!("goto {}", lab)?,
     	    If(Reg,Vec<Cmd>,Vec<Cmd>),
-    	    ReRaise => write!(out, "return;")?,
-        	Noop => (),
-	        Label(String),
+    	    Cmd::ReRaise => write!(out, "return;")?,
+        	Cmd::Noop => (),
+	        Cmd::Label(ref lab) => write!("{}:", lab)?,
         	Catch(Vec<Catch>,String)
         }
         write!(out, ";\n")?;
@@ -131,6 +158,32 @@ fn set(dst : &Reg, src : &Reg, out : &mut File) -> io::Result<()> {
             put!("NEWREAL({}, {})")
         } else { // VAR <= VAR
             put!("ASSIGN({}, {})")
+        }
+    }
+}
+
+// mov without changing ref-counter
+fn set_res(dst : &Reg, src : &Reg, out : &mut File) -> io::Result<()> {
+    macro_rules! put {($tmpl:expr) => ( write!(out, $tmpl, reg(dst), reg(src)) );}
+    if dst.is_int() {
+        if src.is_int() {
+            put!("{} = {}")
+        } else { // INT <= VAR
+            put!("{} = VINT({})")
+        }
+    } else if dst.is_real() {
+        if src.is_real() {
+            put!("{} = {}")
+        } else { // REAL <= VAR
+            put!("{} = VREAL({})")
+        }
+    } else { // VAR
+        if src.is_int() {
+            put!("NEWINT({}, {})")
+        } else if src.is_real() {
+            put!("NEWREAL({}, {})")
+        } else { // VAR <= VAR
+            put!("{} = {}")
         }
     }
 }

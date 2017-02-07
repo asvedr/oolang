@@ -26,7 +26,7 @@ pub enum Cmd {
 	//NewCls(Box<NewCls>),
 	NewObj(usize,usize,Reg), // NewObj(prop_count, virt_count, out)
 
-	Throw(usize,Option<Reg>), // try optimize it: if catch in this function, just use simple goto
+	Throw(usize,Option<Reg>,String), // try optimize it: if catch in this function, just use simple goto
 	Ret(Reg),
 	Goto(String), // used by break, loops, try-catch
 	If(Reg,Vec<Cmd>,Vec<Cmd>),
@@ -135,7 +135,7 @@ impl Cmd {
 	        Cmd::Prop(ref a, _, _) => Some(a),
 	        Cmd::SetProp(_, _, ref a) => Some(a),
 	        Cmd::Conv(ref a,_,_) => Some(a),
-	        Cmd::Throw(_, ref a) =>
+	        Cmd::Throw(_, ref a, _) =>
                 match *a {
                     Some(ref r) => Some(r),
                     _ => None
@@ -160,7 +160,7 @@ impl Cmd {
 	        Cmd::Prop(ref mut a, _, _) => *a = val,
 	        Cmd::SetProp(_, _, ref mut a) => *a = val,
 	        Cmd::Conv(ref mut a,_,_) => *a = val,
-	        Cmd::Throw(_, ref mut a) =>
+	        Cmd::Throw(_, ref mut a, _) =>
                 match *a {
                     Some(ref mut r) => *r = val,
                     _ => panic!("CMD has no in-slot")
@@ -261,7 +261,7 @@ impl Show for Cmd {
 			//Cmd::NewCls(ref cls) => vec![format!("{}{:?}", tab, cls)],
 			Cmd::NewObj(ref cnt, ref virt, ref out) =>
 				vec![format!("{}NEW OBJ {} {} => {:?}", tab, cnt, virt, out)],
-			Cmd::Throw(ref n, ref v) => vec![format!("{}THROW {:?} {:?}", tab, n, v)],
+			Cmd::Throw(ref n, ref v, ref lab) => vec![format!("{}THROW {:?} {:?} '{}'", tab, n, v, lab)],
 			Cmd::Ret(ref val) => vec![format!("{}RETURN {:?}", tab, val)],
 			Cmd::Goto(ref lab) => vec![format!("{}GOTO {}", tab, lab)],
 			Cmd::Label(ref lab) => vec![format!("{}LABEL {}", tab, lab)], 

@@ -166,7 +166,8 @@ pub fn compile<'a>(acts : &'a Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd
 					Some(ref val) => Some(c_expr::compile(val, state, cmds)),
 					_ => None
 				};
-				cmds.push(Cmd::Throw(num, param))
+                let lab = state.try_catch_label();
+				cmds.push(Cmd::Throw(num, param, lab))
 			}
 		}
 	}
