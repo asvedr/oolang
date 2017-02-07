@@ -1,3 +1,4 @@
+/*
 exception EInt : int;
 
 #NoExcept
@@ -7,24 +8,18 @@ fn curry(a : int) : Fn(int):int {
 	};
 	return clos;
 }
-
-fn divd(a : int, b : int) : int {
-	if(b == 0){
-		return b;
-	} else {
-		return a / b;
-	}
-}
+*/
 
 fn main() : () {
-	try {
+//	try {
 		var a = readln();
 		var b = readln();
-		a.add(b);
-		print(a);
-	} catch EInt a {
-		print(a as str)
-	} catch {
-		print("error exist")
-	}
+		print((a.len() + b.len()) as str);
+		//a.add(b);
+		//print(a);
+//	} catch EInt a {
+//		print(a as str)
+//	} catch {
+//		print("error exist")
+//	}
 }

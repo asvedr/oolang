@@ -1,0 +1,16 @@
+defining exception:
+
+	exception EInt : int;   // define exception with name 'EInt' with param of int
+	exception EFlag : void; // define exception without params
+
+try-catch:
+
+	try {
+		...
+	} catch EInt a { // catching exception. param puts in var 'a'
+		...
+	} catch EInt { // catch exception, ignore param
+		...
+	} catch { // catch any exception
+		...
+	}

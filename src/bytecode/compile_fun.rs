@@ -132,48 +132,57 @@ fn get_stacks_size(cmds : &Vec<Cmd>, si : &mut u8, sr : &mut u8, sv : &mut u8) {
 	}
 }
 
+// removing unused 'mov' instruction
 fn optimize_movs(code : &mut Vec<Cmd>) {
-	let mut i = 0;
-	let mut used = Vec::new();
-	while i < code.len() {
-		if i == 0 {
-			i += 1;
-			continue
-		}
-		let ismov = match code[i] {Cmd::Mov(_,_) => true, _ => false};
-		if ismov {
-			unsafe {
-				let replace_by : Option<Reg> = match code[i].get_out() {
-					Some(r) => {
-						if r.is_int() || r.is_real() {
-							Some(r.clone())
-						} else {
-							code[i-1].regs_in_use(&mut used);
-							let mut cross = false;
-							for ru in used.iter() {
-								cross = cross || **ru == *r;
-							}
-							if !cross {
-								Some(r.clone())
-							} else {
-								None
-							}
-						}
-					},
-					_ => None
-				};
-				match replace_by {
-					Some(r) => {
-						code[i-1].set_out(r);
-						code.remove(i);
-					},
-					_ => i += 1
-				}
-			}
-		} else {
-			i += 1;
-		}
-	}
+    let mut i = 0;
+    while i < code.len() {
+        let r_out = match code[i].get_out() {
+            Some(r) =>
+                // CANT CUT VAR ASSIGMENT
+                if r.is_var() {
+                    i += 1;
+                    continue;
+                } else {
+                    r.clone()
+                },
+            _ => {
+                i += 1;
+                continue
+            }
+        };
+        let j = i + 1;
+        while j < code.len() {
+            if code[j].is_mov() && *code[j].mov_in() == r_out {
+                let allow_skip = {
+                    let reg = code[j].mov_out();
+                    reg.is_int() || reg.is_real() || !code[i].reg_in_use(reg)
+                };
+                if allow_skip {
+                    // IF ALLOW THEN DROP
+                    let cmd = code.remove(j);
+                    code[i].set_out(cmd.mov_out().clone());
+                    // AND NEXT LOOP ITERATION
+                } else {
+                    break;
+                }
+            } else {
+                break
+            }
+        }
+        if code[i].is_mov() && i + 1 < code.len() {
+            let can_rem = match code[i+1].get_in() {
+                Some(r) => r == code[i].mov_out(),
+                _ => false
+            };
+            if can_rem {
+                let reg = code[i].mov_in().clone();
+                code[i+1].set_in(reg);
+                code.remove(i);
+            }
+        } else {
+            i += 1;
+        }
+    }
 }
 
 fn make_env(fun : &SynFn, env : &mut Env) {

@@ -39,9 +39,30 @@ pub enum Cmd {
 }
 
 impl Cmd {
-	pub unsafe fn regs_in_use(&self, store : &mut Vec<*const Reg>) {
-		store.clear();
-		macro_rules! add {($e:expr) => {store.push(&$e)}; }
+    pub fn is_mov(&self) -> bool {
+        match *self {
+            Cmd::Mov(_,_) => true,
+            _ => false
+        }
+    }
+    // WARNING can panic
+    pub fn mov_in(&self) -> &Reg {
+        match *self {
+            Cmd::Mov(ref a, _) => a,
+            _ => panic!()
+        }
+    }
+    // WARNING can panic
+    pub fn mov_out(&self) -> &Reg {
+        match *self {
+            Cmd::Mov(_, ref a) => a,
+            _ => panic!()
+        }
+    }
+	pub fn reg_in_use(&self, reg : &Reg/*store : &mut Vec<*const Reg>*/) -> bool {
+		//store.clear();
+		//macro_rules! add {($e:expr) => {store.push(&$e)}; }
+        macro_rules! add {($e:expr) => {if $e == *reg {return true}}; }
 		match *self {
 			Cmd::NewObj(_,_,ref a) => add!(*a),
 			Cmd::Mov(ref a, _) => add!(*a),
@@ -94,7 +115,61 @@ impl Cmd {
 			Cmd::Ret(ref val) => add!(*val),
 			_ => ()
 		}
+        return false;
 	}
+    pub fn get_in(&self) -> Option<&Reg> {
+        match *self {
+	        Cmd::Mov(ref a, _) => Some(a),
+	        //Cmd::IOp(Box<Opr>),
+	        //Cmd::ROp(Box<Opr>), // real operation
+	        //Cmd::VOp(Box<Opr>), // oper for object
+	        Cmd::Call(ref c) => Some(&c.func),
+	        Cmd::WithItem(ref i) =>
+                if !i.is_get {
+                    Some(&i.value)
+                } else {
+                    None
+                },
+	        Cmd::MethMake(_, ref a, _) => Some(a),
+	        Cmd::MethCall(_, ref a) => Some(a),
+	        Cmd::Prop(ref a, _, _) => Some(a),
+	        Cmd::SetProp(_, _, ref a) => Some(a),
+	        Cmd::Conv(ref a,_,_) => Some(a),
+	        Cmd::Throw(_, ref a) =>
+                match *a {
+                    Some(ref r) => Some(r),
+                    _ => None
+                },
+	        Cmd::Ret(ref a) => Some(a),
+	        Cmd::If(ref a, _, _) => Some(a),
+            _ => None
+        }
+    }
+    pub fn set_in(&mut self, val : Reg) {
+        match *self {
+	        Cmd::Mov(ref mut a, _) => *a = val,
+	        Cmd::Call(ref mut c) => c.func = val,
+	        Cmd::WithItem(ref mut i) =>
+                if !i.is_get {
+                    i.value = val
+                } else {
+                    panic!("CMD has no in-slot")
+                },
+	        Cmd::MethMake(_, ref mut a, _) => *a = val,
+	        Cmd::MethCall(_, ref mut a) => *a = val,
+	        Cmd::Prop(ref mut a, _, _) => *a = val,
+	        Cmd::SetProp(_, _, ref mut a) => *a = val,
+	        Cmd::Conv(ref mut a,_,_) => *a = val,
+	        Cmd::Throw(_, ref mut a) =>
+                match *a {
+                    Some(ref mut r) => *r = val,
+                    _ => panic!("CMD has no in-slot")
+                },
+	        Cmd::Ret(ref mut a) => *a = val,
+	        Cmd::If(ref mut a, _, _) => *a = val,
+            _ => panic!("CMD has no in-slot")
+        }
+    }
 	pub fn get_out(&self) -> Option<&Reg> {
 		match *self {
 			Cmd::NewObj(_,_,ref a) => Some(a),
@@ -134,13 +209,15 @@ impl Cmd {
 			Cmd::WithItem(ref mut i) =>
 				if i.is_get {
 					i.value = out
-				},
+				} else {
+                    panic!("CMD has no out-slot")
+                },
 			Cmd::MethMake(_,_,ref mut a) => *a = out,
 			Cmd::MethCall(ref mut a, _) => a.dst = out,
 			Cmd::MakeClos(ref mut c) => c.dst = out,
 			Cmd::Prop(_,_,ref mut a) => *a = out,
 			Cmd::Conv(_,_,ref mut a) => *a = out,
-			_ => ()
+			_ => panic!("CMD has no out-slot")
 		}
 	}
 }

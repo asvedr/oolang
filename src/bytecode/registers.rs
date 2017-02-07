@@ -42,4 +42,10 @@ impl Reg {
 			_ => false
 		}
 	}
+    pub fn is_name(&self) -> bool {
+        match *self {
+            Reg::Name(_) => true,
+            _ => false
+        }
+    }
 }
