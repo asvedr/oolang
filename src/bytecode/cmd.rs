@@ -7,7 +7,7 @@ pub enum Cmd {
 	Mov(Reg,Reg),
 	IOp(Box<Opr>), // int operation
 	ROp(Box<Opr>), // real operation
-	VOp(Box<Opr>), // oper for object
+	VOp(Box<Opr>), // oper for object. type: (Obj,Obj) -> int
 	Call(Box<Call>),
 	SetI(isize,Reg),
 	SetR(f64,Reg),

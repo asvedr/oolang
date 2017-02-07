@@ -1,7 +1,15 @@
 #include <stdlib.h>
 #include "func.h"
 
-void destructorClos(void *link) {
+unsigned int _reg_err_key;
+Var _reg_result;
+
+void initFRegs() {
+	_reg_err_key = 0;
+	NEWINT(_reg_result, 0);
+}
+
+static void destructorClos(void *link) {
 	Closure* clos = (Closure*)link;
 	for(int i=0; i<clos -> envSize; ++i) {
 		DECLINK(clos -> env[i]);
@@ -10,7 +18,7 @@ void destructorClos(void *link) {
 	free(clos);
 }
 
-void destructorMeth(void *link) {
+static void destructorMeth(void *link) {
 	Closure* clos = (Closure*)link;
 	DECLINK(clos -> env[0]);
 	free(clos -> env);

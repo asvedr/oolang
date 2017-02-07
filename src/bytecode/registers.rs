@@ -15,6 +15,8 @@ pub enum Reg {
 	Exc,        // exception value
 	Null,       // no value
 	Name(Box<String>) // getting global symbol
+
+    Res
 }
 
 impl Reg {
