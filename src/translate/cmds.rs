@@ -231,14 +231,34 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
     	    Cmd::SetProp(ref obj, ref ind, ref val) => {
                 let dst = format!("((Object*)VAL({})) -> props[{}]", reg(obj), ind);
                 if val.is_int() {
-                    write!(out, "VINT({}) = {}", dst, reg(val))?;
+                    write!(out, "VINT({}) = {}", dst, get_i(val))?;
                 } else if val.is_real() {
-                    write!(out, "VREAL({}) = {}", dst, reg(val))?;
+                    write!(out, "VREAL({}) = {}", dst, get_r(val))?;
                 } else {
                     write!(out, "ASG({},{})", dst, reg(val))?;
                 }
             },
-    	    Conv(Reg,Convert,Reg),
+    	    Cmd::Conv(ref src, ref kind, ref dst) =>
+                match *kind {
+                    Convert::I2R =>
+                        if dst.is_real() {
+                            write!(out, "{} = (double){}", reg(dst), get_i(src))?;
+                        } else {
+                            write!(out, "NEWREAL({},(double)({}))", reg(dst), get_i(src))?;
+                        },
+                    Convert::I2B =>
+                        if dst.is_int() {
+                            write!(out, "{} = ({}) != 0", reg(dst), get_i(src))?;
+                        } else {
+                            write!(out, "NEWINT({}, (({}) != 0))", reg(dst), get_i(src))?;
+                        },
+                    Convert::R2I =>
+                        if dst.is_int() {
+                            write!(out, "{} = (int){}", reg(dst), get_r(src))?;
+                        } else {
+                            write!(out, "NEWINT({},(double)({}))", reg(dst), get_r(src))?;
+                        }
+                },
         	NewObj(usize,usize,Reg),
 	        Cmd::Throw(ref code, ref arg, ref lab) =>
                 match *arg {
@@ -289,6 +309,22 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
         }
         stack[0].pos += 1;
         write!(out, ";\n")?;
+    }
+}
+
+fn get_i(r : &Reg) -> String {
+    if r.is_int() {
+        reg(r)
+    } else {
+        format!("VINT({})", reg(r))
+    }
+}
+
+fn get_r(r : &Reg) -> String {
+    if r.is_real() {
+        reg(r)
+    } else {
+        format!("VREAL({})", reg(r))
     }
 }
 
