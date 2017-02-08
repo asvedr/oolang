@@ -52,10 +52,20 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
 			}
 		},
 		EVal::Call(_, ref fun, ref args, ref noexc) => {
+            // regular_expr USED FOR ALL VARIANTS EXCLUDE %opr
 			macro_rules! regular_expr {($fun_v:expr) => {{
 					let mut c_args = vec![];
 					for a in args.iter() {
-						c_args.push(compile(a, state, cmds));
+                        // COMPILE ARG VAL
+                        let val_reg = compile(a, state, cmds);
+                        // PREPARE VALUE (CAN USE ONLY VARS, NOT PRIMS)
+                        if val_reg.is_int() || val_reg.is_real() {
+                            let arg_reg = Reg::VStack(state.push_v());
+                            cmds.push(Cmd::Mov(val_reg, arg_reg));
+                            c_args.push(arg_reg);
+                        } else {
+						    c_args.push(val_reg);
+                        }
 					}
 					let f;
 					let mut is_attr = false;

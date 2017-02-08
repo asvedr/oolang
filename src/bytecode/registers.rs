@@ -32,6 +32,12 @@ impl Reg {
 			_ => false
 		}
 	}
+    pub fn is_obj(&self) -> bool {
+        match *self {
+            Reg::Var(_)|Reg::VStack(_)|Reg::Arg(_)|Reg::Env(_)|Reg::Temp|Reg::Exc|Reg::Res|Reg::RSelf => true,
+            _ => false
+        }
+    }
 	pub fn is_stack(&self) -> bool {
 		match *self {
 			Reg::IStack(_)|Reg::RStack(_)|Reg::VStack(_) => true,
@@ -47,6 +53,12 @@ impl Reg {
     pub fn is_name(&self) -> bool {
         match *self {
             Reg::Name(_) => true,
+            _ => false
+        }
+    }
+    pub fn is_null(&self) -> bool {
+        match *self {
+            Reg::Null => true,
             _ => false
         }
     }
