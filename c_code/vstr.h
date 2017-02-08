@@ -9,9 +9,9 @@ typedef struct {
 	int size;
 } Str;
 
-void strNew(Var*,Var);
-void strFromRaw(Var*,char*,int);
-void strFromCStr(Var*,char*);
+void _std_str_new(Var*,Var);
+void _std_str_fromRaw(Var*,char*,int);
+void _std_str_fromCStr(Var*,char*);
 #ifdef DEBUG
 void strPrint(Var);
 #endif

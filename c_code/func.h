@@ -28,8 +28,11 @@ typedef struct {
 // ON THROW USED REGULAR MACROS "ASSIGN"
 
 #define RETURNNULL {_reg_err_key = 0; return;}
+#define RETURNJUST {_reg_err_key = 0; return;}
 #define THROWP(code,val) {_reg_err_key = code; ASSIGN(_reg_exc_val, val); return;}
 #define THROW(code) {_reg_err_key = code; return;}
+#define THROWP_NORET(code,val) {_reg_err_key = code; ASSIGN(_reg_exc_val, val);}
+#define THROW_NORET(code) _reg_err_key = code;
 #define RETURN(a) {_reg_err_key = 0; _reg_result = (a); return;}
 #define CHECKNULL(_val) if(!_val.obj) THROW(NULLPTRERR)
 
