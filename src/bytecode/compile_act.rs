@@ -105,9 +105,10 @@ pub fn compile<'a>(acts : &'a Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd
 				if fail.len() > 0 {
 					let mut no_body = vec![];
 					compile(fail, state,/* gc,*/ &mut no_body, loc_funs);
-					cmds.push(Cmd::If(res, ok_body, no_body));
+					cmds.push(Cmd::If(res, ok_body));//, no_body));
+                    cmds.push(Cmd::Else(no_body));
 				} else {
-					cmds.push(Cmd::If(res, ok_body, vec![]));
+					cmds.push(Cmd::If(res, ok_body));//, vec![]));
 				}
 			},
 			ActVal::Try(ref body, ref ctchs) => {

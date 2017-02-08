@@ -29,7 +29,8 @@ pub enum Cmd {
 	Throw(usize,Option<Reg>,String), // try optimize it: if catch in this function, just use simple goto
 	Ret(Reg),
 	Goto(String), // used by break, loops, try-catch
-	If(Reg,Vec<Cmd>,Vec<Cmd>),
+	If(Reg,Vec<Cmd>),//,Vec<Cmd>),
+    Else(Vec<Cmd>),
 	ReRaise, // if exception can't be catched. making reraise and return from function
 
 	// NOT EXECUTABLE
@@ -141,7 +142,7 @@ impl Cmd {
                     _ => None
                 },
 	        Cmd::Ret(ref a) => Some(a),
-	        Cmd::If(ref a, _, _) => Some(a),
+	        Cmd::If(ref a, _) => Some(a),
             _ => None
         }
     }
@@ -166,7 +167,7 @@ impl Cmd {
                     _ => panic!("CMD has no in-slot")
                 },
 	        Cmd::Ret(ref mut a) => *a = val,
-	        Cmd::If(ref mut a, _, _) => *a = val,
+	        Cmd::If(ref mut a, _) => *a = val,
             _ => panic!("CMD has no in-slot")
         }
     }
@@ -265,22 +266,32 @@ impl Show for Cmd {
 			Cmd::Ret(ref val) => vec![format!("{}RETURN {:?}", tab, val)],
 			Cmd::Goto(ref lab) => vec![format!("{}GOTO {}", tab, lab)],
 			Cmd::Label(ref lab) => vec![format!("{}LABEL {}", tab, lab)], 
-			Cmd::If(ref cnd, ref good, ref bad) => {
+			Cmd::If(ref cnd, ref good/*, ref bad*/) => {
 				let mut acc = vec![format!("{}IF {:?}", tab, cnd)];
 				for cmd in good.iter() {
 					for val in cmd.show(layer + 1) {
 						acc.push(val);
 					}
 				}
-				acc.push(format!("{}ELSE", tab));
+				/*acc.push(format!("{}ELSE", tab));
 				for cmd in bad.iter() {
 					for val in cmd.show(layer + 1) {
 						acc.push(val);
 					}
-				}
+				}*/
 				acc.push(format!("{}ENDIF", tab));
 				acc
 			},
+            Cmd::Else(ref v) => {
+                let mut acc = vec![format!("{}ELSE", tab)];
+                for cmd in v.iter() {
+                    for val in cmd.show(layer + 1) {
+                        acc.push(val);
+                    }
+                }
+                acc.push(format!("{}ENDELSE", tab));
+                acc
+            },
 			Cmd::Noop => vec![format!("{}NOOP", tab)],
 			Cmd::ReRaise => vec![format!("{}RERAISE", tab)],
 			Cmd::Catch(ref lst, ref next) => {

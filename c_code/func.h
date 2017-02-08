@@ -39,6 +39,7 @@ typedef struct {
 extern unsigned int _reg_err_key;
 extern Var _reg_exc_val;
 extern Var _reg_result;
+extern void* _reg_func;
 void initFRegs();
 //extern int _i_result;
 //extern double _r_result;

@@ -4,6 +4,7 @@
 unsigned int _reg_err_key;
 Var _reg_result;
 Var _reg_exc_val;
+void* _reg_func;
 
 void initFRegs() {
 	_reg_err_key = 0;

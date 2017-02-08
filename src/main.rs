@@ -12,7 +12,7 @@ mod type_check;
 mod preludelib;
 mod bytecode;
 mod cmd_args;
-mod translate;
+//mod translate;
 //use std::io;
 use std::io::Read;
 use std::fs::File;
