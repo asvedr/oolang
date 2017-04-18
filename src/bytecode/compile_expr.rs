@@ -61,7 +61,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
                         // PREPARE VALUE (CAN USE ONLY VARS, NOT PRIMS)
                         if val_reg.is_int() || val_reg.is_real() {
                             let arg_reg = Reg::VStack(state.push_v());
-                            cmds.push(Cmd::Mov(val_reg, arg_reg));
+                            cmds.push(Cmd::Mov(val_reg, arg_reg.clone()));
                             c_args.push(arg_reg);
                         } else {
 						    c_args.push(val_reg);

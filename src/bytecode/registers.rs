@@ -14,7 +14,7 @@ pub enum Reg {
 	TempR,
 	Exc,        // exception value
 	Null,       // no value
-	Name(Box<String>) // getting global symbol
+	Name(Box<String>), // getting global symbol
 
     Res
 }

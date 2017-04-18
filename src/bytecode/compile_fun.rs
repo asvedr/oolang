@@ -118,10 +118,8 @@ fn get_stacks_size(cmds : &Vec<Cmd>, si : &mut u8, sr : &mut u8, sv : &mut u8) {
 		};
 		if !checked {
 			match *c {
-				Cmd::If(_, ref a, ref b) => {
-					get_stacks_size(a, si, sr, sv);
-					get_stacks_size(b, si, sr, sv);
-				},
+				Cmd::If(_, ref a) => get_stacks_size(a, si, sr, sv),
+                Cmd::Else(ref a) => get_stacks_size(a, si, sr, sv),
 				Cmd::Catch(ref catchs, _) =>
 					for catch in catchs.iter() {
 						get_stacks_size(&catch.code, si, sr, sv)

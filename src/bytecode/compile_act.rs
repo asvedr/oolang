@@ -92,7 +92,7 @@ pub fn compile<'a>(acts : &'a Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd
 				let mut body = vec![];
 				compile(act, state,/* gc,*/ &mut body, loc_funs);
 				body.push(Cmd::Goto(state.loop_in_label()));
-				let cmd = Cmd::If(res, body, vec![Cmd::Goto(state.loop_out_label())]);
+				let cmd = Cmd::If(res, body/*, vec![Cmd::Goto(state.loop_out_label())]*/);
 				cmds.push(cmd);
 				cmds.push(Cmd::Label(state.loop_out_label()));
 				state.pop_loop();
