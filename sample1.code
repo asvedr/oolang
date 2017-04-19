@@ -10,3 +10,15 @@ class single Main {
 		self.a = self.a + p;
 	};
 }
+
+fn main() : Fn(int):int {
+	var b = 2;
+	fn fact_plus(a : int) : int {
+		if a < 1 {
+			return b;
+		} else {
+			return fact_plus(a - 1) * a;
+		}
+	};
+	return fact_plus;
+}

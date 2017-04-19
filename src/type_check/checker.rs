@@ -328,7 +328,18 @@ impl Checker {
 		ok!()
 	}
 	fn check_fn(&self, pack : &Pack, fun : &mut SynFn, out_env : Option<&LocEnv>, _self : Option<RType>) -> CheckAns<isize> {
-		let mut env = LocEnv::new(&*pack, &fun.tmpl, _self);
+		let mut env =
+            match out_env {
+                Some(_) => {
+                    // THIS IS CLOSURE. NEED REC PARAMS
+                    let name = fun.name.clone();
+                    let tp = fun.ftype.clone();
+                    LocEnv::new_loc(&*pack, &fun.tmpl, _self, name, tp)
+                },
+                _ =>
+                    // THIS IS GLOBAL FUN
+                    LocEnv::new_glob(&*pack, &fun.tmpl, _self)
+            };
 		// PREPARE LOCAL ENV
 		let top_level = match out_env {
 			Some(eo) => {
@@ -363,6 +374,7 @@ impl Checker {
 				} else {
 					// TYPING OK
 					// NOT NEED fun.outers TOP LEVEL HAS NULL
+                    fun.rec_used = env.is_rec_used();
 					return Ok(0)
 				}
 			}
@@ -370,6 +382,7 @@ impl Checker {
 			let cnt = try!(self.check_actions(&mut env, &mut fun.body, false));
 			//fun.outers =
 			let fenv = env.fun_env();
+            fun.rec_used = fenv.rec_used;
 			unsafe {
 				for (n,t) in fenv.outers.iter() {
 					let t = match *t {
@@ -534,13 +547,13 @@ impl Checker {
 					}
 				},
 				ActVal::DFun(ref mut df) => {
-					if !repeated {
-						add_loc_knw!(env, &df.name, df.ftype.clone(), df.addr);
-					}
 					{
 						let pack : &Pack = env.pack();
 						let _self = env.self_val();
 						unk_count += self.check_fn(pack, &mut **df, Some(env), _self)?;
+					}
+					if !repeated {
+						add_loc_knw!(env, &df.name, df.ftype.clone(), df.addr);
 					}
 					for name in df.outers.keys() {
 						let mut pref = Vec::new();
@@ -548,7 +561,9 @@ impl Checker {
 						let _ = env.get_var(&mut pref, name, &mut tp, &df.addr);
 						if pref[0] == "%out" {
 							env.fun_env_mut().used_outers.insert(name.clone());
-						}
+						} else if pref[0] == "%rec" {
+                            env.set_rec_used(true);
+                        }
 					}
 				},
 				ActVal::Try(ref mut body, ref mut catches) => {
@@ -1039,7 +1054,9 @@ impl Checker {
 					//println!("GET VAR OK: {:?}", pref);
 					if pref[0] == "%out" {
 						env.fun_env_mut().used_outers.insert(name.clone());
-					}
+					} else if pref[0] == "%rec" {
+                        env.set_rec_used(true);
+                    }
 					/* MUST RECUSRIVE CHECK FOR COMPONENTS */
 					match *expr.kind {
 						Type::Unk => return Ok(1),

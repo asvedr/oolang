@@ -26,7 +26,8 @@ pub struct SynFn {
 	pub ftype       : RType,           // Fn(args) -> res
 	// COMPILE TIME
 	pub outers      : BTreeMap<String,RType>,
-	pub no_except   : bool             // force optimization flag #noexcept
+	pub no_except   : bool,            // force optimization flag #noexcept
+    pub rec_used    : bool             // is function closure and contain recursion
 }
 
 impl Show for Arg {
@@ -59,6 +60,7 @@ impl Show for SynFn {
 		if self.no_except {
 			res.push(format!("{}#NoExcept", tab));
 		}
+        res.push(format!("{}USING REC({})", tab, self.rec_used));
 		if self.tmpl.len() > 0 {
 			res.push(format!("{}func {} tmpl:{:?} allowclos:{} type:{:?}", tab, name, self.tmpl, self.can_be_clos, self.rettp));
 		} else {
@@ -178,7 +180,8 @@ pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
 		has_named   : has_named,
 		ftype       : ftype,
 		outers      : BTreeMap::new(),//Vec::new(),
-		no_except   : false
+		no_except   : false,
+        rec_used    : false
 	};
 	syn_ok!(res, body.cursor)
 }

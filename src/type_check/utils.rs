@@ -64,20 +64,53 @@ macro_rules! get_fenv_m {
 }
 
 impl LocEnv {
-	pub fn new(pack : *const Pack, tmpl : &Vec<String>, _self : Option<RType>) -> LocEnv {
-		//LocEnv::FunEnv(FunEnv::new())
-		let mut env = FunEnv::new(pack, _self);
+	pub fn new_loc(pack : *const Pack, tmpl : &Vec<String>, _self : Option<RType>, r_name : String, r_tp : RType) -> LocEnv {
+		let mut env = FunEnv::new(pack, _self, r_name, r_tp);
 		for t in tmpl.iter() {
 			env.templates.insert(t.clone());
 		}
 		LocEnv::FunEnv(env)
 	}
+    pub fn new_glob(pack : *const Pack, tmpl : &Vec<String>, _self : Option<RType>) -> LocEnv {
+		let mut env = FunEnv::new(pack, _self, String::new(), Type::void());
+		for t in tmpl.iter() {
+			env.templates.insert(t.clone());
+		}
+		LocEnv::FunEnv(env)
+    }
 	pub fn inherit(parent : &mut LocEnv) -> LocEnv {
 		LocEnv::SubEnv(SubEnv{parent : &mut *parent, local : BTreeMap::new()})
 	}
 	pub fn self_val(&self) -> Option<RType> {
 		get_fenv!(self).self_val.clone()
 	}
+    pub fn is_rec_call(&self, name : &String) -> bool {
+        let mut link : *const LocEnv = &*self;
+        unsafe {loop {
+            match *link {
+                LocEnv::FunEnv(ref fenv) => {
+                    if fenv.local.contains_key(name) {
+                        return false;
+                    } else {
+                        return fenv.rec_name == *name;
+                    }
+                },
+                LocEnv::SubEnv(ref env) => {
+                    if env.local.contains_key(name) {
+                        return false;
+                    } else {
+                        link = env.parent;
+                    }
+                }
+            }
+        }}
+    }
+    pub fn set_rec_used(&mut self, val : bool) {
+        get_fenv_m!(self).rec_used = val
+    }
+    pub fn is_rec_used(&self) -> bool {
+        get_fenv!(self).rec_used
+    }
 	pub fn pack(&self) -> &Pack {
 		let mut link : *const LocEnv = &*self;
 		unsafe {loop {
@@ -447,7 +480,8 @@ pub fn gen_default_init(has_parent : bool, addr : Cursor) -> Method {
 		has_named   : false,
 		ftype       : t.clone(),
 		outers      : BTreeMap::new(),
-		no_except   : false
+		no_except   : false,
+        rec_used    : false
 	};
 	Method {
 		is_virt : false,
