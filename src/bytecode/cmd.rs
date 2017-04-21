@@ -26,7 +26,8 @@ pub enum Cmd {
 	//NewCls(Box<NewCls>),
 	NewObj(usize,usize,Reg), // NewObj(prop_count, virt_count, out)
 
-	Throw(usize,Option<Reg>,String), // try optimize it: if catch in this function, just use simple goto
+	//   (err-code, value, goto-to-this-label)
+	Throw(usize,Option<Reg>,String),
 	Ret(Reg),
 	Goto(String), // used by break, loops, try-catch
 	If(Reg,Vec<Cmd>),//,Vec<Cmd>),

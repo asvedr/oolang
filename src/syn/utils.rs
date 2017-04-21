@@ -51,4 +51,12 @@ pub trait Show {
 			println!("{}",line);
 		}
 	}
+	fn print_to_string(&self) -> String {
+		let mut acc = String::new();
+		for line in self.show(0) {
+			acc.push_str(&*line);
+			acc.push('\n');
+		}
+		acc
+	}
 }

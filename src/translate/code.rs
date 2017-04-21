@@ -1,4 +1,4 @@
-use bytecode::cmds::*;
+use bytecode::cmd::*;
 use bytecode::registers::*;
 use std::io;
 use std::io::Write;
@@ -12,18 +12,18 @@ struct CodeBlock<'a> {
 
 // TODO add compile_func
 // TODO add INCLINK to all args at func begining
-// TODO add DECLINK to all args end env at return
+// TODO add DECLINK to all (args and env) at (return and reraise)
 
-pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
+pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::Result<()> {
     let mut stack = vec![CodeBlock{code : cmds, pos : 0}];
     let mut space = String::new();
     let reg_res = Reg::Res;
     space.push('\t');
     macro_rules! set_prim {($pred:ident, $constr:expr, $dst:expr, $val:expr) => {{
         if $dst.$pred() {
-            write!(out, "{} = {}", reg($dst), $val)?
+            write!(out, "{} = {}", reg(&$dst), $val)?
         } else {
-            write!(out, "DECLINK({});\n{}{}({}, {})", $dst, space, $constr, $dst, $val)?
+            write!(out, "DECLINK({});\n{}{}({}, {})", reg(&$dst), space, $constr, reg(&$dst), $val)?
         }
     }};}
     while !stack.is_empty() {
@@ -36,10 +36,10 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
             write!(out, "{}{}", space, '}')?;
             continue;
         }
-        let cmd : *const Cmd = &stack[0].code[stack[0].pos];
+        let cmd : &Cmd = &stack[0].code[stack[0].pos];
         write!(out, "{}", space)?;
-        match (*cmd) {
-	        Cmd::Mov(ref a, ref b) => set(reg(b), reg(a), out),
+        match *cmd {
+	        Cmd::Mov(ref a, ref b) => set_res(b, a, out)?,
     	    Cmd::IOp(ref opr) =>
                 if opr.is_f {
                     set_prim!(is_int, "NEWINT", opr.dst, format!("{}({},{})", opr.opr, get_i(&opr.a), get_i(&opr.b)))
@@ -63,16 +63,17 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
                 // XXX ARGS MUST BE COERSED TO RIGHT REGS BEFORE TRANSLATION
                 for a in call.args.iter() {
                     if param.len() == 0 {
-                        write!(param, "{}", reg(a))?;
+                        param.push_str(&*reg(a));
                     } else {
-                        write!(param, ",{}", reg(a))?;
+                        param.push(',');
+                        param.push_str(&*reg(a));
                     }
                 }
                 match call.func {
                     Reg::Name(ref name) => {
                         // NO ENV. DIRECT CALLa
                         write!(out, "{}(NULL, {})", name, param)?;
-                        exist_env = false;
+                        // exist_env = false;
                     },
                     ref r => {
                         let /*(ftp,*/callm/*)*/ =
@@ -89,7 +90,7 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
                 write!(out, ";\n{}", space);
                 match call.catch_block {
                     Some(ref label) => {
-                        write!(out, "if (_reg_err_key) goto {};\n{}else ", label, tab)?;
+                        write!(out, "if (_reg_err_key) goto {};\n{}else ", label, space)?;
                         if !call.dst.is_null() {
                             set_res(&call.dst, &reg_res, out)?;
                         }
@@ -102,15 +103,15 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
                 }
             },
         	Cmd::SetI(ref val, ref r) => {
-                if reg.is_obj() {
-                    write!(out, "DECVAL({});\n{}NEWINT({},{})", reg(r), tab, reg(r), val)?
+                if r.is_obj() {
+                    write!(out, "DECVAL({});\n{}NEWINT({},{})", reg(r), space, reg(r), val)?
                 } else {
                     write!(out, "{} = {}", reg(r), val)?
                 }
             },
 	        Cmd::SetR(ref val, ref r) => {
-                if reg.is_obj() {
-                    write!(out, "DECVAL({});\n{}NEWREAL({},{})", reg(r), tab, reg(r), val)?
+                if r.is_obj() {
+                    write!(out, "DECVAL({});\n{}NEWREAL({},{})", reg(r), space, reg(r), val)?
                 } else {
                     write!(out, "{} = {}", reg(r), val)?
                 }
@@ -118,14 +119,20 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
     	    Cmd::SetS(ref s, ref r) => {
                 write!(out, "_std_str_fromRaw({}, {});\n", s, s.len())?;
                 write!(out, "{}", space)?;
-                set_res(r, &reg_res)?
+                set_res(r, &reg_res, out)?
             },
     	    Cmd::WithItem(ref opr) => {
                 if opr.is_get {
                     match opr.cont_type {
                         ContType::Vec => {
-                            write!(out, "if({} < 0 || {} >= ((Vector*)VAL({})) -> size) THROW(INDEXERR);\n", get_i(opr.index))?;
-                            let val = format!("((Vector*)VAL({})) -> data[{}]", reg(opr.cont), get_i(opr.index))?;
+                            write!(
+                                out,
+                                "if({} < 0 || {} >= ((Vector*)VAL({})) -> size) THROW(INDEXERR);\n",
+                                get_i(&opr.index),
+                                get_i(&opr.index),
+                                reg(&opr.container)
+                            )?;
+                            let val = format!("((Vector*)VAL({})) -> data[{}]", reg(&opr.container), get_i(&opr.index));
                             if opr.value.is_int() {
                                 write!(out, "{} = VINT({})", reg(&opr.value), val)?;
                             } else if opr.value.is_real() {
@@ -135,8 +142,14 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
                             }
                         },
                         ContType::Str => {
-                            write!(out, "if({} < 0 || {} >= ((Str*)VAL({})) -> size) THROW(INDEXERR);\n", get_i(opr.index))?;
-                            let val = format!("((Str*)VAL({})) -> data[{}]", reg(opr.cont), get_i(opr.index))?;
+                            write!(
+                                out,
+                                "if({} < 0 || {} >= ((Str*)VAL({})) -> size) THROW(INDEXERR);\n",
+                                get_i(&opr.index),
+                                get_i(&opr.index),
+                                reg(&opr.container)
+                            )?;
+                            let val = format!("((Str*)VAL({})) -> data[{}]", reg(&opr.container), get_i(&opr.index));
                             if opr.value.is_int() {
                                 write!(out, "{} = {}", reg(&opr.value), val)?;
                             } else {
@@ -148,8 +161,14 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
                 } else {
                     match opr.cont_type {
                         ContType::Vec => {
-                            write!(out, "if({} < 0 || {} >= ((Vector*)VAL({})) -> size) THROW(INDEXERR);\n", get_i(opr.index))?;
-                            let val = format!("((Vector*)VAL({})) -> data[{}]", reg(opr.cont), get_i(opr.index))?;
+                            write!(
+                                out,
+                                "if({} < 0 || {} >= ((Vector*)VAL({})) -> size) THROW(INDEXERR);\n",
+                                get_i(&opr.index),
+                                get_i(&opr.index),
+                                reg(&opr.container)
+                            )?;
+                            let val = format!("((Vector*)VAL({})) -> data[{}]", reg(&opr.container), get_i(&opr.index));
                             if opr.value.is_int() {
                                 // CAUSE WE CANT PUT INT IN VEC OF VALUE
                                 write!(out, "NEWINT({},{})", val, reg(&opr.value))?;
@@ -160,7 +179,7 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
                             }
                         },
                         ContType::Str => {
-                            let val = format!("((Str*)VAL({})) -> data[{}]", reg(opr.cont), get_i(opr.index))?;
+                            let val = format!("((Str*)VAL({})) -> data[{}]", reg(&opr.container), get_i(&opr.index));
                             if opr.value.is_int() {
                                 write!(out, "{} = {}", val, reg(&opr.value))?;
                             } else {
@@ -171,23 +190,25 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
                     }
                 }
             },
-        	MethMake(Reg,Reg,Reg),
+            // TODO
+        	Cmd::MethMake(_,_,_) => panic!(),
 	        Cmd::MethCall(ref call, ref meth) => {
-                let mut param = format!("");
+                let mut param = String::new();
                 for a in call.args.iter() {
                     if param.len() == 0 {
-                        write!(param, "{}", reg(a))?;
+                        param.push_str(&*reg(a));
                     } else {
-                        write!(param, ",{}", reg(a))?;
+                        param.push(',');
+                        param.push_str(&*reg(a));
                     }
                 }
                 // TODO CHECK FOR NULL IF NEED
-                let self_val = format!("&{}", reg(call.func));
+                let self_val = format!("&{}", reg(&call.func));
                 match *meth {
                     Reg::Name(ref name) => {
                         // NO ENV. DIRECT CALLa
                         write!(out, "{}({}, {})", name, self_val, param)?;
-                        exist_env = false;
+                        // exist_env = false;
                     },
                     ref r => {
                         let ftp =
@@ -205,7 +226,7 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
                 write!(out, ";\n{}", space);
                 match call.catch_block {
                     Some(ref label) => {
-                        write!(out, "if (_reg_err_key) goto {};\n{}else ", label, tab)?;
+                        write!(out, "if (_reg_err_key) goto {};\n{}else ", label, space)?;
                         if !call.dst.is_null() {
                             set_res(&call.dst, &reg_res, out)?;
                         }
@@ -217,15 +238,16 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
                     }
                 }
             },
-        	MakeClos(Box<MakeClos>),
-	        Cmd::Prop(ref obj, ref ind, ref out) => {
+            // TODO
+        	Cmd::MakeClos(_) => panic!(),
+	        Cmd::Prop(ref obj, ref ind, ref out_reg) => {
                 let val = format!("((Object*)VAL({})) -> props[{}]", reg(obj), ind);
-                if out.is_int() {
-                    write!(out, "{} = VINT({})", reg(out), val)?;
-                } else if out.is_real() {
-                    write!(out, "{} = VREAL({})", reg(out), val)?;
+                if out_reg.is_int() {
+                    write!(out, "{} = VINT({})", reg(out_reg), val)?;
+                } else if out_reg.is_real() {
+                    write!(out, "{} = VREAL({})", reg(out_reg), val)?;
                 } else {
-                    write!(out, "ASG({},{})", reg(out), val)?;
+                    write!(out, "ASG({},{})", reg(out_reg), val)?;
                 }
             },
     	    Cmd::SetProp(ref obj, ref ind, ref val) => {
@@ -259,7 +281,8 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
                             write!(out, "NEWINT({},(double)({}))", reg(dst), get_r(src))?;
                         }
                 },
-        	NewObj(usize,usize,Reg),
+            // TODO
+        	Cmd::NewObj(_,_,_) => panic!(),
 	        Cmd::Throw(ref code, ref arg, ref lab) =>
                 match *arg {
                     Some(ref val) => {
@@ -273,13 +296,22 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
                 },
         	Cmd::Ret(ref val) =>
                 match *val {
-                    Some(ref v) => {
-                        set_res(&reg_res, v)?;
-                        write!(out, ";\n{}RETURNJUST", space)?
+                    Reg::Null => {
+                        for line in finalizer {
+                            write!(out, "{};\n{}", line, space)?;
+                        }
+                        write!(out, "RETURNNULL")?
                     },
-                    _ => write!(out, "RETURNNULL")?
+                    ref v => {
+                        set_res(&reg_res, v, out)?;
+                        write!(out, ";\n")?;
+                        for line in finalizer {
+                            write!(out, "{}{};\n", space, line)?;
+                        }
+                        write!(out, "{}RETURNJUST", space)?
+                    }
                 },
-	        Cmd::Goto(ref lab) => write!("goto {}", lab)?,
+	        Cmd::Goto(ref lab) => write!(out, "goto {}", lab)?,
     	    Cmd::If(ref cond, ref code) => {
                 if cond.is_int() {
                     write!(out, "if({}) {}", reg(cond), '{')?;
@@ -294,7 +326,7 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
                 continue
             },
             Cmd::Else(ref code) => {
-                write!(out, "else {")?;
+                write!(out, "else {}", '{')?;
                 stack[0].pos += 1;
                 stack.push(CodeBlock {
                     code : code,
@@ -302,14 +334,21 @@ pub fn to_c(cmds : &Vec<Cmd>, out : &mut File) -> io::Result<()> {
                 });
                 continue
             },
-    	    Cmd::ReRaise => write!(out, "return;")?,
+    	    Cmd::ReRaise => {
+                for line in finalizer {
+                    write!(out, "{};\n{}", line, space)?;
+                }
+                write!(out, "return;")?
+            },
         	Cmd::Noop => (),
-	        Cmd::Label(ref lab) => write!("{}:", lab)?,
-        	Catch(Vec<Catch>,String)
+	        Cmd::Label(ref lab) => write!(out, "{}:", lab)?,
+            // TODO
+        	Cmd::Catch(_,_) => panic!()
         }
         stack[0].pos += 1;
         write!(out, ";\n")?;
     }
+    Ok(())
 }
 
 fn get_i(r : &Reg) -> String {
@@ -382,7 +421,7 @@ fn set_res(dst : &Reg, src : &Reg, out : &mut File) -> io::Result<()> {
 }
 
 fn reg(a : &Reg) -> String {
-    match a {
+    match *a {
     	Reg::IVar(ref i)    => format!("i_var{}", i),
 	    Reg::RVar(ref i)    => format!("r_var{}", i),
     	Reg::Var(ref i)     => format!("v_var{}", i),
@@ -397,6 +436,7 @@ fn reg(a : &Reg) -> String {
 	    Reg::TempR          => format!("temp_r"),
     	Reg::Exc            => format!("_reg_result.val"),
 	    Reg::Null           => String::new(),
-    	Reg::Name(ref s)    => s.clone()
+    	Reg::Name(ref s)    => (**s).clone(),
+        Reg::Res            => format!("result")
     }
 }

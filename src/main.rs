@@ -12,9 +12,10 @@ mod type_check;
 mod preludelib;
 mod bytecode;
 mod cmd_args;
+mod translate;
 //mod translate;
 //use std::io;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::fs::File;
 use syn::*;
 use type_check::checker::*;
@@ -55,7 +56,10 @@ fn main() {
 						println!("{}", e[0].mess);
 						return;
 					},
-					_ => m.print()
+					_ => {
+						println!("syn in res.syn");
+						write_file("res.syn", &*m.print_to_string());
+					}
 				}
 			}
 			let mut excs = ExcKeys::new(0);
@@ -65,11 +69,18 @@ fn main() {
 			//let mod_name = vec!["main".to_string()];
 			let cmod = cmplr.compile_mod(&m);
 			excs = cmplr.destroy();
-			cmod.print();
+			println!("asm in res.asm");
+			write_file("res.asm", &*cmod.print_to_string());
 			//if m.funs.len() > 0 {
 			//	let cfun = compile_fun::compile(&m.funs[0]);
 			//	cfun.print()
 			//}
+			println!("c in res.c");
+			match with_file_w("res.c", &|out : &mut File| {translate::fun::to_c(&cmod.pub_fns[0], out)}) {
+				Ok(_) => (),
+				Err(e) =>
+					println!("write res.c err: {:?}", e)
+			};
 		},
 		Err(vec) => {
 			for e in vec {
@@ -78,4 +89,15 @@ fn main() {
 			}
 		}
 	}
+}
+
+fn write_file(name : &str, text : &str) -> std::io::Result<()> {
+	let mut file = File::create(name)?;
+	write!(file, "{}", text)?;
+	Ok(())
+}
+
+fn with_file_w<A>(name : &str, act : &Fn(&mut File) -> std::io::Result<A>) -> std::io::Result<A> {
+	let mut file = File::create(name)?;
+	act(&mut file)
 }
