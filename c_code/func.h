@@ -3,24 +3,7 @@
 
 #include "gc.h"
 #include "errors.h"
-/*
-typedef struct {
-	Var           val;
-	unsigned int  errKey; // 0: no err, >0: code of exception
-} FunRes;
 
-
-#define RETURN(ptr, _val) {\
-	DECLINK(ptr -> val);\
-	INCLINK(_val);\
-	ptr -> val = _val;\
-}
-#define RETURNNULL(ptr) {return; }
-#define THROWP(ptr, code, val) {ptr -> errKey = code; ASG(ptr -> val, val); return; }
-#define THROW(ptr, code) {ptr -> errKey = code; return; }
-#define NEWFRES(name) FunRes name; NEWINT(name.val, 0); name -> errKey = 0;
-#define CHECKNULL(ptr, _val) if(!_val.obj) THROW(ptr, NULLPTRERR)
-*/
 // WARNING!!!
 // ON RETURN
 // linkcounter in value DOES NOT INCED when value moved in _reg_result
@@ -41,24 +24,6 @@ extern Var _reg_exc_val;
 extern Var _reg_result;
 extern void* _reg_func;
 void initFRegs();
-//extern int _i_result;
-//extern double _r_result;
-
-/*
-	void funTemplate(args) {
-		Var vars, ...;
-		simpleCall (fres, args');
-		
-		exCall(fres, args')
-		if(fres.errFlag)
-			goto TRACE;
-
-		return res;
-		TRACE:
-		DECLINK(vars, ...);
-		*FunRes = *inheritFunRes;
-	}
-*/
 
 //                   env,   res,  args ...
 typedef void(*CFun0)(Var* /*FunRes* */);

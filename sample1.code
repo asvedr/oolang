@@ -17,9 +17,15 @@ fn main() {
 	fn add(a : int) : int {
 		return a + 1;
 	};
-	try {
+	var x = add(3);
+	/*try {
 		throw BAD;
 	} catch {
 		return;
-	}
+	}*/
+	var a : int = 2;
+	var b = a + 1;
+	print(b as str);
+	throw BAD;
+	return;
 }

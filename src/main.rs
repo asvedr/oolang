@@ -58,7 +58,7 @@ fn main() {
 					},
 					_ => {
 						println!("syn in res.syn");
-						write_file("res.syn", &*m.print_to_string());
+						let _ = write_file("res.syn", &*m.print_to_string());
 					}
 				}
 			}
@@ -70,17 +70,13 @@ fn main() {
 			let cmod = cmplr.compile_mod(&m);
 			excs = cmplr.destroy();
 			println!("asm in res.asm");
-			write_file("res.asm", &*cmod.print_to_string());
+			let _ = write_file("res.asm", &*cmod.print_to_string());
 			//if m.funs.len() > 0 {
 			//	let cfun = compile_fun::compile(&m.funs[0]);
 			//	cfun.print()
 			//}
 			println!("c in res.c");
-			match with_file_w("res.c", &|out : &mut File| {translate::fun::to_c(&cmod.pub_fns[0], out)}) {
-				Ok(_) => (),
-				Err(e) =>
-					println!("write res.c err: {:?}", e)
-			};
+			let _ = translate::cmod_to_c(&cmod, "res");
 		},
 		Err(vec) => {
 			for e in vec {

@@ -87,7 +87,7 @@ pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::
                         write!(out, "{}(_reg_func,{})", callm, param)?;
                     }
                 }
-                write!(out, ";\n{}", space);
+                write!(out, ";\n{}", space)?;
                 match call.catch_block {
                     Some(ref label) => {
                         write!(out, "if (_reg_err_key) goto {};\n{}else ", label, space)?;
@@ -223,7 +223,7 @@ pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::
                         write!(out, "(({})PLINK({}))({},{})", ftp, reg(r), self_val, param)?;
                     }
                 }
-                write!(out, ";\n{}", space);
+                write!(out, ";\n{}", space)?;
                 match call.catch_block {
                     Some(ref label) => {
                         write!(out, "if (_reg_err_key) goto {};\n{}else ", label, space)?;
@@ -238,8 +238,19 @@ pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::
                     }
                 }
             },
-            // TODO
-        	Cmd::MakeClos(_) => panic!(),
+        	Cmd::MakeClos(ref clos_conf) => {
+                write!(
+                    out,
+                    "ASSIGN({}, newClosure({}, {}, &closure));\n",
+                    reg(&clos_conf.dst),
+                    clos_conf.to_env.len(),
+                    clos_conf.func
+                )?;
+                for i in 0 .. clos_conf.to_env.len() {
+                    write!(out, "\tclosure -> env[{}] = {};\n", i, reg(&clos_conf.to_env[i]))?;
+                    write!(out, "\tINCLINK({});\n", reg(&clos_conf.to_env[i]))?;
+                }
+            },
 	        Cmd::Prop(ref obj, ref ind, ref out_reg) => {
                 let val = format!("((Object*)VAL({})) -> props[{}]", reg(obj), ind);
                 if out_reg.is_int() {
@@ -291,7 +302,7 @@ pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::
                     },
                     _ => {
                         write!(out, "THROW_NORET({})", code)?;
-                        write!(out, ";\n{}goto {}", space, lab);
+                        write!(out, ";\n{}goto {}", space, lab)?;
                     }
                 },
         	Cmd::Ret(ref val) =>
@@ -383,10 +394,10 @@ fn set(dst : &Reg, src : &Reg, out : &mut File) -> io::Result<()> {
         }
     } else { // VAR
         if src.is_int() {
-            write!(out, "DECLINK({}); ", reg(dst));
+            write!(out, "DECLINK({}); ", reg(dst))?;
             put!("NEWINT({}, {})")
         } else if src.is_real() {
-            write!(out, "DECLINK({}); ", reg(dst));
+            write!(out, "DECLINK({}); ", reg(dst))?;
             put!("NEWREAL({}, {})")
         } else { // VAR <= VAR
             put!("ASSIGN({}, {})")
