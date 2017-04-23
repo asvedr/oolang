@@ -334,11 +334,11 @@ impl Checker {
                     // THIS IS CLOSURE. NEED REC PARAMS
                     let name = fun.name.clone();
                     let tp = fun.ftype.clone();
-                    LocEnv::new_loc(&*pack, &fun.tmpl, _self, name, tp)
+                    LocEnv::new(&*pack, &fun.tmpl, _self, name, tp)
                 },
                 _ =>
                     // THIS IS GLOBAL FUN
-                    LocEnv::new_glob(&*pack, &fun.tmpl, _self)
+                    LocEnv::new_no_rec(&*pack, &fun.tmpl, _self)
             };
 		// PREPARE LOCAL ENV
 		let top_level = match out_env {
@@ -429,14 +429,12 @@ impl Checker {
 				},
 				ActVal::If(ref mut cond, ref mut th_act, ref mut el_act) => {
 					expr!(cond);
-					{
-						let mut sub = LocEnv::inherit(env);
-						actions!(&mut sub, th_act);
-					}
-					{
-						let mut sub = LocEnv::inherit(env);
-						actions!(&mut sub, el_act);
-					}
+					env.push_block();
+					actions!(env, th_act);
+					env.pop_block();
+					env.push_block();
+					actions!(env, el_act);
+					env.pop_block();
 				},
 				ActVal::DVar(ref name, ref mut tp, ref mut val) => {
 					let unk_val = match *val {
@@ -549,8 +547,8 @@ impl Checker {
 				ActVal::DFun(ref mut df) => {
 					{
 						let pack : &Pack = env.pack();
-						let _self = env.self_val();
-						unk_count += self.check_fn(pack, &mut **df, Some(env), _self)?;
+						let _self = &env.fun_env.self_val;
+						unk_count += self.check_fn(pack, &mut **df, Some(env), _self.clone())?;
 					}
 					if !repeated {
 						add_loc_knw!(env, &df.name, df.ftype.clone(), df.addr);
@@ -569,11 +567,9 @@ impl Checker {
 				ActVal::Try(ref mut body, ref mut catches) => {
 				// благодаря тому, что в LocEnv ссылки, а не типы, расформирование и формирование LocEnv заново не влияют на вычисление типов
 				// окружение текущей функции остается, но локальное для блоков здесь формируется заново при каждом проходе 
-					{
-						let mut sub = LocEnv::inherit(env);
-						actions!(&mut sub, body);
-						//unk_count += try!(self.check_actions(&mut sub, body, false/*repeated*/));
-					}
+					env.push_block();
+					actions!(env, body);
+					env.pop_block();
 					for catch in catches.iter_mut() {
 						// CHECK PARAMS
 						if catch.ekey.len() > 0 {
@@ -587,14 +583,15 @@ impl Checker {
 								_ => ()
 							}
 						}
-						let mut sub = LocEnv::inherit(env);
+						env.push_block();
 						// UPDATE ENV IF NEEDED
 						match catch.vname {
-							Some(ref name) => add_loc_knw!(sub, name, catch.vtype.clone(), catch.addres),
+							Some(ref name) => add_loc_knw!(env, name, catch.vtype.clone(), catch.addres),
 							_ => ()
 						}
-						// DO WITH SUB
-						actions!(&mut sub, &mut catch.act);
+						// DO WITH PUSHED ENV
+						actions!(env, &mut catch.act);
+						env.pop_block();
 					}
 				},
 				ActVal::While(ref lname, ref mut cond, ref mut body) => {
@@ -606,10 +603,9 @@ impl Checker {
 					// checking cond
 					expr!(cond);
 					// checking body
-					{
-						let mut sub = LocEnv::inherit(env);
-						actions!(&mut sub, body);
-					}
+					env.push_block();
+					actions!(env, body);
+					env.pop_block();
 					// pop label if it was
 					match *lname {
 						Some(_) => env.pop_loop_label(),
@@ -623,12 +619,11 @@ impl Checker {
 					}
 					expr!(val_from);
 					expr!(val_to);
-					{
-						let mut sub = LocEnv::inherit(env);
-						// type for env
-						add_loc_knw!(sub, vname, Type::int(), act.addres);
-						actions!(&mut sub, body);
-					}
+					env.push_block();
+					// type for env
+					add_loc_knw!(env, vname, Type::int(), act.addres);
+					actions!(env, body);
+					env.pop_block();
 					match *lname {
 						Some(_) => env.pop_loop_label(),
 						_ => ()
@@ -639,36 +634,32 @@ impl Checker {
 						Some(ref name) => env.add_loop_label(name),
 						_ => ()
 					}
-					{
-						let mut sub = LocEnv::inherit(env);
-						expr!(cont);
-						let mut need_regress = false;
-						match *cont.kind {
-							Type::Arr(ref item) => {
-								/*if vt.is_unk() {
-									*vt = item[0].clone();
-									add_loc_unk!(sub, vname, &mut item[0], act.addres);
-								} else*/ if *vt != item[0] {
-									throw!(format!("foreach var expected {:?}, found {:?}", item, vt), act.addres);
-								} else {
-									add_loc_knw!(sub, vname, item[0].clone(), act.addres);
-								}
-							},
-							Type::Unk => {
-								if vt.is_unk() {
-									add_loc_unk!(sub, vname, &mut *vt, act.addres);
-								} else {
-									need_regress = true;
-								}
-							},
-							_ => throw!("you can foreach only through array", cont.addres)
-						}
-						if need_regress {
-							regress!(&mut sub, cont, vt.clone());
-							add_loc_knw!(sub, vname, vt.clone(), act.addres);
-						}
-						actions!(&mut sub, body);
+					env.push_block();
+					expr!(cont);
+					let mut need_regress = false;
+					match *cont.kind {
+						Type::Arr(ref item) => {
+							if *vt != item[0] {
+								throw!(format!("foreach var expected {:?}, found {:?}", item, vt), act.addres);
+							} else {
+								add_loc_knw!(env, vname, item[0].clone(), act.addres);
+							}
+						},
+						Type::Unk => {
+							if vt.is_unk() {
+								add_loc_unk!(env, vname, &mut *vt, act.addres);
+							} else {
+								need_regress = true;
+							}
+						},
+						_ => throw!("you can foreach only through array", cont.addres)
 					}
+					if need_regress {
+						regress!(env, cont, vt.clone());
+						add_loc_knw!(env, vname, vt.clone(), act.addres);
+					}
+					actions!(env, body);
+					env.pop_block();
 					match *lname {
 						Some(_) => env.pop_loop_label(),
 						_ => ()
@@ -1173,8 +1164,8 @@ impl Checker {
 				check_type!(tp);
 			}
 			EVal::TSelf =>
-				match env.self_val() {
-					Some(tp) => expr.kind = tp,
+				match env.fun_env.self_val {
+					Some(ref tp) => expr.kind = tp.clone(),
 					_ => throw!("using 'self' out of class", expr.addres)
 				},
 			_ => ()

@@ -1,6 +1,5 @@
 use std::result::*;
 //use std::str::{Chars};
-use std::mem;
 
 // error for 'lex' function
 #[derive(Debug)]

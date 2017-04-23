@@ -12,8 +12,8 @@ macro_rules! ok {() => {return Ok(())};}
 
 type VMap = BTreeMap<String, Result<RType, *mut RType>>;
 
-type CheckRes    = Result<(),Vec<SynErr>>;
-type CheckAns<A> = Result<A,Vec<SynErr>>;
+pub type CheckRes    = Result<(),Vec<SynErr>>;
+pub type CheckAns<A> = Result<A,Vec<SynErr>>;
 
 pub struct FunEnv {
     pub global      : *const Pack,
@@ -50,7 +50,7 @@ impl FunEnv {
             None => panic!(),
             Some(ref tp) =>
                 match **tp {
-                    Type::Class(ref pref, ref name, ref param) => unsafe {
+                    Type::Class(ref pref, ref name, _) => unsafe {
                         match (*self.global).get_cls_rc(pref, name){
                             Some(cls) =>
                                 match cls.borrow().parent {
