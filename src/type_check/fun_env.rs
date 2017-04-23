@@ -224,7 +224,7 @@ impl FunEnv {
     pub fn check_exception(&self, pref : &mut Vec<String>, name : &String, pos : &Cursor) -> CheckAns<Option<RType>> {
         unsafe {
             if pref.len() == 0 {
-                match (*self.global).excepts.get(name) {
+                match (*self.global).exceptions.get(name) {
                     Some(arg) => {
                         pref.push("%mod".to_string());
                         return Ok(arg.clone());
@@ -233,7 +233,7 @@ impl FunEnv {
                         match (*self.global).out_exc.get(name) {
                             Some(pack) => {
                                 *pref = (**pack).name.clone();
-                                match (**pack).excepts.get(name) {
+                                match (**pack).exceptions.get(name) {
                                     Some(arg) => return Ok(arg.clone()),
                                     None => panic!()
                                 }

@@ -43,7 +43,7 @@ pub struct SynMod {
 	pub imports : Vec<Import>,
 	pub funs    : Vec<SynFn>,
 	pub classes : Vec<Class>,
-	pub excepts : Vec<DefExcept>,
+	pub exceptions : Vec<DefExcept>,
 	pub c_fns   : Vec<CFun>,
 	pub c_types : Vec<CType>
 }
@@ -70,7 +70,7 @@ impl Show for SynMod {
 			res.push(format!("{:?}", f));
 		}
 		res.push(format!("{}EXCEPTIONS", tab));
-		for e in self.excepts.iter() {
+		for e in self.exceptions.iter() {
 			res.push(format!("{:?}", e))
 		}
 		res.push(format!("{}CLASSES", tab));
@@ -114,7 +114,7 @@ fn parse_mod_syn(lexer : &Lexer, curs : &Cursor) -> SynRes<SynMod> {
 	loop {
 		match lexer.lex(&curs) {
 			Err(_) =>
-				syn_ok!(SynMod{imports : imps, funs : funs, classes : clss, c_fns : cfns, c_types : ctps, excepts : excs}, curs),
+				syn_ok!(SynMod{imports : imps, funs : funs, classes : clss, c_fns : cfns, c_types : ctps, exceptions : excs}, curs),
 			Ok(ans) =>
 				match &*ans.val {
 					"class"  => {

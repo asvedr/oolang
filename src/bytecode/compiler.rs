@@ -27,11 +27,14 @@ use preludelib::*;
 
 */
 
+// STRUCT FOR COMPILATION
+// FIELDS IS CONFIGURATION
 pub struct Compiler {
-	pub gc       : GlobalConf,
-	pub dest_dir : String
+	pub global_conf : GlobalConf,
+	pub dest_dir    : String
 }
 
+// COMPILED MODULE
 pub struct CMod {
 	pub pub_fns  : Vec<c_fun::CFun>,
 	pub priv_fns : Vec<c_fun::CFun>
@@ -43,28 +46,25 @@ struct FunQueueItem<'a> {
 }
 
 impl Compiler {
-	pub fn new(std : &Prelude, excs : RExcKeys, mod_name : Vec<String>, dest_dir : String) -> Compiler {
-		let mut gc = GlobalConf::new(excs, mod_name);
-		//gc.fns     = std.pack.fns.clone();
+	pub fn new(std : &Prelude, exceptions : RExcKeys, mod_name : Vec<String>, dest_dir : String) -> Compiler {
+		let mut global_conf = GlobalConf::new(exceptions, mod_name);
 		for (k,v) in std.cfns.iter() {
-			gc.fns.insert(k.clone(), v.clone());
+			global_conf.fns.insert(k.clone(), v.clone());
 		}
 		for tcls in std.pack.cls.values() {
 			let name = tcls.borrow().fname.clone();
-			gc.classes.insert(name, tcls.clone());
+			global_conf.classes.insert(name, tcls.clone());
 		}
-		for e in std.pack.excepts.keys() {
-			//let name = format!("{}_{}", std.full_name(), e);
-			//gc.excepts.add(name);
-			gc.excepts./*borrow_mut().*/add(&std.pack.name, e);
+		for e in std.pack.exceptions.keys() {
+			global_conf.exceptions.add(&std.pack.name, e);
 		}
 		Compiler {
-			gc       : gc,
+			global_conf       : global_conf,
 			dest_dir : dest_dir
 		}
 	}
 	pub fn destroy(self) -> RExcKeys {
-		self.gc.destroy()
+		self.global_conf.destroy()
 	}
 	pub fn compile_mod(&self, smod : &SynMod) -> CMod {
 		let mut pub_f = vec![];
@@ -72,7 +72,7 @@ impl Compiler {
 		
 		let mut queue = vec![];
 		let mut mod_name = String::new();
-		for i in self.gc.mod_name.iter() {
+		for i in self.global_conf.mod_name.iter() {
 			if mod_name.len() == 0 {
 				mod_name.push_str(&**i);
 			} else {
@@ -83,23 +83,14 @@ impl Compiler {
 
 		for fun in smod.funs.iter() {
 			queue.push(FunQueueItem{fun : fun, pref : None});
-			/*let mut loc_funs = vec![];
-			let name = f.name.clone();
-			let f = c_fun::compile(fun, name, &self.gc, false, &mut loc_funs);
-			pub_f.push(f);
-			loop {
-				let mut loc_loc_funs = vec![];
-				let 
-			}*/
 		}
 		let mut loc_funs = vec![];
 		while let Some(item) = queue.pop() {
-			let f = c_fun::compile(item.fun, &self.gc, &mod_name, &item.pref, &mut loc_funs);
+			let f = c_fun::compile(item.fun, &self.global_conf, &mod_name, &item.pref, &mut loc_funs);
 			match item.pref {
 				None => pub_f.push(f),
 				_    => priv_f.push(f)
 			}
-			//let lname = item.fun.name.clone();
 			let pref = match item.pref {
 				Some(p) => format!("{}_{}", p, item.fun.name),
 				_ => format!("{}_{}", mod_name, item.fun.name)

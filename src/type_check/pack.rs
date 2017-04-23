@@ -68,29 +68,29 @@ macro_rules! find_import {
 }
 
 pub struct Pack {
-	pub name     : Vec<String>,
-	pub packs    : HashMap<String,*const Pack>, // imports
-	pub out_cls  : HashMap<String,*const Pack>, // imports *
-	pub out_fns  : HashMap<String,*const Pack>, // imports *
-	pub out_exc  : HashMap<String,*const Pack>, // imports *
-	pub cls      : HashMap<String,RTClass>,
-	pub fns      : HashMap<String,RType>,
-	pub fns_noex : HashSet<String>,             // optimizator noexcept flag
-	pub excepts  : HashMap<String,Option<RType>>
+	pub name        : Vec<String>,
+	pub packs       : HashMap<String,*const Pack>, // imports
+	pub out_cls     : HashMap<String,*const Pack>, // imports *
+	pub out_fns     : HashMap<String,*const Pack>, // imports *
+	pub out_exc     : HashMap<String,*const Pack>, // imports *
+	pub cls         : HashMap<String,RTClass>,
+	pub fns         : HashMap<String,RType>,
+	pub fns_noex    : HashSet<String>,             // optimizator noexcept flag
+	pub exceptions  : HashMap<String,Option<RType>>
 }
 
 impl Pack {
 	pub fn new() -> Pack {
 		Pack{
-			name      : Vec::new(),
-			packs     : HashMap::new(),
-			out_cls   : HashMap::new(),
-			out_fns   : HashMap::new(),
-			out_exc   : HashMap::new(),
-			cls       : HashMap::new(),
-			fns       : HashMap::new(),
-			fns_noex  : HashSet::new(),
-			excepts   : HashMap::new()
+			name         : Vec::new(),
+			packs        : HashMap::new(),
+			out_cls      : HashMap::new(),
+			out_fns      : HashMap::new(),
+			out_exc      : HashMap::new(),
+			cls          : HashMap::new(),
+			fns          : HashMap::new(),
+			fns_noex     : HashSet::new(),
+			exceptions   : HashMap::new()
 		}
 	}
 	#[inline]
@@ -111,9 +111,9 @@ impl Pack {
 		for name in self.packs.keys() {
 			let _ = write!(out, "{}, ", name);
 		}
-		let _ = write!(out, "]\nexcepts:\n");
-		for e in self.excepts.keys() {
-			let _ = write!(out, "DEF EX {} {:?}\n", e, self.excepts.get(e).unwrap());
+		let _ = write!(out, "]\nexceptions:\n");
+		for e in self.exceptions.keys() {
+			let _ = write!(out, "DEF EX {} {:?}\n", e, self.exceptions.get(e).unwrap());
 		}
 		let _ = write!(out, "fns:\n");
 		for name in self.fns.keys() {
@@ -149,7 +149,7 @@ impl Pack {
 		}*/
 	}
 	pub fn get_exception(&self, pref : &Vec<String>, name : &String) -> Option<Option<RType>> {
-		match get_obj!(self, pref, name, excepts, out_exc) {
+		match get_obj!(self, pref, name, exceptions, out_exc) {
 			Some(l) => Some(l.clone()),
 			_       => None
 		}

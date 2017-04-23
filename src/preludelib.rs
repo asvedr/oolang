@@ -14,8 +14,8 @@ impl Prelude {
 		let mut cfns = HashMap::new();
 		pack.name.push("%std".to_string());
 		macro_rules! newe {
-			($n:expr, $arg:expr) => {pack.excepts.insert($n.to_string(), Some($arg))};
-			($n:expr) => {pack.excepts.insert($n.to_string(), None)};
+			($n:expr, $arg:expr) => {pack.exceptions.insert($n.to_string(), Some($arg))};
+			($n:expr) => {pack.exceptions.insert($n.to_string(), None)};
 		}
 		macro_rules! newc {($name:expr, $fname:expr, $p:expr, $acnt:expr) => {{
 			let c = TClass::new($fname.to_string());

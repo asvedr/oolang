@@ -49,8 +49,8 @@ impl ExcKeys {
 			mod_name.push_str(&**p);
 			mod_name.push('_');
 		}
-		self.map.reserve(smod.excepts.len());
-		for e in smod.excepts.iter() {
+		self.map.reserve(smod.exceptions.len());
+		for e in smod.exceptions.iter() {
 			self.map.insert(format!("{}{}", mod_name, e.name), self.cnt);
 			self.cnt += 1;
 		}

@@ -93,7 +93,7 @@ pub struct Lexer {
 }
 
 // state of lex machine. Using for stra, ida, chara, etc
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 struct State {
 	fin : bool, // flag
 	err : bool, // flag
@@ -251,8 +251,13 @@ impl Lexer {
 				for i in 0 .. machines.len() {
 					if !machines[i].state.err {
 						{
-							let f = &*machines[i].func;
-							unsafe {f(sym, &self, mem::transmute(&machines[i].state))};
+							let new_state = {
+								let f = &*machines[i].func;
+								let mut state = machines[i].state.clone();
+								f(sym, &self, &mut state);
+								state
+							};
+							machines[i].state = new_state;
 						}
 						if !machines[i].state.err {
 							if machines[i].state.fin {

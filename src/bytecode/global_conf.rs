@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 // global values for module
 pub struct GlobalConf {
-	pub excepts  : RExcKeys,
+	pub exceptions  : RExcKeys,
 	pub classes  : HashMap<String,RTClass>,
 	pub mod_name : Vec<String>,
 	pub fns      : HashMap<String,String> // map of full names
@@ -14,7 +14,7 @@ pub struct GlobalConf {
 impl GlobalConf {
 	pub fn new(exc : RExcKeys, mname : Vec<String>) -> GlobalConf {
 		GlobalConf{
-			excepts  : exc,//ExcKeys::new(0),
+			exceptions  : exc,//ExcKeys::new(0),
 			classes  : HashMap::new(),
 			fns      : HashMap::new(),
 			mod_name : mname
@@ -52,14 +52,14 @@ impl GlobalConf {
 	#[inline(always)]
 	pub fn get_exc(&self, pref : &Vec<String>, name : &String) -> usize {
 		if pref.len() == 0 || pref[0] == "%mod" {
-			self.excepts.get(&self.mod_name, name)
+			self.exceptions.get(&self.mod_name, name)
 		} else {
-			self.excepts.get(pref,name)
+			self.exceptions.get(pref,name)
 		}
 	}
 	#[inline(always)]
 	pub fn destroy(self) -> RExcKeys {
-		self.excepts
+		self.exceptions
 	}
 }
 

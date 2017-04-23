@@ -108,15 +108,15 @@ impl Checker {
 		for f in self.std.pack.fns.keys() {
 			pack.out_fns.insert(f.clone(), &*self.std.pack);
 		}
-		pack.out_exc.reserve(self.std.pack.excepts.len());
-		for e in self.std.pack.excepts.keys() {
+		pack.out_exc.reserve(self.std.pack.exceptions.len());
+		for e in self.std.pack.exceptions.keys() {
 			pack.out_exc.insert(e.clone(), &*self.std.pack);
 		}
 		pack.packs.reserve(smod.imports.len());
 		pack.packs.insert("%std".to_string(), &*self.std.pack);
 		pack.cls.reserve(smod.classes.len());
 		pack.fns.reserve(smod.funs.len() + smod.c_fns.len());
-		pack.excepts.reserve(smod.excepts.len());
+		pack.exceptions.reserve(smod.exceptions.len());
 		// ADD FUNS TO ENV
 		for f in smod.funs.iter_mut() {
 			// GETTING NAME
@@ -222,19 +222,19 @@ impl Checker {
 				_ => ()
 			}
 		}
-		// CHEKC EXCEPTS ADD EXCEPTS TO ENV
+		// CHEKC exceptions ADD exceptions TO ENV
 		let tmpl_plug = Vec::new();
-		for e in smod.excepts.iter_mut() {
-			if pack.excepts.contains_key(&e.name) {
+		for e in smod.exceptions.iter_mut() {
+			if pack.exceptions.contains_key(&e.name) {
 				throw!(format!("exception {} already exist", e.name), e.addr);
 			} else {
 				match e.arg {
 					Some(ref mut tp) => {
 						unsafe{ self.check_type_pack(&pack, &tmpl_plug, tp, &e.addr)? };
-						pack.excepts.insert(e.name.clone(), Some(tp.clone()));
+						pack.exceptions.insert(e.name.clone(), Some(tp.clone()));
 					},
 					_ => {
-						pack.excepts.insert(e.name.clone(), None);
+						pack.exceptions.insert(e.name.clone(), None);
 					}
 				}
 			}
