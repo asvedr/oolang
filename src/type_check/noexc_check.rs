@@ -91,8 +91,8 @@ unsafe fn replace_to_noex(code : &mut Vec<ActF>, names : &Vec<*const String>) ->
     macro_rules! replace_expr {($e:expr) => {res = replace_expr($e, names) || res}; }
     for act in code.iter_mut() {
         match act.val {
-			ActVal::Expr(ref mut e) => replace_expr!(e),
-			ActVal::DVar(_,_,ref mut oe) =>
+            ActVal::Expr(ref mut e) => replace_expr!(e),
+            ActVal::DVar(_,_,ref mut oe) =>
                 match *oe {
                     Some(ref mut e) => replace_expr!(e),
                     _ => ()
@@ -106,33 +106,33 @@ unsafe fn replace_to_noex(code : &mut Vec<ActF>, names : &Vec<*const String>) ->
                     Some(ref mut e) => replace_expr!(e),
                     _ => ()
                 },
-	        ActVal::While(_, ref mut e, ref mut a) => {
+            ActVal::While(_, ref mut e, ref mut a) => {
                 replace_expr!(e);
                 res = replace_to_noex(a, names) || res;
             },
-	        ActVal::For(_,_,ref mut a,ref mut b,ref mut c) => {
+            ActVal::For(_,_,ref mut a,ref mut b,ref mut c) => {
                 replace_expr!(a);
                 replace_expr!(b);
                 res = replace_to_noex(c, names) || res;
             },
-	        ActVal::Foreach(_,_,_,ref mut c, ref mut a) => {
+            ActVal::Foreach(_,_,_,ref mut c, ref mut a) => {
                 replace_expr!(c);
                 res = replace_to_noex(a, names) || res;
                 force_false = true
             },
-	        ActVal::If(ref mut e,ref mut a,ref mut b) => {
+            ActVal::If(ref mut e,ref mut a,ref mut b) => {
                 let e = replace_expr(e, names);
                 let a = replace_to_noex(a, names);
                 res = replace_to_noex(b, names) || a || e || res
             },
-	        ActVal::Try(ref mut t, ref mut ctch) => {
+            ActVal::Try(ref mut t, ref mut ctch) => {
                 replace_to_noex(t, names);
                 for c in ctch.iter_mut() {
                     replace_to_noex(&mut c.act, names);
                 }
                 force_false = true;
             },
-	        ActVal::Throw(_,_,ref mut e) => {
+            ActVal::Throw(_,_,ref mut e) => {
                 match *e {
                     Some(ref mut e) => replace_expr!(e),
                     _ => ()
@@ -222,17 +222,17 @@ unsafe fn get_local_funs(code : &mut Vec<ActF>, result : &mut Vec<*mut SynFn>) {
     for act in code.iter_mut() {
         match act.val {
             ActVal::DFun(ref mut df) => result.push(&mut **df),
-	        ActVal::While(_, _, ref mut body) =>
+            ActVal::While(_, _, ref mut body) =>
                 get_local_funs(body, result),
-	        ActVal::For(_,_,_,_,ref mut body) =>
+            ActVal::For(_,_,_,_,ref mut body) =>
                 get_local_funs(body, result),
-	        ActVal::Foreach(_,_,_,_,ref mut body) =>
+            ActVal::Foreach(_,_,_,_,ref mut body) =>
                 get_local_funs(body, result),
-	        ActVal::If(_,ref mut t_body,ref mut e_body) => {
+            ActVal::If(_,ref mut t_body,ref mut e_body) => {
                 get_local_funs(t_body, result);
                 get_local_funs(e_body, result);
             },
-	        ActVal::Try(ref mut body, ref mut ctchs) => {
+            ActVal::Try(ref mut body, ref mut ctchs) => {
                 get_local_funs(body, result);
                 for ctch in ctchs.iter_mut() {
                     get_local_funs(&mut ctch.act, result);
@@ -249,10 +249,10 @@ fn can_throw_act(code : &Vec<ActF>/*, store : &Vec<SynFn>*/) -> bool {
         ($e:expr) => {res = res || can_throw_expr($e/*, store*/)};
         ($a:expr, ACT) => {res = res || can_throw_act($a/*, store*/)};
     }
-	for act in code.iter() {
-		match act.val {
-			ActVal::Expr(ref e) => can_throw!(e),
-			ActVal::DVar(_,_,ref oe) =>
+    for act in code.iter() {
+        match act.val {
+            ActVal::Expr(ref e) => can_throw!(e),
+            ActVal::DVar(_,_,ref oe) =>
                 match *oe {
                     Some(ref e) => can_throw!(e),
                     _ => ()
@@ -266,35 +266,35 @@ fn can_throw_act(code : &Vec<ActF>/*, store : &Vec<SynFn>*/) -> bool {
                     Some(ref e) => can_throw!(e),
                     _ => ()
                 },
-	        ActVal::While(_, ref e, ref a) => {
+            ActVal::While(_, ref e, ref a) => {
                 can_throw!(e);
                 can_throw!(a, ACT);
             },
-	        ActVal::For(_,_,ref a,ref b,ref c) => {
+            ActVal::For(_,_,ref a,ref b,ref c) => {
                 can_throw!(a);
                 can_throw!(b);
                 can_throw!(c, ACT);
             },
-	        ActVal::Foreach(_,_,_,_,_) => res = true,
-	        ActVal::If(ref e,ref a,ref b) => {
+            ActVal::Foreach(_,_,_,_,_) => res = true,
+            ActVal::If(ref e,ref a,ref b) => {
                 can_throw!(e);
                 can_throw!(a, ACT);
                 can_throw!(b, ACT);
             },
-	        ActVal::Try(_, _) => res = true,
-	        ActVal::Throw(_,_,_) => res = true,
+            ActVal::Try(_, _) => res = true,
+            ActVal::Throw(_,_,_) => res = true,
             _ => ()
-		}
+        }
         if res {
             return true;
         }
-	}
+    }
     return res;
 }
 
 fn can_throw_expr(e : &Expr/*, store : &Vec<SynFn>*/) -> bool {
     macro_rules! rec {($e:expr) => {can_throw_expr($e/*, store*/)} }
-	match e.val {
+    match e.val {
         EVal::Call(_, ref fun, ref args, ref noexc) => {
             let mut has = rec!(fun);
             for a in args.iter() {

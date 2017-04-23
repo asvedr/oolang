@@ -39,26 +39,26 @@ pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::
         let cmd : &Cmd = &stack[0].code[stack[0].pos];
         write!(out, "{}", space)?;
         match *cmd {
-	        Cmd::Mov(ref a, ref b) => set_res(b, a, out)?,
-    	    Cmd::IOp(ref opr) =>
+            Cmd::Mov(ref a, ref b) => set_res(b, a, out)?,
+            Cmd::IOp(ref opr) =>
                 if opr.is_f {
                     set_prim!(is_int, "NEWINT", opr.dst, format!("{}({},{})", opr.opr, get_i(&opr.a), get_i(&opr.b)))
                 } else {
                     set_prim!(is_int, "NEWINT", opr.dst, format!("{}{}{}", get_i(&opr.a), opr.opr, get_i(&opr.b)))
                 },
-    	    Cmd::ROp(ref opr) =>
+            Cmd::ROp(ref opr) =>
                 if opr.is_f {
                     set_prim!(is_real, "NEWREAL", opr.dst, format!("{}({},{})", opr.opr, get_r(&opr.a), get_r(&opr.b)))
                 } else {
                     set_prim!(is_real, "NEWREAL", opr.dst, format!("{}{}{}", get_r(&opr.a), opr.opr, get_r(&opr.b)))
                 },
-        	Cmd::VOp(ref opr) =>
+            Cmd::VOp(ref opr) =>
                 if opr.is_f {
                     set_prim!(is_int, "NEWINT", opr.dst, format!("{}({},{})", opr.opr, get_i(&opr.a), get_i(&opr.b)))
                 } else {
                     set_prim!(is_int, "NEWINT", opr.dst, format!("{}{}{}", get_i(&opr.a), opr.opr, get_i(&opr.b)))
                 },
-	        Cmd::Call(ref call) => {
+            Cmd::Call(ref call) => {
                 let mut param = format!("");
                 // XXX ARGS MUST BE COERSED TO RIGHT REGS BEFORE TRANSLATION
                 for a in call.args.iter() {
@@ -102,26 +102,26 @@ pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::
                     }
                 }
             },
-        	Cmd::SetI(ref val, ref r) => {
+            Cmd::SetI(ref val, ref r) => {
                 if r.is_obj() {
                     write!(out, "DECVAL({});\n{}NEWINT({},{})", reg(r), space, reg(r), val)?
                 } else {
                     write!(out, "{} = {}", reg(r), val)?
                 }
             },
-	        Cmd::SetR(ref val, ref r) => {
+            Cmd::SetR(ref val, ref r) => {
                 if r.is_obj() {
                     write!(out, "DECVAL({});\n{}NEWREAL({},{})", reg(r), space, reg(r), val)?
                 } else {
                     write!(out, "{} = {}", reg(r), val)?
                 }
             },
-    	    Cmd::SetS(ref s, ref r) => {
+            Cmd::SetS(ref s, ref r) => {
                 write!(out, "_std_str_fromRaw({}, {});\n", s, s.len())?;
                 write!(out, "{}", space)?;
                 set_res(r, &reg_res, out)?
             },
-    	    Cmd::WithItem(ref opr) => {
+            Cmd::WithItem(ref opr) => {
                 if opr.is_get {
                     match opr.cont_type {
                         ContType::Vec => {
@@ -191,8 +191,8 @@ pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::
                 }
             },
             // TODO
-        	Cmd::MethMake(_,_,_) => panic!(),
-	        Cmd::MethCall(ref call, ref meth) => {
+            Cmd::MethMake(_,_,_) => panic!(),
+            Cmd::MethCall(ref call, ref meth) => {
                 let mut param = String::new();
                 for a in call.args.iter() {
                     if param.len() == 0 {
@@ -238,7 +238,7 @@ pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::
                     }
                 }
             },
-        	Cmd::MakeClos(ref clos_conf) => {
+            Cmd::MakeClos(ref clos_conf) => {
                 write!(
                     out,
                     "ASSIGN({}, newClosure({}, {}, &closure));\n",
@@ -251,7 +251,7 @@ pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::
                     write!(out, "\tINCLINK({});\n", reg(&clos_conf.to_env[i]))?;
                 }
             },
-	        Cmd::Prop(ref obj, ref ind, ref out_reg) => {
+            Cmd::Prop(ref obj, ref ind, ref out_reg) => {
                 let val = format!("((Object*)VAL({})) -> props[{}]", reg(obj), ind);
                 if out_reg.is_int() {
                     write!(out, "{} = VINT({})", reg(out_reg), val)?;
@@ -261,7 +261,7 @@ pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::
                     write!(out, "ASG({},{})", reg(out_reg), val)?;
                 }
             },
-    	    Cmd::SetProp(ref obj, ref ind, ref val) => {
+            Cmd::SetProp(ref obj, ref ind, ref val) => {
                 let dst = format!("((Object*)VAL({})) -> props[{}]", reg(obj), ind);
                 if val.is_int() {
                     write!(out, "VINT({}) = {}", dst, get_i(val))?;
@@ -271,7 +271,7 @@ pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::
                     write!(out, "ASG({},{})", dst, reg(val))?;
                 }
             },
-    	    Cmd::Conv(ref src, ref kind, ref dst) =>
+            Cmd::Conv(ref src, ref kind, ref dst) =>
                 match *kind {
                     Convert::I2R =>
                         if dst.is_real() {
@@ -293,8 +293,8 @@ pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::
                         }
                 },
             // TODO
-        	Cmd::NewObj(_,_,_) => panic!(),
-	        Cmd::Throw(ref code, ref arg, ref lab) =>
+            Cmd::NewObj(_,_,_) => panic!(),
+            Cmd::Throw(ref code, ref arg, ref lab) =>
                 match *arg {
                     Some(ref val) => {
                         write!(out, "THROWP_NORET({},{})", code, reg(val))?;
@@ -305,7 +305,7 @@ pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::
                         write!(out, ";\n{}goto {}", space, lab)?;
                     }
                 },
-        	Cmd::Ret(ref val) =>
+            Cmd::Ret(ref val) =>
                 match *val {
                     Reg::Null => {
                         for line in finalizer {
@@ -322,8 +322,8 @@ pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::
                         write!(out, "{}RETURNJUST", space)?
                     }
                 },
-	        Cmd::Goto(ref lab) => write!(out, "goto {}", lab)?,
-    	    Cmd::If(ref cond, ref code) => {
+            Cmd::Goto(ref lab) => write!(out, "goto {}", lab)?,
+            Cmd::If(ref cond, ref code) => {
                 if cond.is_int() {
                     write!(out, "if({}) {}", reg(cond), '{')?;
                 } else {
@@ -345,16 +345,16 @@ pub fn to_c(cmds : &Vec<Cmd>, finalizer : &Vec<String>, out : &mut File) -> io::
                 });
                 continue
             },
-    	    Cmd::ReRaise => {
+            Cmd::ReRaise => {
                 for line in finalizer {
                     write!(out, "{};\n{}", line, space)?;
                 }
                 write!(out, "return;")?
             },
-        	Cmd::Noop => (),
-	        Cmd::Label(ref lab) => write!(out, "{}:", lab)?,
+            Cmd::Noop => (),
+            Cmd::Label(ref lab) => write!(out, "{}:", lab)?,
             // TODO
-        	Cmd::Catch(_,_) => panic!()
+            Cmd::Catch(_,_) => panic!()
         }
         stack[0].pos += 1;
         write!(out, ";\n")?;
@@ -433,21 +433,21 @@ fn set_res(dst : &Reg, src : &Reg, out : &mut File) -> io::Result<()> {
 
 fn reg(a : &Reg) -> String {
     match *a {
-    	Reg::IVar(ref i)    => format!("i_var{}", i),
-	    Reg::RVar(ref i)    => format!("r_var{}", i),
-    	Reg::Var(ref i)     => format!("v_var{}", i),
-	    Reg::IStack(ref i)  => format!("i_stack{}", i),
-    	Reg::RStack(ref i)  => format!("r_stack{}", i),
-	    Reg::VStack(ref i)  => format!("v_stack{}", i),
-    	Reg::RSelf          => format!("(*env)"),
-	    Reg::Arg(ref i)     => format!("arg{}", i),
-    	Reg::Env(ref i)     => format!("env[{}]", i),
-	    Reg::Temp           => format!("temp"),
-    	Reg::TempI          => format!("temp_i"),
-	    Reg::TempR          => format!("temp_r"),
-    	Reg::Exc            => format!("_reg_result.val"),
-	    Reg::Null           => String::new(),
-    	Reg::Name(ref s)    => (**s).clone(),
+        Reg::IVar(ref i)    => format!("i_var{}", i),
+        Reg::RVar(ref i)    => format!("r_var{}", i),
+        Reg::Var(ref i)     => format!("v_var{}", i),
+        Reg::IStack(ref i)  => format!("i_stack{}", i),
+        Reg::RStack(ref i)  => format!("r_stack{}", i),
+        Reg::VStack(ref i)  => format!("v_stack{}", i),
+        Reg::RSelf          => format!("(*env)"),
+        Reg::Arg(ref i)     => format!("arg{}", i),
+        Reg::Env(ref i)     => format!("env[{}]", i),
+        Reg::Temp           => format!("temp"),
+        Reg::TempI          => format!("temp_i"),
+        Reg::TempR          => format!("temp_r"),
+        Reg::Exc            => format!("_reg_result.val"),
+        Reg::Null           => String::new(),
+        Reg::Name(ref s)    => (**s).clone(),
         Reg::Res            => format!("result")
     }
 }

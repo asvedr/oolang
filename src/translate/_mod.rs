@@ -6,17 +6,17 @@ use std::io::Write;
 use std::io;
 
 pub fn cmod_to_c(cmod : &CMod, fname : &str) -> io::Result<()> {
-	let mut out = File::create(format!("{}.c", fname))?;
-	write!(out, "#include \"{}.h\"\n\n", fname)?;
+    let mut out = File::create(format!("{}.c", fname))?;
+    write!(out, "#include \"{}.h\"\n\n", fname)?;
 
-	for f in cmod.priv_fns.iter() {
-		write!(out, "static ")?;
-		fun::to_c(&f, &mut out)?;
-		write!(out, "\n")?;
-	}
-	for f in cmod.pub_fns.iter() {
-		fun::to_c(&f, &mut out)?;
-		write!(out, "\n")?;
-	}
-	Ok(())
+    for f in cmod.priv_fns.iter() {
+        write!(out, "static ")?;
+        fun::to_c(&f, &mut out)?;
+        write!(out, "\n")?;
+    }
+    for f in cmod.pub_fns.iter() {
+        fun::to_c(&f, &mut out)?;
+        write!(out, "\n")?;
+    }
+    Ok(())
 }
