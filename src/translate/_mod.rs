@@ -12,9 +12,11 @@ pub fn cmod_to_c(cmod : &CMod, fname : &str) -> io::Result<()> {
 	for f in cmod.priv_fns.iter() {
 		write!(out, "static ")?;
 		fun::to_c(&f, &mut out)?;
+		write!(out, "\n")?;
 	}
 	for f in cmod.pub_fns.iter() {
 		fun::to_c(&f, &mut out)?;
+		write!(out, "\n")?;
 	}
 	Ok(())
 }

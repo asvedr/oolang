@@ -1,4 +1,5 @@
 use bytecode::compile_fun::*;
+use bytecode::cmd::Cmd;
 use translate::code;
 
 use std::fs::File;
@@ -23,7 +24,7 @@ pub fn to_c(fun : &CFun, out : &mut File) -> io::Result<()> {
 	 			finalizer.push(format!("DECLINK({}{})", $prefix, i));
 	 		}
 	 	}
-	} 
+	}
 	add_vars!("arg", fun.arg_cnt);
 	add_vars!("v_var", fun.var_v);
 	add_vars!("v_stack", fun.stack_v);
@@ -32,6 +33,7 @@ pub fn to_c(fun : &CFun, out : &mut File) -> io::Result<()> {
 	}
 	write!(out, ") {}", "{\n")?;
 	write!(out, "\t// INIT SECTION\n")?;
+	// MACRO FOR DEFINE SEQUENCE OF LOCAL HOMOGENIC VARIABLES
 	macro_rules! def_vars {
 		($prefix:expr, $count:expr, $_type:expr, $init_val:expr) => {
 			if $count > 0 {
@@ -43,13 +45,24 @@ pub fn to_c(fun : &CFun, out : &mut File) -> io::Result<()> {
 			}
 		}
 	}
+	// INIT LOCAL VARIABLES
 	def_vars!("v_stack", fun.stack_v, "Var", "NULL");
 	def_vars!("i_stack", fun.stack_i, "int", "0");
 	def_vars!("r_stack", fun.stack_r, "double", "0");
 	def_vars!("v_var", fun.var_v, "Var", "NULL");
 	def_vars!("i_var", fun.var_i, "int", "0");
 	def_vars!("r_var", fun.var_r, "double", "0");
-	write!(out, "\tClosure *closure;\n")?;
+	// DOES WE NEED LOCAL VAR FOR CLOSURES
+	for cmd in fun.body.iter() {
+		match *cmd {
+			Cmd::MakeClos(_) => {
+				// YES WE NEED
+				write!(out, "\tClosure *closure;\n")?;
+				break;
+			},
+			_ => ()
+		}
+	}
 	write!(out, "\t// CODE SECTION\n")?;
 	code::to_c(&fun.body, &finalizer, out)
 	//write!(out, "{}", '}')
