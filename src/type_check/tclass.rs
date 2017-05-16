@@ -7,15 +7,16 @@ pub use std::rc::Rc;
 pub type RTClass = Rc<RefCell<TClass>>;
 
 pub struct Parent {
-    pub class  : RTClass,//*const TClass,
-    pub params : Option<*const Vec<RType>>
+    pub class  : RTClass,
+    // PARAMS OF USING CLASS
+    pub params : Option<Vec<RType>>
 }
 
 impl Parent {
-    pub fn new(cls : RTClass, pars : Option<*const Vec<RType>>) -> Parent {
+    pub fn new(class : RTClass, params : Option<Vec<RType>>) -> Parent {
         Parent {
-            class  : cls,
-            params : pars
+            class  : class,
+            params : params
         }
     }
 }
@@ -63,6 +64,24 @@ pub struct TClass {
     pub virts_i  : HashMap<String,usize>
 }
 
+macro_rules! rec_to_parent {
+    ($_self:expr, $name:ident, $matcher:expr, $val:ident, $action:expr) => {{
+        unsafe {
+            let mut $name : *const TClass = $_self;
+            //loop { $name = $matcher }
+            loop {
+                match $matcher {
+                    Some($val) => $action,
+                    _ => match (*$name).parent {
+                        Some(ref p) => $name = &*p.class.borrow(),
+                        _ => return None
+                    }
+                }
+            }
+        }
+    }}
+}
+
 impl TClass {
     pub fn new(name : String) -> RTClass {
         Rc::new(RefCell::new(TClass {
@@ -93,46 +112,47 @@ impl TClass {
         }
     }
     pub fn get_prop_i(&self, name : &String) -> Option<usize> {
-        unsafe {
-            let mut cls : *const TClass = self;
-            loop {
-                match (*cls).props_i.get(name) {
-                    Some(a) => return Some(*a),
-                    _ => match (*cls).parent {
-                        Some(ref p) => cls = &*p.class.borrow(),
-                        _ => return None
-                    }
-                }
-            }
-        }
+        rec_to_parent!(
+            self,
+            cls, (*cls).props_i.get(name),
+            val, return Some(*val)
+        )
+            // let mut cls : *const TClass = self;
+            // loop {
+            //     match (*cls).props_i.get(name) {
+            //         Some(a) => return Some(*a),
+            //         _ => match (*cls).parent {
+            //             Some(ref p) => cls = &*p.class.borrow(),
+            //             _ => return None
+            //         }
+            //     }
+            // }
     }
     pub fn get_virt_i(&self, name : &String) -> Option<usize> {
-        unsafe {
-            let mut cls : *const TClass = self;
-            loop {
-                match (*cls).virts_i.get(name) {
-                    Some(a) => return Some(*a),
-                    _ => match (*cls).parent {
-                        Some(ref p) => cls = &*p.class.borrow(),
-                        _ => return None
-                    }
-                }
-            }
-        }
+        rec_to_parent!(
+            self,
+            cls, (*cls).virts_i.get(name),
+            val, return Some(*val)
+        )
+            // let mut cls : *const TClass = self;
+            // loop {
+            //     match (*cls).virts_i.get(name) {
+            //         Some(a) => return Some(*a),
+            //         _ => match (*cls).parent {
+            //             Some(ref p) => cls = &*p.class.borrow(),
+            //             _ => return None
+            //         }
+            //     }
+            // }
     }
     pub fn method2name(&self, name : &String) -> Option<String> {
-        unsafe {
-            let mut cls : *const TClass = self;
-            loop {
-                match (*cls).pubs.get(name) {
-                    Some(_) => return Some(format!("{}_M_{}", (*cls).fname, name)),
-                    _ => match (*cls).privs.get(name) {
-                        Some(_) => return Some(format!("{}_M_{}", (*cls).fname, name)),
-                        _ => match (*cls).parent {
-                            Some(ref p) => cls = &*p.class.borrow(),
-                            _ => return None
-                        }
-                    }
+        match self.pubs.get(name) {
+            Some(_) => Some(format!("{}_M_{}", self.fname, name)),
+            _ => match self.privs.get(name) {
+                Some(_) => Some(format!("{}_M_{}", self.fname, name)),
+                _ => match self.parent {
+                    Some(ref parent) => parent.class.borrow().method2name(name),
+                    _ => None
                 }
             }
         }
@@ -294,10 +314,10 @@ impl TClass {
             }
         }
     }
-    pub unsafe fn check_initializer(&mut self) -> Result<(),Vec<SynErr>> {    
+    pub fn check_initializer(&mut self) -> Result<(),Vec<SynErr>> {    
         let fname = format!("init");
         let cls : &Class = match self.source {
-            Some(ptr) => &*ptr,
+            Some(ptr) => unsafe { &*ptr },
             _ => panic!()
         };
         for meth in cls.pub_fn.iter() {
@@ -322,73 +342,64 @@ impl TClass {
         panic!("init not found")
     }
     fn exist_attr(&self, name : &String) -> bool {
-        unsafe {
-            let mut lnk : *const TClass = self;
-            loop {
-                if (*lnk).privs.contains_key(name) || (*lnk).pubs.contains_key(name) {
-                    return true
-                } else {
-                    match (*lnk).parent {
-                        Some(ref par) => lnk = &*par.class.borrow(),
-                        _ => return false
-                    }
-                }
+        if self.privs.contains_key(name) || self.pubs.contains_key(name) {
+            true
+        } else {
+            match self.parent {
+                Some(ref par) => par.class.borrow().exist_attr(name),
+                _ => false
             }
         }
     }
     pub fn look_in_all(&self, name : &String, tmpl : Option<&Vec<RType>>) -> Option<RType> {
-        // TODO change tmpl when going to parent
-        let lnk : &RType;
-        unsafe {
-            let mut cls : *const TClass = self;
-            loop {
-                match (*cls).pubs.get(name) {
-                    Some(attr) => {
-                        lnk = &attr._type;
-                        break
-                    },
-                    _ =>
-                        match (*cls).privs.get(name) {
-                            Some(attr) => {
-                                lnk = &attr._type;
-                                break
-                            },
-                            _ =>
-                                match (*cls).parent {
-                                    Some(ref p) => cls = &*p.class.borrow(),
-                                    _ => return None
-                                }
-                        }
+        // TODO use local template and then global
+        macro_rules! replace_template {
+            ($t:expr, $other:expr) => {
+                match tmpl {
+                    Some(vec) => Some(self.replace_type(&$t, vec, true)),
+                    _ => Some($other)
                 }
             }
         }
-        match tmpl {
-            Some(vec) => Some(self.replace_type(lnk, vec, true)),
-            _ => Some(lnk.clone())
+        match self.pubs.get(name) {
+            Some(attr) => replace_template!(attr._type, attr._type.clone()),
+            _ =>
+                match self.privs.get(name) {
+                    Some(attr) => replace_template!(attr._type, attr._type.clone()),
+                    _ =>
+                        match self.parent {
+                            Some(ref p) =>
+                                match p.class.borrow().look_in_all(name, None) {
+                                    Some(t) =>
+                                        replace_template!(t, t),
+                                    _ => None
+                                },
+                            _ => None
+                        }
+                }
         }
     }
     pub fn look_in_pub(&self, name : &String, tmpl : Option<&Vec<RType>>) -> Option<RType> {
-        // TODO change tmpl when going to parent
-        let lnk : &RType;
-        unsafe {
-            let mut cls : *const TClass = self;
-            loop {
-                match (*cls).pubs.get(name) {
-                    Some(attr) => {
-                        lnk = &attr._type;
-                        break
-                    },
-                    _ =>
-                        match self.parent {
-                            Some(ref p) => cls = &*p.class.borrow(),
-                            _ => return None
-                        }
+        // TODO use local template and then global
+        macro_rules! replace_template {
+            ($t:expr, $other:expr) => {
+                match tmpl {
+                    Some(vec) => Some(self.replace_type(&$t, vec, true)),
+                    _ => Some($other)
                 }
             }
         }
-        match tmpl {
-            Some(vec) => Some(self.replace_type(lnk, vec, true)),
-            _ => Some(lnk.clone())
+        match self.pubs.get(name) {
+            Some(attr) => replace_template!(attr._type, attr._type.clone()),
+            _ =>
+                match self.parent {
+                    Some(ref p) =>
+                        match p.class.borrow().look_in_pub(name, None) {
+                            Some(t) => replace_template!(t, t),
+                            _ => None
+                        },
+                    _ => None
+                }
         }
     }
     pub fn initer_type(&self, tmpl : Option<&Vec<RType>>) -> RType {
@@ -399,41 +410,31 @@ impl TClass {
     }
     // true if attr is method, false if prop. there is no check for existing here
     pub fn is_method(&self, name : &String) -> bool {
-        unsafe {
-            let mut lnk : *const TClass = self;
-            loop {
-                match (*lnk).pubs.get(name) {
-                    Some(p) => return p.is_method,
+        match self.pubs.get(name) {
+            Some(prop) => prop.is_method,
+            _ =>
+                match self.privs.get(name) {
+                    Some(prop) => return prop.is_method,
                     _ =>
-                        match (*lnk).privs.get(name) {
-                            Some(p) => return p.is_method,
-                            _ =>
-                                match (*lnk).parent {
-                                    Some(ref par) => lnk = &*par.class.borrow(),
-                                    _ => panic!()
-                                }
+                        match self.parent {
+                            Some(ref par) => par.class.borrow().is_method(name),
+                            _ => panic!()
                         }
                 }
-            }
         }
     }
     pub fn is_method_noexc(&self, name : &String) -> bool {
-        unsafe {
-            let mut lnk : *const TClass = self;
-            loop {
-                match (*lnk).pubs.get(name) {
+        match self.pubs.get(name) {
+            Some(p) => return p.is_no_exc,
+            _ =>
+                match self.privs.get(name) {
                     Some(p) => return p.is_no_exc,
                     _ =>
-                        match (*lnk).privs.get(name) {
-                            Some(p) => return p.is_no_exc,
-                            _ =>
-                                match (*lnk).parent {
-                                    Some(ref par) => lnk = &*par.class.borrow(),
-                                    _ => panic!()
-                                }
+                        match self.parent {
+                            Some(ref par) => par.class.borrow().is_method_noexc(name),
+                            _ => panic!()
                         }
                 }
-            }
         }
     }
     // REPLACING TEMPLATES

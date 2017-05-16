@@ -3,7 +3,7 @@
 +/- source => byte code
 - byte code => c
 
-* refact: typecheck/fun_env, typecheck/utils: убрать локал из funenv. Это упростит fun env и block env
+* refact: слишком много unsafe. Сделать safe
 * refact: как нибудь разделить на модули checker.rs
 * bytecode: обрабатывать %rec вызовы.
 	Если функция rec_used, то при вызове ее окружение сразу копируется.

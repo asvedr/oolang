@@ -164,9 +164,9 @@ impl Checker {
                     //let tp : &mut (&mut Type) = mem::transmute(tp);
                     let tp : &mut Type = mem::transmute(&**tp);
                     match *tp {
-                        Type::Class(ref mut pref, ref name, ref mut pars) => {
-                            let p_ref : Option<*const Vec<RType>> =
-                                match *pars {
+                        Type::Class(ref mut pref, ref name, ref mut c_params) => {
+                            let params : Option<Vec<RType>> =
+                                match *c_params {
                                     Some(ref mut vec) => {
                                         for par in vec.iter_mut() {
                                             let val : RType = par.clone();
@@ -177,11 +177,11 @@ impl Checker {
                                                 &c.addres
                                             )?
                                         }
-                                        Some(&*vec)
+                                        Some(vec.clone())
                                     },
                                     _ => None
                                 };
-                            pack.check_class(pref, name, pars, &c.addres)?;
+                            pack.check_class(pref, name, c_params, &c.addres)?;
                             let cls =
                                 if pref[0] == "%mod" {
                                     let p = Vec::new();
@@ -190,7 +190,7 @@ impl Checker {
                                     pack.get_cls_rc(pref, name)
                                 };
                             let cls = cls.unwrap().clone();
-                            Some(Parent::new(cls, p_ref))
+                            Some(Parent::new(cls, params))
                         },
                         _ => throw!(format!("can't inherit from {:?}", tp), c.addres)
                     }
@@ -226,7 +226,7 @@ impl Checker {
             }
             let prefix = Vec::new();
             match pack.get_cls_rc(&prefix, &c.name) {
-                Some(tcl) => unsafe {tcl.borrow_mut().check_initializer()?},
+                Some(tcl) => tcl.borrow_mut().check_initializer()?,
                 _ => ()
             }
         }
