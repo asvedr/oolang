@@ -2,6 +2,7 @@ use syn::reserr::*;
 use syn::utils::*;
 use std::fmt;
 use std::rc::Rc;
+pub use std::cell::RefCell;
 
 #[derive(Clone,PartialEq)]
 pub enum Type {
@@ -21,6 +22,7 @@ pub enum Type {
 }
 
 pub type RType = Rc<Type>;
+pub type MRType = Rc<RefCell<RType>>;
 
 #[macro_export]
 macro_rules! type_fn {
@@ -74,6 +76,9 @@ lazy_static! {
 //static stat_int : *mut Type = 0 as *mut Type;
 
 impl Type {
+    pub fn mtype(ptr : RType) -> MRType {
+        Rc::new(RefCell::new(ptr))
+    }
     pub fn unk()  -> RType { STAT_UNK.store.clone()  }
     pub fn int()  -> RType { STAT_INT.store.clone()  }
     pub fn real() -> RType { STAT_REAL.store.clone() }
@@ -187,6 +192,11 @@ impl fmt::Debug for Type {
 }
 
 pub type Tmpl = Vec<String>;
+
+pub fn parse_m_type(lexer : &Lexer, curs : &Cursor) -> SynRes<MRType> {
+    let tp = parse_type(lexer, curs)?;
+    syn_ok!(Rc::new(RefCell::new(tp.val)), tp.cursor);
+}
 
 pub fn parse_type(lexer : &Lexer, curs : &Cursor) -> SynRes<RType> {
     let ans = lex!(lexer, curs);

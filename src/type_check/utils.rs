@@ -13,24 +13,26 @@ macro_rules! throw {
 #[macro_export]
 macro_rules! ok {() => {return Ok(())};}
 
-pub type VMap = BTreeMap<String, Result<RType, *mut RType>>;
+pub type VMap = BTreeMap<String, MRType>;
 // Ok  (WE TRULY KNOW WHAT IT IS)
 // Err (WE CALCULATED THIS AND WE CAN MISTAKE)
 
 #[macro_export]
 macro_rules! add_loc_unk {
-    ($loc_e:expr, $name:expr, $tp:expr, $pos:expr) => { try!($loc_e.add_loc_var($name, Err($tp), &$pos)) };
+    // ($loc_e:expr, $name:expr, $tp:expr, $pos:expr) => { try!($loc_e.add_loc_var($name, Err($tp), &$pos)) };
+    ($loc_e:expr, $name:expr, $tp:expr, $pos:expr) => { $loc_e.add_loc_var($name, $tp, &$pos)? };
 }
 #[macro_export]
 macro_rules! add_loc_knw {
-    ($loc_e:expr, $name:expr, $tp:expr, $pos:expr) => { try!($loc_e.add_loc_var($name, Ok($tp), &$pos)) };
+    // ($loc_e:expr, $name:expr, $tp:expr, $pos:expr) => { try!($loc_e.add_loc_var($name, Ok($tp), &$pos)) };
+    ($loc_e:expr, $name:expr, $tp:expr, $pos:expr) => { $loc_e.add_loc_var_const_t($name, $tp, &$pos)? };
 }
 
 pub fn find_unknown(body : &Vec<ActF>) -> &Cursor {    
     macro_rules! go_e {($e:expr) => {match check($e) {Some(p) => return Some(p) , _ => ()}};}
     macro_rules! go_a {($e:expr) => {match rec($e) {Some(p) => return Some(p) , _ => ()}};}
     fn check(e : &Expr) -> Option<&Cursor> {    
-        if e.kind.is_unk() {
+        if e.kind.borrow().is_unk() {
             Some(&e.addres)
         } else {
             match e.val {
@@ -87,7 +89,7 @@ pub fn find_unknown(body : &Vec<ActF>) -> &Cursor {
                     go_a!(a);
                 },
                 ActVal::Foreach(_,_,ref t,ref e,ref a) => {
-                    if t.is_unk() {
+                    if t.borrow().is_unk() {
                         return Some(&act.addres);
                     } else {
                         go_e!(e);
@@ -133,14 +135,14 @@ pub fn put_inherit_init(seq : &mut Vec<ActF>, pos : Cursor) {
                 None,
                 Box::new(Expr {
                     val     : EVal::Var(vec!["%parent".to_string()], "%init".to_string()),
-                    kind    : Type::unk(),
+                    kind    : Type::mtype(Type::unk()),
                     addres  : p2,
                     op_flag : 0
                 }),
                 vec![],
                 false
             ),
-            kind    : Type::void(),
+            kind    : Type::mtype(Type::void()),
             addres  : pos,
             op_flag : 0
         }),
@@ -189,14 +191,14 @@ pub fn gen_default_init(has_parent : bool, addr : Cursor) -> Method {
                     None,
                     Box::new(Expr {
                         val     : EVal::Var(vec!["%parent".to_string()], "%init".to_string()),
-                        kind    : Type::unk(),
+                        kind    : Type::mtype(Type::unk()),
                         addres  : addr.clone(),
                         op_flag : 0
                     }),
                     vec![],
                     false
                 ),
-                kind    : Type::void(),
+                kind    : Type::mtype(Type::void()),
                 addres  : addr.clone(),
                 op_flag : 0
             }),

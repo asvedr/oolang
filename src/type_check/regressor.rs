@@ -12,80 +12,90 @@ pub fn regress_expr(env : &mut LocEnv, expr : &mut Expr, e_type : RType) -> Chec
             macro_rules! a { () => {args[0]}; }
             macro_rules! b { () => {args[1]}; }
             macro_rules! coerse { ($e:expr, $from:expr, $to:expr) => {{
-                let val  = mem::replace(&mut $e.val, EVal::Null);
-                let expr = Expr{val : val, kind : $from, addres : $e.addres.clone(), op_flag : 0};
-                $e.val   = EVal::ChangeType(Box::new(expr), $to);
-                $e.kind  = $to;
+                let val               = mem::replace(&mut $e.val, EVal::Null);
+                let expr              = Expr{
+                    val : val,
+                    kind : Type::mtype($from),
+                    addres : $e.addres.clone(),
+                    op_flag : 0
+                };
+                $e.val                = EVal::ChangeType(Box::new(expr), Type::mtype($to));
+                *$e.kind.borrow_mut() = $to;
             }}; }
             macro_rules! apply {($e:expr, $f:expr, $t:expr) => {{
-                if $e.kind.is_unk() {
+                let kind = $e.kind.borrow().clone();
+                let f = $f;
+                if kind.is_unk() {
                     regress!(&mut $e, $t);
-                } else if $e.kind == $f {
-                    coerse!($e, $f, $t)
-                } else if !($e.kind.is_real()) {
-                    throw!(format!("expected int or real, found {:?}", $e.kind), $e.addres)
+                } else if *kind == *f {
+                    coerse!($e, f, $t)
+                } else if !(kind.is_real()) {
+                    throw!(format!("expected int or real, found {:?}", kind), $e.addres)
                 }
             }};}
             macro_rules! happly {($e:expr, $t:expr) => {{
-                let t = $t;
-                if $e.kind.is_unk() {
+                let t : RType = $t;
+                //let kind = $e.kind.borrow();
+                if $e.kind.borrow().is_unk() {
                     regress!(&mut $e, t)
-                } else if $e.kind != t {
-                    throw!(format!("expected {:?}, found {:?}", t, $e.kind), $e.addres)
+                } else if *$e.kind.borrow() != t {
+                    throw!(format!("expected {:?}, found {:?}", t, $e.kind.borrow()), $e.addres)
                 }
             }};}
             match fun.op_flag {
                 IROP if e_type.is_int() => {
                     apply!(a!(), Type::real(), Type::int());
                     apply!(b!(), Type::real(), Type::int());
-                    fun.kind = type_fn!(vec![Type::int(), Type::int()], Type::int());
+                    *fun.kind.borrow_mut() = type_fn!(vec![Type::int(), Type::int()], Type::int());
                 },
                 IROP if e_type.is_real() => {
                     apply!(a!(), Type::int(), Type::real());
                     apply!(b!(), Type::int(), Type::real());
-                    fun.kind = type_fn!(vec![Type::real(), Type::real()], Type::real());
+                    *fun.kind.borrow_mut() = type_fn!(vec![Type::real(), Type::real()], Type::real());
                 },
                 IROP => throw!(format!("expected {:?} found num operation", e_type), expr.addres),
                 IROPB if e_type.is_bool() => {
-                    if a!().kind.is_real() || b!().kind.is_real() {
+                    if a!().kind.borrow().is_real() || b!().kind.borrow().is_real() {
                         apply!(a!(), Type::int(), Type::real());
                         apply!(b!(), Type::int(), Type::real());
-                        fun.kind = type_fn!(vec![Type::real(), Type::real()], Type::bool());
+                        *fun.kind.borrow_mut() = type_fn!(vec![Type::real(), Type::real()], Type::bool());
                     } else {
                         apply!(a!(), Type::real(), Type::int());
                         apply!(b!(), Type::real(), Type::int());
-                        fun.kind = type_fn!(vec![Type::int(), Type::int()], Type::bool());
+                        *fun.kind.borrow_mut() = type_fn!(vec![Type::int(), Type::int()], Type::bool());
                     }
                 },
                 IROPB => throw!(format!("expected {:?} found bool", e_type), expr.addres),
                 IOP   => {
                     happly!(a!(), Type::int());
                     happly!(b!(), Type::int());
-                    fun.kind = type_fn!(vec![Type::int(),Type::int()],Type::int());
+                    *fun.kind.borrow_mut() = type_fn!(vec![Type::int(),Type::int()],Type::int());
                 },
                 ROP   => {
                     happly!(a!(), Type::real());
                     happly!(b!(), Type::real());
-                    fun.kind = type_fn!(vec![Type::real(),Type::real()],Type::real());
+                    *fun.kind.borrow_mut() = type_fn!(vec![Type::real(),Type::real()],Type::real());
                 }
                 AOP   => {
-                    if a!().kind.is_unk() && b!().kind.is_unk() {
+                    let akind : RType = a!().kind.borrow().clone();
+                    let bkind : RType = b!().kind.borrow().clone();
+                    if akind.is_unk() && bkind.is_unk() {
                         // CAN'T SOLUTE THIS
                         // return;
-                    } else if a!().kind.is_unk() {
-                        let t = b!().kind.clone();
+                    } else if akind.is_unk() {
+                        let t = bkind.clone();
                         regress!(&mut a!(), t);
-                    } else if b!().kind.is_unk() {
-                        let t = a!().kind.clone();
+                    } else if bkind.is_unk() {
+                        let t = akind.clone();
                         regress!(&mut b!(), t);
-                    } else if a!().kind != b!().kind {
-                        throw!(format!("expected {:?}, found {:?}", a!().kind, b!().kind), b!().addres)
+                    } else if akind != bkind {
+                        throw!(format!("expected {:?}, found {:?}", akind, bkind), b!().addres)
                     }
                 }
                 BOP   => {
                     happly!(a!(), Type::bool());
                     happly!(b!(), Type::bool());
-                    fun.kind = type_fn!(vec![Type::bool(),Type::bool()], Type::bool());
+                    *fun.kind.borrow_mut() = type_fn!(vec![Type::bool(),Type::bool()], Type::bool());
                 },
                 _     => { // NOP
                 }
@@ -96,22 +106,27 @@ pub fn regress_expr(env : &mut LocEnv, expr : &mut Expr, e_type : RType) -> Chec
         EVal::Item(ref mut cont, ref mut index) => {
             // IF INDEX IS INT OR UNKNOWN TRY TO FOLD TO ARRAY ELSE ASSOC
             // 'CAUSE OF REGRESS CALLED CONT TYPE EXACTLY UNKNOWN
-            if index.kind.is_unk() {
+            let i_kind = index.kind.borrow().clone();
+            if i_kind.is_unk() {
                 // ARRAY
                 regress!(cont, Type::arr(e_type.clone()));
                 regress!(index, Type::int());
-            } else if index.kind.is_int() {
+            } else if i_kind.is_int() {
                 regress!(cont, Type::arr(e_type.clone()));
-            } else if index.kind.is_char() || index.kind.is_str() {
+            } else if i_kind.is_char() || i_kind.is_str() {
                 // ASSOC
-                let tp = type_c!(vec!["%std".to_string()], "Asc".to_string(), Some(vec![index.kind.clone(), e_type.clone()]));
+                let tp = type_c!(
+                    vec!["%std".to_string()],
+                    "Asc".to_string(),
+                    Some(vec![i_kind.clone(),e_type.clone()])
+                );
                 regress!(cont, tp);
             } else {
                 throw!(format!("can't use {:?} for indexing", index.kind), index.addres.clone());
             }
         },
         EVal::Var(_, ref name) => { // namespace, name
-            if expr.kind.is_unk() {
+            if expr.kind.borrow().is_unk() {
                 env.replace_unk(name, e_type.clone());
             }
         },
@@ -146,6 +161,6 @@ pub fn regress_expr(env : &mut LocEnv, expr : &mut Expr, e_type : RType) -> Chec
         //Prop(Box<Expr>,String),
         _ => ()
     }
-    expr.kind = e_type;
+    *expr.kind.borrow_mut() = e_type;
     Ok(())
 }

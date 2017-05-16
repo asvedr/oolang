@@ -14,8 +14,9 @@ class single Main {
 }
 
 fn main() {
+	var out_var : int = 1;
 	fn add(a : int) : int {
-		return a + 1;
+		return a + out_var;
 	};
 	var x = add(3);
 	/*try {

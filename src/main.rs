@@ -6,6 +6,8 @@ extern crate getopts;
 extern crate lazy_static;
 
 #[macro_use]
+mod utils;
+#[macro_use]
 mod syn;
 #[macro_use]
 mod type_check;
@@ -17,7 +19,7 @@ mod translate;
 //use std::io;
 use std::io::{Read, Write};
 use std::fs::File;
-use syn::*;
+use syn::Show;
 use type_check::checker::*;
 use bytecode::compiler::*;
 use bytecode::exc_keys::*;
@@ -43,9 +45,9 @@ fn main() {
             },
         Err(_)  => panic!("can't open file")
     };
-    let lxr = Lexer::new(&*source);
+    let lxr = syn::Lexer::new(&*source);
     //let curs = Cursor::new();
-    match parse_mod(&lxr) {
+    match syn::parse_mod(&lxr) {
         Ok(mut m) => {
             let mod_name = vec!["main".to_string()];
             {

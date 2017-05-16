@@ -201,7 +201,8 @@ fn make_env(fun : &SynFn, env : &mut Env) {
         };}
         match action.val {
             //ActVal::Expr(ref e) => expr(e, env),
-            ActVal::DVar(ref name, ref tp, _) => {
+            ActVal::DVar(ref name, ref tp_cell, _) => {
+                let tp = tp_cell.borrow();
                 if tp.is_int() || tp.is_char() || tp.is_bool() {
                     add!(env.loc_i, name)
                 } else if tp.is_real() {
@@ -221,7 +222,8 @@ fn make_env(fun : &SynFn, env : &mut Env) {
                     act(a, env)
                 }
             },
-            ActVal::Foreach(_, ref name, ref tp, _, ref acts) => {
+            ActVal::Foreach(_, ref name, ref tp_cell, _, ref acts) => {
+                let tp = tp_cell.borrow();
                 if tp.is_int() || tp.is_char() || tp.is_bool() {
                     add!(env.loc_i, name)
                 } else if tp.is_real() {
@@ -248,9 +250,10 @@ fn make_env(fun : &SynFn, env : &mut Env) {
                 for c in ctch.iter() {
                     match c.vname {
                         Some(ref v) => {
-                            if c.vtype.is_int() || c.vtype.is_bool() || c.vtype.is_char() {
+                            let c_vtype = c.vtype.borrow();
+                            if c_vtype.is_int() || c_vtype.is_bool() || c_vtype.is_char() {
                                 add!(env.loc_i, v);
-                            } else if c.vtype.is_real() {
+                            } else if c_vtype.is_real() {
                                 add!(env.loc_r, v);
                             } else {
                                 add!(env.loc_v, v);

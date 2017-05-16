@@ -32,7 +32,7 @@ pub fn compile<'a>(acts : &'a Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd
                 cmds.push(Cmd::MakeClos(Box::new(mk_clos)));
             },
             ActVal::DVar(ref name, ref tp, ref val) => {
-                let reg = state.env.get_loc_var(name, &**tp);
+                let reg = state.env.get_loc_var(name, &**tp.borrow());
                 match *val {
                     None => cmds.push(Cmd::Mov(Reg::Null, reg)),
                     Some(ref val) => {
@@ -65,7 +65,7 @@ pub fn compile<'a>(acts : &'a Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd
                     match var.val {
                         EVal::Attr(ref obj, ref pname, _) => {
                             let reg_var = c_expr::compile(var, state, cmds);
-                            let cname = obj.kind.class_name();
+                            let cname = obj.kind.borrow().class_name();
                             let ind = state.property(&cname, pname);
                             cmds.push(Cmd::SetProp(reg_var, ind, reg_val));
                         }
@@ -129,7 +129,10 @@ pub fn compile<'a>(acts : &'a Vec<ActF>, state : &mut State, cmds : &mut Vec<Cmd
                         };
                     let mut code = vec![];
                     match c.vname {
-                        Some(ref name) => code.push(Cmd::Mov(Reg::Exc,state.env.get_loc_var(name, &c.vtype))),
+                        Some(ref name) => {
+                            let lnk : &Type = &**c.vtype.borrow();
+                            code.push(Cmd::Mov(Reg::Exc,state.env.get_loc_var(name, lnk)))
+                        },
                         _ => ()
                     }
                     compile(&c.act, state,/* gc,*/ &mut code, loc_funs);

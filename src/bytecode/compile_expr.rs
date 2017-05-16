@@ -36,7 +36,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
         },
         EVal::Var(ref pref, ref var) => {
             if pref[0] == "%loc" {
-                state.env.get_loc_var(var, &*e.kind)
+                state.env.get_loc_var(var, &*e.kind.borrow())
             } else if pref[0] == "%out" {
                 Reg::Env(*state.env.out.get(var).unwrap())
             } else if pref[0] == "%mod" {
@@ -90,7 +90,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
                             state.pop_v();
                         }
                     };
-                    let dst = match *e.kind {
+                    let dst = match **e.kind.borrow() {
                         Type::Int|Type::Char|Type::Bool => Reg::TempI,
                         Type::Real => Reg::TempR,
                         Type::Void => Reg::Null,
@@ -179,7 +179,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
                         }
                         match name.as_ref() {
                             "+"|"-"|"*"|"/" => 
-                                if e.kind.is_int() {
+                                if e.kind.borrow().is_int() {
                                     let out = Reg::IStack(state.push_i());
                                     cmds.push(Cmd::IOp(Box::new(Opr{a : a, b : b, dst : out.clone(), opr : name.clone(), is_f : false})));
                                     out
@@ -202,7 +202,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
                                 out
                             },
                             "<"|">"|"<="|">=" =>
-                                if args[0].kind.is_int() {
+                                if args[0].kind.borrow().is_int() {
                                     let out = Reg::IStack(state.push_i());
                                     let opr = Opr{a : a, b : b, dst : out.clone(), opr : name.clone(), is_f : false};
                                     cmds.push(Cmd::IOp(Box::new(opr)));
@@ -214,7 +214,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
                                     out
                                 },
                             "=="|"!=" =>
-                                match *args[0].kind {
+                                match **args[0].kind.borrow() {
                                     Type::Int|Type::Char|Type::Bool => {
                                         let out = Reg::IStack(state.push_i());
                                         let opr = Opr{a : a, b : b, dst : out.clone(), opr : name.clone(), is_f : false};
@@ -301,7 +301,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
             state.pop_v();
             state.pop_i();
             macro_rules! make_cmd{($a:expr,$i:expr,$d:expr) => {{
-                let ctp = match *arr.kind {
+                let ctp = match **arr.kind.borrow() {
                     Type::Str    => ContType::Str,
                     Type::Arr(_) => ContType::Vec,
                     _ /* asc */  => ContType::Asc
@@ -314,7 +314,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
                     value     : $d
                 }
             }};}
-            let cmd : WithItem = match *e.kind {
+            let cmd : WithItem = match **e.kind.borrow() {
                 Type::Int|Type::Char|Type::Bool => {
                     let r = Reg::IStack(state.push_i());
                     make_cmd!(arr_c, ind_c, r.clone())
@@ -332,9 +332,11 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
             cmds.push(Cmd::WithItem(Box::new(cmd)));
             out
         },
-        EVal::ChangeType(ref val, ref tp) => {
+        EVal::ChangeType(ref val, ref tp_cell) => {
             let reg = compile(val, state, cmds);
-            if val.kind == *tp {
+            let val_kind = val.kind.borrow();
+            let tp = tp_cell.borrow();
+            if *val_kind == *tp {
                 reg
             } else {
                 let out = if tp.is_int() {
@@ -363,7 +365,7 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
                     let call : Box<Call> = Box::new(call);
                     cmds.push(Cmd::Call(call));
                 }};}
-                match *val.kind {
+                match **val_kind {
                     Type::Int  => 
                         match **tp {
                             Type::Real => cmds.push(Cmd::Conv(reg, Convert::I2R, out.clone())),
@@ -412,31 +414,19 @@ pub fn compile(e : &Expr, state : &mut State, cmds : &mut Vec<Cmd>) -> Reg {
             if *is_meth {
                 let obj = compile(e, state, cmds);
                 state.pop_v();
-                let cname = e.kind.class_name();
+                let cname = e.kind.borrow().class_name();
                 state.closure_method(&cname, name, obj, cmds);
                 let out = Reg::VStack(state.push_v());
                 cmds.push(Cmd::Mov(Reg::Temp, out.clone()));
                 out
             } else {
-                let cls = e.kind.class_name();
+                let cls = e.kind.borrow().class_name();
                 let prop = state.property(&cls, name);
                 let out = Reg::VStack(state.push_v());
                 let obj = compile(e, state, cmds);
                 cmds.push(Cmd::Prop(obj, prop, out.clone()));
                 out
             }
-            /*if *is_meth {
-                let obj = compile(e, state, cmds);
-                state.pop_this_stack(&obj);
-                let cname = e.kind.class_name();
-                let tmp = state.this_temp(&*e.kind);
-                let out = state.push_this_stack(&*e.kind);
-                cmds.push(Cmd::MethMake(obj, format!("{}_M_{}", cname, name), tmp.clone()));
-                cmds.push(Cmd::Mov(tmp, out.clone()));
-                out
-            } else {
-                panic!()
-            }*/
         }
     }
 }

@@ -160,6 +160,7 @@ impl Pack {
             _       => None
         }
     }
+
     // DON'T USE WITH pref == []
     pub fn is_fn_noexcept(&self, pref : &Vec<String>, name : &String) -> bool {
         if pref[0] == "%mod" {
@@ -175,23 +176,40 @@ impl Pack {
             }
         }
     }
-    // changing arg
-    pub fn open_pref(&self, pref : &mut Vec<String>) {
+
+    pub fn open_pref(&self, pref : &Vec<String>) -> Option<Vec<String>> {
         let pack = unsafe {pack_of!(self, pref)};
         match pack {
-            Some(ptr) => unsafe {*pref = (*ptr).name.clone()},
-            _ => ()
+            Some(ptr) => unsafe {
+                if pref.ne(&(*ptr).name) {
+                    return Some((*ptr).name.clone());
+                } else {
+                    return None;
+                }
+            },
+            _ => return None
         }
     }
+
     pub fn pack_of_fn(&self, name : &String) -> Option<Vec<String>> { // Some(pack) or None[it mean then fun is in self module]
         find_import!(self, name, fns, out_fns)
     }
+
     pub fn pack_of_cls(&self, name : &String) -> Option<Vec<String>> { // Some(pack) or None[it mean then class is in self module]
         find_import!(self, name, cls, out_cls)
     }
-    pub fn check_class(&self, pref : &mut Vec<String>, name : &String, params : &Option<Vec<RType>>, pos : &Cursor) -> Result<(), Vec<SynErr>> {
+    // TODO make immutable class check
+    // result - new prefix or none if prefix not changed
+    pub fn check_class(
+        &self,
+        pref : &Vec<String>,
+        name : &String,
+        params : &Option<Vec<RType>>,
+        pos : &Cursor
+    ) -> Result<Option<Vec<String>>, Vec<SynErr>> {
         // .get_cls, .open_pref
         // GET OBJ
+        let mut new_pref = Vec::new();
         let cls = if pref.len() == 0 {
             match self.get_cls(pref, name) {
                 None => syn_throw!(format!("class {} not found", name), pos),
@@ -202,7 +220,7 @@ impl Pack {
             // CHECK FOR ZERO PARAMS AND RETURN
             match *params {
                 Some(_) => syn_throw!("template has more then 0 params", pos),
-                _ => return Ok(())
+                _ => return Ok(None)
             }
         } else {
             match self.get_cls(pref, name) {
@@ -222,14 +240,22 @@ impl Pack {
         // CHANGE PREF
         if pref.len() == 0 {
             match self.pack_of_cls(name) {
-                Some(p) => *pref = p,
-                _ => pref.push("%mod".to_string())
+                Some(p) => new_pref = p,
+                _ => new_pref.push("%mod".to_string())
             }
         } else if pref[0] == "%mod" {
             // ok
         } else {
-            self.open_pref(pref)
+            match self.open_pref(pref) {
+                Some(p) => new_pref = p,
+                _ => ()
+            }
         }
-        Ok(())
+        // result
+        if new_pref.len() > 0 {
+            Ok(Some(new_pref))
+        } else {
+            Ok(None)
+        }
     }
 }

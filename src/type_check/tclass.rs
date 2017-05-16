@@ -3,7 +3,6 @@ use syn::class::*;
 use syn::reserr::*;
 use std::collections::HashMap;
 pub use std::rc::Rc;
-pub use std::cell::RefCell;
 
 pub type RTClass = Rc<RefCell<TClass>>;
 

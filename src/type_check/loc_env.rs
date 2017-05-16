@@ -4,11 +4,12 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 use syn::*;
 
-type VMap = BTreeMap<String, Result<RType, *mut RType>>;
+type VMap = BTreeMap<String, MRType>;
 
 pub struct LocEnv {
     pub fun_env   : FunEnv,
-    pub block_env : Vec<VMap>
+    pub block_env : Vec<VMap>,
+    reduced_cells : Vec<MRType>
 }
 
 macro_rules! is_in_local {
@@ -42,8 +43,9 @@ impl LocEnv {
             env.templates.insert(name.clone());
         }
         LocEnv {
-            fun_env   : env,
-            block_env : vec![BTreeMap::new()]
+            fun_env       : env,
+            block_env     : vec![BTreeMap::new()],
+            reduced_cells : vec![]
         }
     }
 
@@ -53,8 +55,9 @@ impl LocEnv {
             env.templates.insert(name.clone());
         }
         LocEnv {
-            fun_env   : env,
-            block_env : vec![BTreeMap::new()]
+            fun_env       : env,
+            block_env     : vec![BTreeMap::new()],
+            reduced_cells : vec![]
         }
     }
 
@@ -148,16 +151,10 @@ impl LocEnv {
     pub fn replace_unk(&self, name : &String, tp : RType) {
         for env in self.block_env.iter().rev() {
             match env.get(name) {
-                Some(ans) =>
-                    unsafe {
-                        match *ans {
-                            Err(ref ptr) => {
-                                **ptr = tp.clone();
-                                return;
-                            },
-                            _ => panic!("replace_unk: var known: {}", name)
-                        }
-                    },
+                Some(ans) => {
+                	*ans.borrow_mut() = tp.clone();
+                	break
+                },
                 _ => ()
             }
         }
@@ -166,16 +163,10 @@ impl LocEnv {
         self.fun_env.replace_unk(name, tp)
     }
 
-    pub fn get_local_var(&self, name : &String) -> &RType {
+    pub fn get_local_var(&self, name : &String) -> RType {
         for env in self.block_env.iter().rev() {
             match env.get(name) {
-                Some(v) =>
-                    unsafe {
-                        match *v {
-                            Ok(ref l) => return &l,
-                            Err(ref l) => return &**l
-                        }
-                    },
+                Some(v) => return v.borrow().clone(),
                 _ => ()
             }
         }
@@ -186,8 +177,11 @@ impl LocEnv {
 
     // SET VAR TYPE TO tp_dst AND CHANGE prefix(%loc, %out, %rec, %mod or full path)
     // CURSOR USED FOR SEND ERR MESSAGE
-    pub fn get_var(&self, pref : &mut Vec<String>, name : &String, tp_dst : &mut RType, pos : &Cursor) -> CheckRes {
-        macro_rules! clone_type { ($t:expr) => { match *$t {Ok(ref t) => (*t).clone(), Err(ref t) => (**t).clone()} }; }
+    pub fn get_var(&self, pref : &mut Vec<String>, name : &String, tp_dst : &MRType, pos : &Cursor) -> CheckRes {
+        // macro_rules! clone_type { ($t:expr) => { match *$t {Ok(ref t) => (*t).clone(), Err(ref t) => (**t).clone()} }; }
+        macro_rules! clone_type {
+        	($t:expr) => ($t.borrow().clone())
+        }
         if pref.len() == 0 || pref[0] == "%loc" {
             // IF PREFIX NOT SETTED THEN TRY ALL LOCAL
             // THEN TRY FUN ENV
@@ -196,7 +190,7 @@ impl LocEnv {
                 match env.get(name) {
                     Some(t) => {
                         // FOUND IN LOCAL
-                        *tp_dst = unsafe{ clone_type!(t) };
+                        *tp_dst.borrow_mut() = clone_type!(t);
                         if pref.len() == 0 {
                             pref.push("%loc".to_string());
                         }
@@ -212,9 +206,17 @@ impl LocEnv {
         }
     }
 
-    pub fn add_loc_var(&mut self, name : &String, tp : Result<RType, *mut RType>, pos : &Cursor) -> CheckRes {
+    pub fn add_loc_var(&mut self, name : &String, tp : MRType, pos : &Cursor) -> CheckRes {
         // block_env never empty as container of env
         match self.block_env.last_mut().unwrap().insert(name.clone(), tp) {
+            Some(_) => syn_throw!(format!("local var {} already exist", name), pos),
+            _ => return Ok(())
+        }
+    }
+
+    pub fn add_loc_var_const_t(&mut self, name : &String, tp : RType, pos : &Cursor) -> CheckRes {
+        let cell = Type::mtype(tp);
+        match self.block_env.last_mut().unwrap().insert(name.clone(), cell) {
             Some(_) => syn_throw!(format!("local var {} already exist", name), pos),
             _ => return Ok(())
         }

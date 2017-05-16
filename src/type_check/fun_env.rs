@@ -10,7 +10,7 @@ macro_rules! throw {
 
 macro_rules! ok {() => {return Ok(())};}
 
-type VMap = BTreeMap<String, Result<RType, *mut RType>>;
+type VMap = BTreeMap<String, MRType>;
 
 pub type CheckRes    = Result<(),Vec<SynErr>>;
 pub type CheckAns<A> = Result<A,Vec<SynErr>>;
@@ -45,6 +45,17 @@ impl FunEnv {
             rec_type    : rec_type
         }
     }
+
+    // getting outers for result
+    // WARNING ref-cells will be lost
+    pub fn outers(&self) -> Vec<(String, RType)> {
+        let mut res = Vec::new();
+        for (name,lnk) in self.outers.iter() {
+            res.push((name.clone(), lnk.borrow().clone()));
+        }
+        return res;
+    }
+
     pub fn parent_init(&self) -> RType {
         match self.self_val {
             None => panic!(),
@@ -112,67 +123,51 @@ impl FunEnv {
     }
     pub fn replace_unk(&self, name : &String, tp : RType) {
         match self.local.get(name) {
-            Some(ans) =>
-                unsafe {
-                    match *ans {
-                        Err(ref ptr) => **ptr = tp,
-                        _ => panic!("replace_unk: var known: {}", name)
-                    }
-                },
+            Some(ref rtype) => *rtype.borrow_mut() = tp,
             _ =>
                 match self.outers.get(name) {
-                    Some(ans) => 
-                        unsafe {
-                            match *ans {
-                                Err(ref ptr) => **ptr = tp,
-                                _ => panic!("replace_unk: var known: {}", name)
-                            }
-                        },
+                    Some(rtype) => *rtype.borrow_mut() = tp,
                     _ => panic!("replace_unk: var out: {}", name)
                 }
         }
     }
-    pub fn get_local_var(&self, name : &String) -> &RType {
+    pub fn get_local_var(&self, name : &String) -> RType {
         match self.local.get(name) {
-            Some(v) =>
-                match *v {
-                    Ok(ref l)  => l,
-                    Err(ref l) => unsafe { &**l }
-                },
-            _ if *name == self.rec_name => &self.rec_type,
+            Some(v) => v.borrow().clone(),
+            _ if *name == self.rec_name => self.rec_type.clone(),
             _ => panic!()
         }
     }
-    pub fn get_var(&self, pref : &mut Vec<String>, name : &String, tp_dst : &mut RType, pos : &Cursor) -> CheckRes {
+    pub fn get_var(&self, pref : &mut Vec<String>, name : &String, tp_dst : &MRType, pos : &Cursor) -> CheckRes {
         macro_rules! LOCAL   { () => { pref.push(("%loc").to_string()) }; }
         macro_rules! REC     { () => { pref.push(("%rec").to_string()) }; }
         macro_rules! OUTER   { () => { pref.push(("%out").to_string()) }; }
         macro_rules! THISMOD { () => { pref.push(("%mod").to_string()) }; }
-        macro_rules! clone_type { ($t:expr) => {match *$t {Ok(ref t) => (*t).clone(), Err(ref t) => (**t).clone()} }; }
+        macro_rules! clone_type { ($t:expr) => ($t.borrow().clone()); }
         if pref.len() == 0 {
             match self.local.get(name) {
                 Some(t) => {
-                    *tp_dst = unsafe{ clone_type!(t) };
+                    *tp_dst.borrow_mut() = clone_type!(t);
                     LOCAL!();
                     ok!()
                 },
                 None =>
                     if *name == self.rec_name {
-                        *tp_dst = self.rec_type.clone();
+                        *tp_dst.borrow_mut() = self.rec_type.clone();
                         REC!();
                         ok!();
                     } else {
                         match self.outers.get(name) {
                             Some(t) => {
-                                *tp_dst = unsafe{ clone_type!(t) };
+                                *tp_dst.borrow_mut() = clone_type!(t);
                                 OUTER!();
                                 ok!()
                             },
-                            None => unsafe {
-                                match (*self.global).get_fn(pref, name) {
+                            None => 
+                                match unsafe {(*self.global).get_fn(pref, name)} {
                                     Some(t) => {
-                                        *tp_dst = t;
-                                        match (*self.global).pack_of_fn(name) {
+                                        *tp_dst.borrow_mut() = t;
+                                        match unsafe{(*self.global).pack_of_fn(name)} {
                                             Some(p) => {
                                                 //println!("PACK FOUND {:?}", p);
                                                 *pref = p
@@ -185,38 +180,35 @@ impl FunEnv {
                                         throw!(format!("var {} not found", name), pos)
                                     }
                                 }
-                            }
                         }
                     }
             }
         } else {
-            unsafe {
-                if pref[0] == "%loc" {
-                    *tp_dst = clone_type!(self.local.get(name).unwrap());
-                    ok!()
-                } else if pref[0] == "%out" {
-                    *tp_dst = clone_type!(self.outers.get(name).unwrap());
-                    ok!()
-                } else if pref[0] == "%mod" {
-                    let p = Vec::new();
-                    *tp_dst = (*self.global).get_fn(&p, name).unwrap();
+            if pref[0] == "%loc" {
+                *tp_dst.borrow_mut() = clone_type!(self.local.get(name).unwrap());
+                ok!()
+            } else if pref[0] == "%out" {
+                *tp_dst.borrow_mut() = clone_type!(self.outers.get(name).unwrap());
+                ok!()
+            } else if pref[0] == "%mod" {
+                let p = Vec::new();
+                *tp_dst.borrow_mut() = unsafe{(*self.global).get_fn(&p, name).unwrap()};
+                ok!()
+            }
+            match unsafe{(*self.global).get_fn(pref, name)} {
+                Some(t) => {
+                    unsafe{(*self.global).open_pref(pref)};
+                    *tp_dst.borrow_mut() = t.clone();
                     ok!()
                 }
-                match (*self.global).get_fn(pref, name) {
-                    Some(t) => {
-                        (*self.global).open_pref(pref);
-                        *tp_dst = t.clone();
-                        ok!()
+                None => {
+                    let mut fname = String::new();
+                    for p in pref.iter() {
+                        fname.push_str(&*p);
+                        fname.push_str("::");
                     }
-                    None => {
-                        let mut fname = String::new();
-                        for p in pref.iter() {
-                            fname.push_str(&*p);
-                            fname.push_str("::");
-                        }
-                        fname.push_str(name);
-                        throw!(format!("var {} not found", fname), pos)
-                    }
+                    fname.push_str(name);
+                    throw!(format!("var {} not found", fname), pos)
                 }
             }
         }
@@ -255,12 +247,20 @@ impl FunEnv {
             }
         }
     }
-    pub fn check_class(&self, pref : &mut Vec<String>, name : &String, params : &Option<Vec<RType>>, pos : &Cursor) -> CheckRes {
+    pub fn check_class(
+        &self,
+        pref : &Vec<String>,
+        name : &String,
+        params : &Option<Vec<RType>>,
+        pos : &Cursor
+    ) -> CheckAns<Option<Vec<String>>> {
+        // RESULT IS NONE IF PREF AND NAME NOT CHANGED
+        let mut new_pref = Vec::new();
         if pref.len() == 0 {
             // PREFIX NOT EXIST OR IT'S A TEMPLATE TYPE
             if self.templates.contains(name) {
             // IT'S TEMPLATE
-                pref.push("%tmpl".to_string())
+                new_pref.push("%tmpl".to_string())
             } else {
             // IT'S IN IMPORTED SPACE
                 unsafe {
@@ -277,8 +277,8 @@ impl FunEnv {
                         }
                     }
                     match (*self.global).pack_of_cls(name) {
-                        None => pref.push("%mod".to_string()),
-                        Some(path) => *pref = path
+                        None => new_pref.push("%mod".to_string()),
+                        Some(path) => new_pref = path
                     }
                 }
             }
@@ -299,7 +299,11 @@ impl FunEnv {
                 }
             }
         }
-        ok!()
+        if new_pref.len() == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(new_pref))
+        }
     }
     /*pub fn get_class(&self, pref : &Vec<String>, name : &String) -> *const TClass {
         unsafe {

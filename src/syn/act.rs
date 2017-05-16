@@ -8,7 +8,7 @@ pub struct SynCatch<DF> {
     pub epref  : Vec<String>,
     pub ekey   : String,
     pub vname  : Option<String>,
-    pub vtype  : RType,
+    pub vtype  : MRType,
     pub act    : Vec<Act<DF>>,
     pub addres : Cursor
 }
@@ -17,7 +17,7 @@ pub enum ActVal<DF> {
     Expr(Expr),
     DFun(Box<DF>),
     //   name   var type     init val
-    DVar(String,RType,Option<Expr>),
+    DVar(String,MRType,Option<Expr>),
     //   a  =  b
     Asg(Expr,Expr),
     Ret(Option<Expr>),
@@ -27,7 +27,7 @@ pub enum ActVal<DF> {
     //   label         vname  from  to   body
     For(Option<String>,String,Expr,Expr,Vec<Act<DF>>), // for i in range(a + 1, b - 2) {}
     //      label          vname  vtype cont  body
-    Foreach(Option<String>,String,RType, Expr,Vec<Act<DF>>),  // for i in array {}
+    Foreach(Option<String>,String,MRType, Expr,Vec<Act<DF>>),  // for i in array {}
     // cond   then    else
     If(Expr,Vec<Act<DF>>,Vec<Act<DF>>),
     Try(Vec<Act<DF>>,Vec<SynCatch<DF>>), // try-catch
@@ -262,11 +262,11 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
             // try find type
             let tpflag = lex!(lexer, &curs);
             let tp = if tpflag.val == ":" {
-                let tp = try!(parse_type(lexer, &tpflag.cursor));
+                let tp = try!(parse_m_type(lexer, &tpflag.cursor));
                 curs = tp.cursor;
                 tp.val
             } else {
-                Type::unk()
+                Type::mtype(Type::unk())
             };
             // try find init val
             if is_act_end(lexer, &curs) {
@@ -316,11 +316,11 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
             // var name
             let var = lex_type!(lexer, &curs, LexTP::Id);
             let ans = lex!(lexer, &var.cursor);
-            let mut tp = Type::unk();
+            let tp = Type::mtype(Type::unk());
             if ans.val == ":" {
                 let ans = try!(parse_type(lexer, &ans.cursor));
                 curs = ans.cursor;
-                tp = ans.val;
+                *tp.borrow_mut() = ans.val;
                 curs = lex!(lexer, &curs, "in");
             } else if ans.val == "in" {
                 //curs = lex!(lexer, &var.cursor, "in");
@@ -379,7 +379,15 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
                     if ans.val == "{" {
                         let al = parse_act_list(lexer, &curs, fparse)?;
                         curs = al.cursor;
-                        ctchs.push(SynCatch{ekey : String::new(), epref : vec![], vtype : Type::unk(), vname : None, act : al.val, addres : addr});
+                        let ctch = SynCatch{
+                            ekey   : String::new(),
+                            epref  : vec![],
+                            vtype  : Type::mtype(Type::unk()),
+                            vname  : None,
+                            act    : al.val,
+                            addres : addr
+                        };
+                        ctchs.push(ctch);
                     } else {
                         // ans - EXCEPTON NAME
                         //let key = lex_type!(lexer, &curs, LexTP::Id);
@@ -401,7 +409,15 @@ pub fn parse_act<DF>(lexer : &Lexer, curs : &Cursor, fparse : &Parser<DF>) -> Sy
                         }
                         let al = parse_act_list(lexer, &curs, fparse)?;
                         curs = al.cursor;
-                        ctchs.push(SynCatch{ekey : name, epref : pref, vname : var, vtype : Type::unk(), act : al.val, addres : addr});
+                        let ctch = SynCatch{
+                            ekey   : name,
+                            epref  : pref,
+                            vname  : var,
+                            vtype  : Type::mtype(Type::unk()),
+                            act    : al.val,
+                            addres : addr
+                        };
+                        ctchs.push(ctch);
                         //ctchs.push(SynCatch{except : Some(tp.val), vname : Some(ans.val), act : al.val, addres : addr});
                     }
                 } else {

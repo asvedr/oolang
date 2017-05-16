@@ -323,12 +323,13 @@ fn can_throw_expr(e : &Expr/*, store : &Vec<SynFn>*/) -> bool {
         EVal::Attr(_,_,_) => true,
         EVal::ChangeType(ref e, ref t) => {
             let ech = rec!(e);
-            !safe_coerse(&*e.kind, &**t) || ech
+            !safe_coerse(&**e.kind.borrow(), &**t.borrow()) || ech
         },
         _ => false
     }
 }
 
+// CAN WE COERSE a TO b WITHOUT USING EXCEPTIONS
 fn safe_coerse(a : &Type, b : &Type) -> bool {
     macro_rules! cmp {($at:ident, $bt:ident) => {
         match *a {

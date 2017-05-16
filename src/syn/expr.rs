@@ -12,7 +12,7 @@ pub enum EVal {
     Str        (String),
     Char       (char),
     Bool       (bool),
-    Call       (Option<Vec<RType>>,Box<Expr>,Vec<Expr>,bool), // last flag is 'noexcept'
+    Call       (Option<Vec<MRType>>,Box<Expr>,Vec<Expr>,bool), // last flag is 'noexcept'
     NewClass   (Option<Vec<RType>>,Vec<String>,String,Vec<Expr>),
     Item       (Box<Expr>,Box<Expr>),     // item of array or asc
     Var        (Vec<String>, String),     // namespace, name
@@ -20,7 +20,7 @@ pub enum EVal {
     Asc        (Vec<Pair<Expr,Expr>>),    // new Asc. Only strings, chars and int allowed for key
     //          obj       pname  is_meth
     Attr       (Box<Expr>,String,bool),   // geting class attrib: 'object.prop' or 'object.fun()'
-    ChangeType (Box<Expr>, RType),        // type coersing
+    ChangeType (Box<Expr>, MRType),       // type coersing
     TSelf,
     Null
 }
@@ -36,7 +36,7 @@ pub const IROPB : u8 = 6; // int real op => bool
 #[derive(Clone)]
 pub struct Expr {
     pub val     : EVal,
-    pub kind    : RType,
+    pub kind    : MRType,
     pub addres  : Cursor,
     pub op_flag : u8      // field for regress type calculation
 }
@@ -154,8 +154,18 @@ impl Show for Expr {
 }
 
 macro_rules! expr {
-    ($v:expr, $addr:expr, $k:expr) => {Expr{val : $v, kind : $k,        addres : $addr, op_flag : 0}};
-    ($v:expr, $addr:expr)          => {Expr{val : $v, kind : Type::unk(), addres : $addr, op_flag : 0}};
+    ($v:expr, $addr:expr, $k:expr) => (Expr{
+        val     : $v,
+        kind    : Type::mtype($k),
+        addres  : $addr,
+        op_flag : 0
+    });
+    ($v:expr, $addr:expr)          => (Expr{
+        val     : $v,
+        kind    : Type::mtype(Type::unk()),
+        addres  : $addr,
+        op_flag : 0
+    });
 }
 
 // search for prefix part of id : ModA::ModB::var => [ModA::ModB::]
@@ -333,8 +343,8 @@ fn parse_operand(lexer : &Lexer, curs : &Cursor) -> SynRes<Expr> {
                     curs = fld.cursor;
                 // TYPE COERSING
                 } else if ans.val == "as" {
-                    let tp = try!(parse_type(lexer, &ans.cursor));
-                    let tpc = tp.val.clone();
+                    let tp = try!(parse_m_type(lexer, &ans.cursor));
+                    let tpc = tp.val.borrow().clone();
                     obj = expr!(EVal::ChangeType(Box::new(obj), tp.val), curs, tpc);
                     curs = tp.cursor;
                 } else {

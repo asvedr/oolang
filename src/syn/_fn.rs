@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 
 pub struct Arg {
     pub name  : String,
-    pub tp    : RType,
+    pub tp    : RType, // we don't need a type calculating for args. So we don't need RefCell
     pub val   : Option<Expr>,
     pub named : bool
 }
@@ -84,32 +84,6 @@ impl Show for SynFn {
     }
 }
 
-/*
-pub fn parse_lambda(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
-    // symbol 'fn'
-    let orig = curs.clone();
-    let mut curs = lex!(lexer, curs, "fn");
-    // args
-    let parser = |l : &Lexer, c : &Cursor| {parse_arg(l, c, false)};
-    let args = try!(parse_list(lexer, &curs, &parser, "(", ")"));
-    // ret type
-    curs = lex!(lexer, &args.cursor, ":");
-    let tp = try!(parse_type(lexer, &curs));
-    // body
-    let body = try!(parse_act_list(lexer, &tp.cursor, &parse_fn_full));
-    let res = SynFn {
-        name        : None,
-        tmpl        : None,
-        args        : args.val,
-        rettp       : tp.val,
-        body        : body.val,
-        addr        : orig,
-        can_be_clos : false
-    };
-    syn_ok!(res, body.cursor)    
-}
-*/
-
 pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
     // symbol 'fn'
     let orig = curs.clone();
@@ -145,35 +119,35 @@ pub fn parse_fn_full(lexer : &Lexer, curs : &Cursor) -> SynRes<SynFn> {
     // ret type
     //curs = lex!(lexer, &args.cursor, ":");
     let ans = lex!(lexer, &args.cursor);
-    let tp;
+    let res_tp;
     if ans.val == ":" {
         let ans = try!(parse_type(lexer, &ans.cursor));
         curs = ans.cursor;
-        tp = ans.val;
+        res_tp = ans.val;
     } else if ans.val == "{" {
-        tp = Type::void();
+        res_tp = Type::void();
         curs = args.cursor.clone();
     } else {
         syn_throw!("expected ':' or '{'", args.cursor);
     }
     // body
-    let body = try!(parse_act_list(lexer, /*&tp.cursor*/&curs, &parse_fn_full));
+    let body = try!(parse_act_list(lexer, &curs, &parse_fn_full));
     // type
     let mut atypes = vec![];
     for a in args.val.iter() {
         atypes.push(a.tp.clone())
     }
-    let ftype =
+    let ftype : RType =
         if tmpl.len() == 0 {
-            Rc::new(Type::Fn(None, atypes, tp./*val.*/clone()))
+            type_fn!(atypes, res_tp.clone())
         } else {
-            Rc::new(Type::Fn(Some(tmpl.clone()), atypes, tp./*val.*/clone()))
+            type_fn!(tmpl.clone(), atypes, res_tp.clone())
         };
     let res = SynFn {
         name        : name.val,
         tmpl        : tmpl,
         args        : args.val,
-        rettp       : tp/*.val*/,
+        rettp       : res_tp,
         body        : body.val,
         addr        : orig,
         can_be_clos : can_be_clos,

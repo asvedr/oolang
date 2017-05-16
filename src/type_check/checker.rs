@@ -7,6 +7,7 @@ use std::collections::{HashMap/*, HashSet, BTreeMap*/};
 use std::mem;
 use type_check::regressor::*;
 use preludelib::*;
+use utils::*;
 
 /*
     Типы привязаны к выражениям. В синтаксическом дереве выражений и прочего хранятся все типы.
@@ -132,8 +133,9 @@ impl Checker {
                     }
                 }
             }
-            // FIX TYPE
-            unsafe{ self.check_type_pack(&pack, &f.tmpl, &mut f.ftype, &f.addr)? };
+            // FIX FUN TYPE
+            let f_ftype = f.ftype.clone();
+            f.ftype = self.check_type_pack(&pack, &f.tmpl, f_ftype, &f.addr)?;
             // ADD TO ENV
             match pack.fns.insert(n, f.ftype.clone()) {
                 Some(_) => throw!("fun with this name already exist in this module", f.addr),
@@ -167,7 +169,13 @@ impl Checker {
                                 match *pars {
                                     Some(ref mut vec) => {
                                         for par in vec.iter_mut() {
-                                            self.check_type_pack(&pack, &c.template, par, &c.addres)?
+                                            let val : RType = par.clone();
+                                            *par = self.check_type_pack(
+                                                &pack,
+                                                &c.template,
+                                                val,
+                                                &c.addres
+                                            )?
                                         }
                                         Some(&*vec)
                                     },
@@ -202,8 +210,10 @@ impl Checker {
             for meth in c.pub_fn.iter_mut() {
                 let f = meth.func.name == "init";
                 if f {
-                    unsafe{ self.check_type_pack(&pack, &c.template, &mut meth.func.ftype, &meth.func.addr)? };
-                    meth.ftype = meth.func.ftype.clone();
+                	let mft = meth.func.ftype.clone();
+                	let new_f_type = self.check_type_pack(&pack, &c.template, mft, &meth.func.addr)?;
+                    meth.func.ftype = new_f_type.clone();
+                    meth.ftype = new_f_type;
                     //println!("INITIALIZER FOUND, tp:{:?}", meth.ftype);
                     init_found = true;
                     break;
@@ -214,11 +224,9 @@ impl Checker {
                 let has_parent = match c.parent {Some(_) => true, _ => false};
                 c.pub_fn.push(gen_default_init(has_parent, addr))
             }
-            match pack.cls.get_mut(&c.name) {
-                Some(tcl) => {
-                    unsafe { tcl.borrow_mut().check_initializer()? }
-                    //println!("INIT PARAMS FOR {}: {:?}", tcl.args)
-                },
+            let prefix = Vec::new();
+            match pack.get_cls_rc(&prefix, &c.name) {
+                Some(tcl) => unsafe {tcl.borrow_mut().check_initializer()?},
                 _ => ()
             }
         }
@@ -229,9 +237,10 @@ impl Checker {
                 throw!(format!("exception {} already exist", e.name), e.addr);
             } else {
                 match e.arg {
-                    Some(ref mut tp) => {
-                        unsafe{ self.check_type_pack(&pack, &tmpl_plug, tp, &e.addr)? };
-                        pack.exceptions.insert(e.name.clone(), Some(tp.clone()));
+                    Some(ref mut tp_cell) => {
+                    	let tp = tp_cell.clone();
+                        *tp_cell = self.check_type_pack(&pack, &tmpl_plug, tp, &e.addr)?;
+                        pack.exceptions.insert(e.name.clone(), Some(tp_cell.clone()));
                     },
                     _ => {
                         pack.exceptions.insert(e.name.clone(), None);
@@ -269,10 +278,12 @@ impl Checker {
         // priv_prop, pub_prop, priv_fn, pub_fn
         // CHECK PROPS TYPE
         for prop in class.priv_prop.iter_mut() {
-            unsafe{ self.check_type_pack(&pack, tmpl, &mut prop.ptype, &prop.addres)? }
+        	let prop_ptype = prop.ptype.clone();
+            prop.ptype = self.check_type_pack(&pack, tmpl, prop_ptype, &prop.addres)?;
         }
         for prop in class.pub_prop.iter_mut() {
-            unsafe{ self.check_type_pack(&pack, tmpl, &mut prop.ptype, &prop.addres)? }
+        	let prop_ptype = prop.ptype.clone();
+            prop.ptype = self.check_type_pack(&pack, tmpl, prop_ptype, &prop.addres)?;
         }
         let pref = vec![];
         let self_tclass = match pack.get_cls_rc(&pref, &class.name) {
@@ -282,7 +293,8 @@ impl Checker {
         // CHECK METHODS
         macro_rules! precheck_meth {($m:expr) => {{
             // FIX TYPE
-            unsafe{ self.check_type_pack(&pack, &tmpl, &mut $m.func.ftype, &$m.func.addr)? };
+            let m_func_ftype = $m.func.ftype.clone();
+            $m.func.ftype = self.check_type_pack(&pack, &tmpl, m_func_ftype, &$m.func.addr)?;
             // FIX TMPL
             $m.func.tmpl = tmpl.clone();
             $m.ftype = $m.func.ftype.clone();
@@ -350,12 +362,13 @@ impl Checker {
         };
         // ARGS
         for arg in fun.args.iter_mut() {
-            unsafe{ self.check_type(&env, &mut arg.tp, &fun.addr)? };
-            //let p : *mut Type = &mut arg.tp;
+        	let arg_tp : RType = arg.tp.clone();
+            arg.tp = self.check_type(&env, arg_tp, &fun.addr)?;
             add_loc_knw!(env, &arg.name, arg.tp.clone(), fun.addr);
         }
         // RET TYPE
-        unsafe{ self.check_type(&env, &mut fun.rettp, &fun.addr)? };
+        let fun_ret_tp : RType = fun.rettp.clone(); 
+        fun.rettp = self.check_type(&env, fun_ret_tp, &fun.addr)?;
         env.fun_env_mut().set_ret_type(fun.rettp.clone());
         // CHECK BODY AND COERSING
         if top_level {
@@ -383,14 +396,8 @@ impl Checker {
             //fun.outers =
             let fenv = env.fun_env();
             fun.rec_used = fenv.rec_used;
-            unsafe {
-                for (n,t) in fenv.outers.iter() {
-                    let t = match *t {
-                        Ok(ref t) => t.clone(),
-                        Err(ref r) => (**r).clone()
-                    };
-                    fun.outers.insert(n.clone(), t);
-                }
+            for (n,t) in fenv.outers() {
+                fun.outers.insert(n, t);
             }
             return Ok(cnt)
         }
@@ -414,16 +421,30 @@ impl Checker {
                     match *opt_e {
                         Some(ref mut e) => {
                             expr!(e);
-                            if e.kind.is_unk() {
+                            let e_kind : RType = e.kind.borrow().clone();
+                            if e_kind.is_unk() {
                                 // REGRESS CALL
                                 regress!(e, env.fun_env().ret_type().clone());
-                            } else if !env.fun_env().check_ret_type(&e.kind) {
-                                throw!(format!("expect type {:?}, found {:?}", env.fun_env().ret_type(), e.kind), act.addres)
+                            } else if !env.fun_env().check_ret_type(&e_kind) {
+                                throw!(
+                                    format!(
+                                        "expect type {:?}, found {:?}",
+                                        env.fun_env().ret_type(),
+                                        e_kind
+                                    ),
+                                    act.addres
+                                )
                             }
                         },
                         None =>
                             if !env.fun_env().check_ret_type(&Type::void()) {
-                                throw!(format!("expect type {:?}, found void", env.fun_env().ret_type()), act.addres)
+                                throw!(
+                                    format!(
+                                        "expect type {:?}, found void",
+                                        env.fun_env().ret_type()
+                                    ),
+                                    act.addres
+                                )
                             }
                     }
                 },
@@ -436,31 +457,32 @@ impl Checker {
                     actions!(env, el_act);
                     env.pop_block();
                 },
-                ActVal::DVar(ref name, ref mut tp, ref mut val) => {
+                ActVal::DVar(ref name, ref mut tp_cell, ref mut val) => {
                     let unk_val = match *val {
                         Some(ref mut val) => {
                             expr!(val);
-                            val.kind.is_unk()
+                            val.kind.borrow().is_unk()
                         },
                         None => false
                     };
-                    match **tp {
+                    let tp = tp_cell.borrow().clone();
+                    match *tp {
                         Type::Unk => {
-                            *tp = match *val {
-                                None => Type::unk(),
-                                Some(ref mut v) => {
-                                    v.kind.clone()
+                            match *val {
+                                None => (),
+                                Some(ref mut v_expr) => {
+                                    *tp_cell.borrow_mut() = v_expr.kind.borrow().clone();
                                 }
                             };
                             if !repeated {
-                                add_loc_unk!(env, name, tp, act.addres);
+                                add_loc_unk!(env, name, tp_cell.clone(), act.addres);
                             }
                         },
                         _ => {
                             // regression recovery
-                            unsafe{ self.check_type(env, tp, &act.addres)? };
+                            *tp_cell.borrow_mut() = self.check_type(env, tp.clone(), &act.addres)?;
                             if !repeated {
-                                add_loc_knw!(env, name, tp.clone(), act.addres);
+                                add_loc_knw!(env, name, tp_cell.borrow().clone(), act.addres);
                             }
                         }
                     }
@@ -489,16 +511,16 @@ impl Checker {
                     //act.exist_unk = expr!(var) || expr!(val);
                     expr!(var);
                     expr!(val);
-                    let ua = var.kind.is_unk();
-                    let ub = val.kind.is_unk();
+                    let ua = var.kind.borrow().is_unk();
+                    let ub = val.kind.borrow().is_unk();
                     if ua && ub {
                         // PASS
                     } else if ua {
                         // REGRESS CALL
-                        regress!(var, val.kind.clone());
+                        regress!(var, val.kind.borrow().clone());
                     } else if ub {
                         // REGRESS CALL
-                        regress!(val, var.kind.clone());
+                        regress!(val, var.kind.borrow().clone());
                     } else if var.kind != val.kind {
                         throw!(format!("assign parts incompatible: {:?} and {:?}", var.kind, val.kind), act.addres)
                     }
@@ -524,22 +546,39 @@ impl Checker {
                     let param = env.fun_env().check_exception(pref, key, &act.addres)?;
                     match *e {
                         Some(ref mut e) => {
-                            //expr!(e);
+                            let e_kind = e.kind.borrow().clone();
                             match param {
                                 Some(t) =>
-                                    if e.kind.is_unk() {
+                                    if e_kind.is_unk() {
                                         regress!(e, t);
-                                    } else if e.kind == t {
+                                    } else if e_kind == t {
                                         ()
                                     } else {
-                                        throw!(format!("exception excpect param {:?}, but found {:?}", t, e.kind), e.addres)
+                                        throw!(
+                                            format!(
+                                                "exception excpect param {:?}, but found {:?}",
+                                                t,
+                                                e_kind
+                                            ),
+                                            e.addres
+                                        )
                                     },
                                 _ =>
-                                    throw!(format!("exception excpect no params, but found {:?}", e.kind), e.addres)
+                                    throw!(
+                                        format!(
+                                            "exception excpect no params, but found {:?}",
+                                            e_kind
+                                        ),
+                                        e.addres
+                                    )
                             }
                         },
                         _ => match param {
-                            Some(t) => throw!(format!("exception expect param {:?}, but has none", t), act.addres),
+                            Some(t) =>
+                                throw!(
+                                    format!("exception expect param {:?}, but has none", t),
+                                    act.addres
+                                ),
                             _ => ()
                         }
                     }
@@ -553,13 +592,16 @@ impl Checker {
                     if !repeated {
                         add_loc_knw!(env, &df.name, df.ftype.clone(), df.addr);
                     }
+                    // IN THIS LOOP WE FILLING LIST OF USED OUTERS VARS AND SETTING 'REC' VALUE
                     for name in df.outers.keys() {
-                        let mut pref = Vec::new();
-                        let mut tp = Type::unk();
-                        let _ = env.get_var(&mut pref, name, &mut tp, &df.addr);
-                        if pref[0] == "%out" {
+                        let mut pref_sample = Vec::new();
+                        let mut tp_sample = Type::mtype(Type::unk());
+                        // IGNORING RESULT CHECK BECAUSE IT'S IMPOSIBLE
+                        // TO GET VAR OUT OF VAR MAPS
+                        let _ = env.get_var(&mut pref_sample, name, &mut tp_sample, &df.addr);
+                        if pref_sample[0] == "%out" {
                             env.fun_env_mut().used_outers.insert(name.clone());
-                        } else if pref[0] == "%rec" {
+                        } else if pref_sample[0] == "%rec" {
                             env.set_rec_used(true);
                         }
                     }
@@ -577,8 +619,13 @@ impl Checker {
                             match catch.vname {
                                 Some(_) =>
                                     match earg {
-                                        Some(t) => catch.vtype = t,
-                                        _ => throw!(format!("exception {} had no params", catch.ekey), catch.addres)
+                                        Some(t) =>
+                                            *catch.vtype.borrow_mut() = t,
+                                        _ =>
+                                            throw!(
+                                                format!("exception {} had no params", catch.ekey),
+                                                catch.addres
+                                            )
                                     },
                                 _ => ()
                             }
@@ -586,7 +633,8 @@ impl Checker {
                         env.push_block();
                         // UPDATE ENV IF NEEDED
                         match catch.vname {
-                            Some(ref name) => add_loc_knw!(env, name, catch.vtype.clone(), catch.addres),
+                            Some(ref name) =>
+                                add_loc_knw!(env, name, catch.vtype.borrow().clone(), catch.addres),
                             _ => ()
                         }
                         // DO WITH PUSHED ENV
@@ -629,25 +677,29 @@ impl Checker {
                         _ => ()
                     }
                 },
-                ActVal::Foreach(ref lname, ref vname, ref mut vt, ref mut cont, ref mut body) => {
+                ActVal::Foreach(ref lname, ref vname, ref mut var_t_cell, ref mut cont, ref mut body) => {
                     match *lname {
                         Some(ref name) => env.add_loop_label(name),
                         _ => ()
                     }
                     env.push_block();
                     expr!(cont);
+                    let var_t : RType = var_t_cell.borrow().clone();
                     let mut need_regress = false;
-                    match *cont.kind {
+                    match **cont.kind.borrow() {
                         Type::Arr(ref item) => {
-                            if *vt != item[0] {
-                                throw!(format!("foreach var expected {:?}, found {:?}", item, vt), act.addres);
+                            if var_t != item[0] {
+                                throw!(
+                                    format!("foreach var expected {:?}, found {:?}", item, var_t),
+                                    act.addres
+                                );
                             } else {
                                 add_loc_knw!(env, vname, item[0].clone(), act.addres);
                             }
                         },
                         Type::Unk => {
-                            if vt.is_unk() {
-                                add_loc_unk!(env, vname, &mut *vt, act.addres);
+                            if var_t.is_unk() {
+                                add_loc_unk!(env, vname, var_t_cell.clone(), act.addres);
                             } else {
                                 need_regress = true;
                             }
@@ -655,8 +707,8 @@ impl Checker {
                         _ => throw!("you can foreach only through array", cont.addres)
                     }
                     if need_regress {
-                        regress!(env, cont, vt.clone());
-                        add_loc_knw!(env, vname, vt.clone(), act.addres);
+                        regress!(env, cont, var_t.clone());
+                        add_loc_knw!(env, vname, var_t.clone(), act.addres);
                     }
                     actions!(env, body);
                     env.pop_block();
@@ -685,7 +737,10 @@ impl Checker {
         let mut unk_count = 0;
         // recursive check expression
         macro_rules! check {($e:expr) => {unk_count += try!(self.check_expr(env, $e))};};
-        macro_rules! check_type {($t:expr) => {unsafe{self.check_type(env, $t, &expr.addres)?}}}
+        macro_rules! check_type {($t:expr) => {{
+        	let val : RType = $t.borrow().clone();
+        	*$t.borrow_mut() = self.check_type(env, val, &expr.addres)?;
+        }}}
         macro_rules! regress {($e:expr, $t:expr) => {regress_expr(env, $e, $t)?}; }
         // macro for check what category of operator is
         macro_rules! is_in {
@@ -705,7 +760,27 @@ impl Checker {
                 EVal::Var(ref pref, ref name) => {
                     if pref.len() > 0 {
                         if pref[0] == "%opr" {
-                            is_in!(name, $o, int_real_op, is_in!(name, $o, int_op, is_in!(name, $o, real_op, is_in!(name, $o, all_op, is_in!(name, $o, bool_op, None)))))
+                            is_in!(
+                                name,
+                                $o,
+                                int_real_op,
+                                is_in!(
+                                    name,
+                                    $o,
+                                    int_op,
+                                    is_in!(
+                                        name,
+                                        $o,
+                                        real_op,
+                                        is_in!(
+                                            name,
+                                            $o,
+                                            all_op,
+                                            is_in!(name, $o, bool_op, None)
+                                        )
+                                    )
+                                )
+                            )
                         } else {
                             None
                         }
@@ -738,11 +813,11 @@ impl Checker {
                 match chf {
                     Some(seq_l) => {
                         // CHECK OPERATION
-                        let a : RType = args[0].kind.clone();
-                        let b : RType = args[1].kind.clone();
+                        let a : RType = args[0].kind.borrow().clone();
+                        let b : RType = args[1].kind.borrow().clone();
                         // INT OR REAL OPERATIONS + - * >= <= < > / 
                         if seq_l == &self.int_real_op {
-                            macro_rules! ok {($tp:expr) => {{
+                            macro_rules! ok_ab {($tp:expr) => {{
                                 //set_var_type!(env, args[0], $tp);
                                 //set_var_type!(env, args[1], $tp);
                                 // REGRESS CALL
@@ -751,48 +826,70 @@ impl Checker {
                                 regress!(&mut args[1], $tp.clone());
                                 match *res_type {
                                     Type::Unk => {
-                                        f.kind = type_fn!(vec![$tp, $tp], $tp);
-                                        expr.kind = $tp
+                                        *f.kind.borrow_mut() = type_fn!(
+                                            vec![$tp, $tp],
+                                            $tp
+                                        );
+                                        *expr.kind.borrow_mut() = $tp
                                     },
                                     _ => {
-                                        f.kind = type_fn!(vec![$tp, $tp], res_type.clone());
-                                        expr.kind = res_type
+                                        *f.kind.borrow_mut() = type_fn!(
+                                            vec![$tp, $tp],
+                                            res_type.clone()
+                                        );
+                                        *expr.kind.borrow_mut() = res_type
                                     }
                                 }
                             }};}
                             if (*a).is_int() {
                                 if (*b).is_int() || (*b).is_unk() {
-                                    ok!(Type::int())
+                                    ok_ab!(Type::int())
                                 } else if (*b).is_real() {
                                     let addr = args[0].addres.clone();
                                     let arg = mem::replace(&mut args[0].val, EVal::Null);
-                                    let arg = Expr{val : arg, kind : Type::int(), addres : addr, op_flag : 0};
-                                    args[0].val = EVal::ChangeType(Box::new(arg), Type::real());
-                                    args[0].kind = Type::real();
+                                    let arg = Expr {
+                                        val     : arg,
+                                        kind    : Type::mtype(Type::int()),
+                                        addres  : addr,
+                                        op_flag : 0
+                                    };
+                                    args[0].val = EVal::ChangeType(
+                                        Box::new(arg),
+                                        Type::mtype(Type::real())
+                                    );
+                                    *args[0].kind.borrow_mut() = Type::real();
                                     //args[0] = Expr{val : EVal::ChangeType(Box::new(args[0]), Type::Real), kind : Type::Real, addres : addr};
-                                    ok!(Type::real())
+                                    ok_ab!(Type::real())
                                 } else {
                                     throw!(format!("expect int found {:?}", *b), args[1].addres.clone())
                                 }
                             } else if (*a).is_real() {
                                 if (*b).is_real() || (*b).is_unk() {
-                                    ok!(Type::real())
+                                    ok_ab!(Type::real())
                                 } else if (*b).is_int() {
                                     let addr = args[1].addres.clone();
                                     let arg = mem::replace(&mut args[1].val, EVal::Null);
-                                    let arg = Expr{val : arg, kind : Type::int(), addres : addr, op_flag : 0};
-                                    args[1].val = EVal::ChangeType(Box::new(arg), Type::real());
-                                    args[1].kind = Type::real();
+                                    let arg = Expr {
+                                        val    : arg,
+                                        kind   : Type::mtype(Type::int()),
+                                        addres : addr,
+                                        op_flag : 0
+                                    };
+                                    args[1].val = EVal::ChangeType(
+                                        Box::new(arg),
+                                        Type::mtype(Type::real())
+                                    );
+                                    *args[1].kind.borrow_mut() = Type::real();
                                     //args[1] = Expr{val : EVal::ChangeType(Box::new(args[1]), Type::Real), kind : Type::Real, addres : addr};
-                                    ok!(Type::real())
+                                    ok_ab!(Type::real())
                                 } else {
                                     throw!(format!("expect real found {:?}", *b), args[1].addres.clone())
                                 }
                             } else if (*a).is_unk() {
                                 if (*b).is_int() {
-                                    ok!(Type::int())
+                                    ok_ab!(Type::int())
                                 } else if (*b).is_real() {
-                                    ok!(Type::real())
+                                    ok_ab!(Type::real())
                                 } else if (*b).is_unk() {
                                     unk_count += 1;
                                 } else {
@@ -814,8 +911,8 @@ impl Checker {
                                 let i = Type::int();
                                 regress!(&mut args[0], i.clone());
                                 regress!(&mut args[1], i.clone());
-                                f.kind = type_fn!(vec![i.clone(), i.clone()], i.clone());
-                                expr.kind = i.clone()
+                                *f.kind.borrow_mut() = type_fn!(vec![i.clone(), i.clone()], i.clone());
+                                *expr.kind.borrow_mut() = i.clone()
                             }
                         // REAL OPERATIONS (real, real) -> real
                         } else if seq_l == &self.real_op {
@@ -830,8 +927,8 @@ impl Checker {
                                 let r = Type::real();
                                 regress!(&mut args[0], r.clone());
                                 regress!(&mut args[1], r.clone());
-                                f.kind = type_fn!(vec![r.clone(), r.clone()], r.clone());
-                                expr.kind = r.clone()
+                                *f.kind.borrow_mut() = type_fn!(vec![r.clone(), r.clone()], r.clone());
+                                *expr.kind.borrow_mut() = r.clone()
                             }
                         // ALL OPERATIONS
                         } else if seq_l == &self.all_op {
@@ -848,8 +945,8 @@ impl Checker {
                                 } else {
                                     tp = a.clone();
                                 }
-                                f.kind = type_fn!(vec![tp.clone(), tp], Type::bool());
-                                expr.kind = Type::bool();
+                                *f.kind.borrow_mut() = type_fn!(vec![tp.clone(), tp], Type::bool());
+                                *expr.kind.borrow_mut() = Type::bool();
                                 *noexc = true;
                             } else {
                                 throw!(format!("expect {:?}, found {:?}", *a, *b), args[1].addres.clone())
@@ -864,8 +961,8 @@ impl Checker {
                                 let b = Type::bool();
                                 regress!(&mut args[0], b.clone());
                                 regress!(&mut args[1], b.clone());
-                                f.kind = type_fn!(vec![b.clone(), b.clone()], b.clone());
-                                expr.kind = b.clone()
+                                *f.kind.borrow_mut() = type_fn!(vec![b.clone(), b.clone()], b.clone());
+                                *expr.kind.borrow_mut() = b.clone()
                             }
                         }
                     },
@@ -880,30 +977,35 @@ impl Checker {
                             _ => (),
                         }
                         check!(f);
-                        /*for a in args.iter_mut() {
-                            check!(a);
-                        }*/
                         //let mut type_known = false;
                         // TYPING
-                        match *f.kind {
+                        match **f.kind.borrow() {
                             Type::Fn(ref tmpl_t, ref args_t, ref res_t) => {
                                 // CHECK TMPL
                                 if args.len() != args_t.len() {
                                     throw!(format!("expect {} args, found {}", args_t.len(), args.len()), expr.addres.clone());
                                 } else {
                                     for i in 0 .. args.len() {
-                                        let a = &mut args[i];
-                                        let t = &args_t[i];
-                                        if a.kind == *t {
+                                        let f_arg = &mut args[i];
+                                        let f_arg_type = f_arg.kind.borrow().clone();
+                                        let arg_t = &args_t[i];
+                                        if f_arg_type == *arg_t {
                                             // ALL OK
-                                        } else if a.kind.is_unk() {
+                                        } else if f_arg_type.is_unk() {
                                             // REGRESS CALL
-                                            regress!(a, t.clone());
+                                            regress!(f_arg, arg_t.clone());
                                         } else {
-                                            throw!(format!("expect {:?}, found {:?}", t, a.kind), a.addres.clone())
+                                            throw!(
+                                                format!(
+                                                    "expect {:?}, found {:?}",
+                                                    arg_t,
+                                                    f_arg_type
+                                                ),
+                                                f_arg.addres.clone()
+                                            )
                                         }
                                     }
-                                    expr.kind = res_t.clone();
+                                    *expr.kind.borrow_mut() = res_t.clone();
                                 }
                                 //type_known = true;
                             },
@@ -923,7 +1025,7 @@ impl Checker {
                                 },
                                 EVal::Attr(ref obj, ref prop_name, ref is_meth) => {
                                     if *is_meth {
-                                        match *obj.kind {
+                                        match **obj.kind.borrow() {
                                             Type::Class(ref pref, ref name, _) => {
                                                 match env.pack().get_cls(pref, name) {
                                                     Some(cls_ptr) => unsafe {
@@ -966,7 +1068,8 @@ impl Checker {
                 let pcnt = match *tmpl {
                     Some(ref mut tmpl) => {
                         for t in tmpl.iter_mut() {
-                            check_type!(t);
+                            let new_t = self.check_type(env, t.clone(), &expr.addres)?;
+                            *t = new_t;
                         };
                         tmpl.len()
                     },
@@ -992,53 +1095,60 @@ impl Checker {
                         throw!(format!("class {} initializer expect {} args, given {}", name, (*cls).args.len(), args.len()), &expr.addres)
                     }
                     for i in 0 .. args.len() {
-                        if args[i].kind.is_unk() {
+                        if args[i].kind.borrow().is_unk() {
                             // REGRESS CALL
                             regress!(&mut args[i], (*cls).args[i].clone());
-                        } else if (*cls).args[i] != args[i].kind {
-                            throw!(format!("expected {:?}, found {:?}", (*cls).args[i], args[i].kind), &args[i].addres)
+                        } else if (*cls).args[i] != *args[i].kind.borrow() {
+                            throw!(
+                                format!(
+                                    "expected {:?}, found {:?}",
+                                    (*cls).args[i],
+                                    args[i].kind.borrow()
+                                ),
+                                &args[i].addres
+                            )
                         }
                     }
                 }
-                expr.kind = type_c!(pref.clone(), name.clone(), tmpl.clone())
+                *expr.kind.borrow_mut() = type_c!(pref.clone(), name.clone(), tmpl.clone())
             },
-            EVal::Item(ref mut a, ref mut i) => {
+            EVal::Item(ref mut array, ref mut item) => {
                 // FOR 'a' ALLOW TYPES: Vec<_>, Asc<_,_>, Str
-                check!(a);
-                check!(i);
-                if a.kind.is_unk() {
+                check!(array);
+                check!(item);
+                let array_t = array.kind.borrow();
+                let item_t : RType = item.kind.borrow().clone();
+                if array_t.is_unk() {
                     unk_count += 1;
-                } else if a.kind.is_arr() || a.kind.is_str() {
-                    if i.kind.is_int() {
+                } else if array_t.is_arr() || array_t.is_str() {
+                    if item_t.is_int() {
                         // ALL OK
-                    } else if i.kind.is_unk() {
+                    } else if item_t.is_unk() {
                         // REGRESS CALL
-                        regress!(i, Type::int());
+                        regress!(item, Type::int());
                     } else {
-                        throw!(format!("expect int, found {:?}", i.kind), i.addres.clone())
+                        throw!(format!("expect int, found {:?}", item_t), item.addres.clone())
                     }
-                    expr.kind = a.kind.arr_item().clone();
-                } else if a.kind.is_asc() {
-                    let (key, val) = a.kind.asc_key_val();
-                    if key == i.kind {
+                    *expr.kind.borrow_mut() = array_t.arr_item().clone();
+                } else if array_t.is_asc() {
+                    let (key, val) = array_t.asc_key_val();
+                    if key == item_t {
                         // ALL OK
-                    } else if i.kind.is_unk() {
+                    } else if item_t.is_unk() {
                         // REGRESS CALL
-                        regress!(i, key);
+                        regress!(item, key);
                     } else {
-                        throw!(format!("expect {:?}, found {:?}", key, i.kind), i.addres.clone())
+                        throw!(format!("expect {:?}, found {:?}", key, item_t), item.addres.clone())
                     }
-                    expr.kind = val;
+                    *expr.kind.borrow_mut() = val;
                 } else {
-                    throw!(format!("expect arr or asc, found {:?}", a.kind), a.addres.clone())
+                    throw!(format!("expect arr or asc, found {:?}", array_t), array.addres.clone())
                 }
             },
             EVal::Var(ref mut pref, ref name) => { // namespace, name
-                //println!("GET VAR FOR {:?} {}", pref, name);
-                //println!("{}", env.show());
                 if name == "%init" {
-                    if expr.kind.is_unk() {
-                        expr.kind = env.fun_env().parent_init();
+                    if expr.kind.borrow().is_unk() {
+                        *expr.kind.borrow_mut() = env.fun_env().parent_init();
                     }
                 } else {
                     try!(env.get_var(pref, name, &mut expr.kind, &expr.addres));
@@ -1049,36 +1159,55 @@ impl Checker {
                         env.set_rec_used(true);
                     }
                     /* MUST RECUSRIVE CHECK FOR COMPONENTS */
-                    match *expr.kind {
+                    match **expr.kind.borrow() {
                         Type::Unk => return Ok(1),
                         _ => return Ok(0)
                     }
                 }
             },
             EVal::Arr(ref mut items) => {
-                let mut item : Option<RType> = match *expr.kind {
-                    Type::Unk => None,
+                let mut expr_unk = false;
+                let mut t_item : Option<RType> = match **expr.kind.borrow() {
+                    Type::Unk => {
+                        expr_unk = true;
+                        None
+                    },
                     Type::Arr(ref v) => Some(v[0].clone()),
                     _ => panic!()
                 };
-                for i in items.iter_mut() {
-                    check!(i);
-                    match item {
-                        Some(ref t) =>
-                            if *t != i.kind && !i.kind.is_unk() {
-                                throw!(format!("expected {:?}, found {:?}", t, i.kind), i.addres.clone())
-                            },
-                        _ if !i.kind.is_unk() => item = Some(i.kind.clone()),
-                        _ => ()
+                // check all item for equality and compare with t_item
+                for item in items.iter_mut() {
+                    check!(item);
+                    match t_item {
+                        Some(_/*ref t*/) => (),
+                            /*if *t != *item_kind && !item_kind.is_unk() {
+                                throw!(
+                                    format!(
+                                        "expected {:?}, found {:?}",
+                                        t,
+                                        item_kind
+                                    ),
+                                    item.addres.clone()
+                                )
+                            },*/
+                        _ => {
+                            let item_kind = item.kind.borrow();
+                            if !item_kind.is_unk() {
+                                t_item = Some(item_kind.clone())
+                            }
+                        }
                     }
                 }
-                match item {
+                // result check for unknown
+                match t_item {
                     Some(t) => {
                         // REGRESS CALL
                         for i in items.iter_mut() {
                             regress!(i, t.clone());
                         }
-                        expr.kind = Type::arr(t);
+                        if expr_unk {
+                            *expr.kind.borrow_mut() = Type::arr(t);
+                        }
                     },
                     _ => unk_count += 1
                 }
@@ -1086,86 +1215,102 @@ impl Checker {
             EVal::Asc(ref mut items) => {
                 let mut key_type : Option<RType> = None;
                 let mut val_type : Option<RType> = None;
-                if expr.kind.is_asc() {
-                    let (a,b) = expr.kind.asc_key_val();
-                    key_type = Some(a);
-                    val_type = Some(b);
+                {
+                    let expr_kind = expr.kind.borrow();
+                    if expr_kind.is_asc() {
+                        let (a,b) = expr_kind.asc_key_val();
+                        key_type = Some(a);
+                        val_type = Some(b);
+                    }
                 }
-                macro_rules! skey {($tp:expr, $addr:expr) => {
+                macro_rules! skey {/*($tp:expr, $addr:expr) => {
                     match key_type {
                         None        => key_type = Some($tp),
                         Some(ref t) =>
                             if *t != $tp {
                                 throw!(format!("expected {:?}, found {:?}", t, $tp), $addr)
                             }
-                    }
-                };}
-                for pair in items.iter_mut() {
-                    check!(&mut pair.b);
-                    check!(&mut pair.a);
-                    match *pair.a.kind {
-                        Type::Str  => skey!(Type::str(),  pair.a.addres),
-                        Type::Char => skey!(Type::char(), pair.a.addres),
-                        Type::Int  => skey!(Type::int(),  pair.a.addres),
-                        Type::Unk  => unk_count += 1,
-                        ref a => throw!(format!("asc key must be int, char or str, found {:?}", a), pair.a.addres.clone())
-                    }
-                    match val_type {
-                        None => if !pair.b.kind.is_unk() {
-                            val_type = Some(pair.b.kind.clone());
-                        },
-                        Some(ref t) => {
-                            if !pair.b.kind.is_unk() && pair.b.kind != *t {
-                                throw!(format!("expected {:?}, found {:?}", t, pair.b.kind), pair.b.addres.clone())
-                            }
+                    }};*/
+                    ($tp:expr) => {
+                        match key_type {
+                            Some(_) => (),
+                            None => key_type = Some($tp),
                         }
                     }
                 }
-                match key_type {
-                    Some(k) => match val_type {
-                        Some(v) => {
-                            // REGRESS CALL
-                            for pair in items.iter_mut() {
-                                regress!(&mut pair.a, k.clone());
-                                regress!(&mut pair.b, v.clone());
+                for pair in items.iter_mut() {
+                    check!(&mut pair.b);
+                    check!(&mut pair.a);
+                    match **pair.a.kind.borrow() {
+                        Type::Str  => skey!(Type::str()),//,  pair.a.addres),
+                        Type::Char => skey!(Type::char()),//, pair.a.addres),
+                        Type::Int  => skey!(Type::int()),//,  pair.a.addres),
+                        Type::Unk  => (),// unk_count += 1,
+                        ref a =>
+                            throw!(
+                                format!("asc key must be int, char or str, found {:?}", a),
+                                pair.a.addres.clone()
+                            )
+                    }
+                    match val_type {
+                        None => {
+                            let t = pair.b.kind.borrow();
+                            if !t.is_unk() {
+                                val_type = Some(t.clone());
                             }
-                            expr.kind = type_c!(vec!["%std".to_string()], "Asc".to_string(), Some(vec![k, v]));
                         },
-                        _ => unk_count += 1
+                        _ => ()
+                        /*Some(ref t) => {
+                            if !pair.b.kind.is_unk() && pair.b.kind != *t {
+                                throw!(format!("expected {:?}, found {:?}", t, pair.b.kind), pair.b.addres.clone())
+                            }
+                        }*/
+                    }
+                }
+                match (key_type, val_type) {
+                    (Some(key), Some(val)) => {
+                        // REGRESS CALL
+                        for pair in items.iter_mut() {
+                            regress!(&mut pair.a, key.clone());
+                            regress!(&mut pair.b, val.clone());
+                        }
+                        *expr.kind.borrow_mut() = type_c!(
+                            vec!["%std".to_string()], "Asc".to_string(), Some(vec![key, val])
+                        );
                     },
                     _ => unk_count += 1
                 }
             },
-            EVal::Attr(ref mut obj, ref pname, ref mut m_flag) => {
+            EVal::Attr(ref mut obj, ref attr_name, ref mut method_flag) => {
                 check!(obj);
-                if obj.kind.is_unk() {
+                let obj_t = obj.kind.borrow();
+                if obj_t.is_unk() {
                     unk_count += 1;
                 } else {
                     let is_self = match obj.val {
                         EVal::TSelf => true,
                         _ => false
                     };
-                    /*println!("GET METHOD");
-                    match env.fun_env().get_cls(&obj.kind) {
-                        Some(c) => unsafe {(*c).print()},
-                        _ => panic!()
-                    };*/
-                    match env.fun_env().get_attrib(&obj.kind, pname, is_self) {
-                        Some( (tp,is_m) ) => {
-                            expr.kind = tp;
-                            *m_flag = is_m;
+                    match env.fun_env().get_attrib(&obj_t, attr_name, is_self) {
+                        Some( (kind,is_method) ) => {
+                            *expr.kind.borrow_mut() = kind;
+                            *method_flag = is_method;
                         },
-                        _ => throw!(format!("property {} not found for {:?}", pname, obj.kind), expr.addres)
+                        _ =>
+                            throw!(
+                                format!("property {} not found for {:?}", attr_name, obj_t),
+                                expr.addres
+                            )
                     }
                 }
             },
-            EVal::ChangeType(ref mut e, ref mut tp) => {
-                check!(e);
-                check_type!(tp);
+            EVal::ChangeType(ref mut expr, ref mut new_type) => {
+                check!(expr);
+                check_type!(new_type);
             }
             EVal::TSelf =>
                 match env.fun_env.self_val {
-                    Some(ref tp) => expr.kind = tp.clone(),
+                    Some(ref tp) => *expr.kind.borrow_mut() = tp.clone(),
                     _ => throw!("using 'self' out of class", expr.addres)
                 },
             _ => ()
@@ -1173,84 +1318,148 @@ impl Checker {
         return Ok(unk_count);
     }
     #[allow(mutable_transmutes)]
-    unsafe fn check_type_pack(&self, pack : &Pack, tmpl : &Vec<String>, t : &Type, addr : &Cursor) -> CheckRes {
+    // TODO immutable check of components
+    fn check_type_pack(&self, pack : &Pack, tmpl : &Vec<String>, t : RType, addr : &Cursor) -> CheckAns<RType> {
         macro_rules! rec {($t:expr) => {self.check_type_pack(pack, tmpl, $t, addr)?}; }
-        let t : &mut Type = mem::transmute(t);
         match *t {
-            Type::Arr(ref mut item) => {
-                rec!(&mut item[0]);
+            Type::Arr(ref item) => {
+                let new_val = rec!(item[0].clone());
+                if rc_eq!(&new_val,&item[0]) {
+                	return Ok(t.clone());
+                } else {
+                	return Ok(Type::arr(new_val));
+                }
             },
-            Type::Class(ref mut pref, ref name, ref mut params) => {
+            Type::Class(ref pref, ref name, ref params) => {
+                let mut new_params = Vec::new();
+                let mut params_changed = false;
                 match *params {
-                    Some(ref mut params) =>
-                        for t in params.iter_mut() {
-                            rec!(t);
-                        },
+                    Some(ref params) => {
+                    	new_params.reserve(params.len());
+                        for t in params.iter() {
+                        	let new_tp = rec!(t.clone());
+                        	params_changed = params_changed || !rc_eq!(&new_tp,&t);
+                            new_params.push(new_tp);
+                        }
+                    },
                     _ =>
                         // CHECK FOR TEMPLATE
                         if pref.len() == 0 {
                             for name1 in tmpl.iter() {
                                 if name == name1 {
                                     // TEMPLATE FOUND
-                                    pref.push("%tmpl".to_string());
-                                    return Ok(())
+                                    return Ok(type_c!(vec![("%tmpl".to_string())], name.clone(), None))
                                 }
                             }
                         }
                 }
-                pack.check_class(pref, name, params, addr)?;
-            }
-            Type::Fn(_, ref mut args, ref mut res) => {
-                /*match *tmpl {
-                    Some(ref tmpl) =>
-                        for t in tmpl.iter() {
-                            rec!(t);
-                        },
-                    _ => ()
-                }*/
-                for t in args.iter_mut() {
-                    rec!(t);
+                match pack.check_class(pref, name, params, addr)? {
+                	Some(new_pref) => {
+                		let new_params = if new_params.len() == 0 {
+                			None
+                		} else {
+                			Some(new_params)
+                		};
+                		return Ok(type_c!(new_pref, name.clone(), new_params))
+                	},
+                	_ if params_changed => {
+                		let new_params = if new_params.len() == 0 {
+                			None
+                		} else {
+                			Some(new_params)
+                		};
+                		return Ok(type_c!(pref.clone(), name.clone(), new_params))
+                	},
+                	_ => return Ok(t.clone())
                 }
-                rec!(&**res);
+            }
+            Type::Fn(_, ref args, ref res) => {
+                let mut new_params = Vec::new();
+            	let mut params_changed = false;
+                for t in args.iter() {
+                	let t_new = rec!(t.clone());
+                	params_changed = params_changed || !rc_eq!(&t_new,&t);
+                    new_params.push(t_new);
+                }
+                let new_res = rec!(res.clone());
+                if !rc_eq!(&new_res, &res) || params_changed {
+                	return Ok(type_fn!(tmpl.clone(), new_params, new_res));
+                } else {
+                	return Ok(t.clone());
+                }
             },
-            _ => ()
+            _ => return Ok(t.clone())
         }
-        Ok(())
     }
-    // CHANGING t VAR AS MUTABLE
+
     #[allow(mutable_transmutes)]
-    unsafe fn check_type(&self, env : &LocEnv, t : &Type, addr : &Cursor) -> CheckRes {
+    fn check_type(&self, env : &LocEnv, t : RType, addr : &Cursor) -> CheckAns<RType> {
         macro_rules! rec {($t:expr) => {self.check_type(env, $t, addr)?}; }
-        let t : &mut Type = mem::transmute(t);
         match *t {
-            Type::Arr(ref mut item) => {
-                rec!(&mut item[0]);
+            Type::Arr(ref item) => {
+                let after = rec!(item[0].clone());
+                if rc_eq!(&after,&item[0]) {
+                	// not changed. return old value
+                	return Ok(t.clone());
+                } else {
+                	// construct new array type
+                	return Ok(Type::arr(after));
+                }
             },
-            Type::Class(ref mut pref, ref name, ref mut params) => {
+            Type::Class(ref pref, ref name, ref params) => {
+            	let mut new_params = Vec::new();
+            	let mut params_changed = false;
                 match *params {
-                    Some(ref mut params) =>
-                        for t in params.iter_mut() {
-                            rec!(t);
-                        },
+                    Some(ref params) => {
+          				new_params.reserve(params.len());
+                        for t in params.iter() {
+                        	let t_new = rec!(t.clone());
+                        	params_changed = params_changed || !rc_eq!(&t_new,&t);
+                            new_params.push(t_new);
+                        }
+                    },
                     _ => ()
                 }
-                try!(env.fun_env().check_class(pref, name, params, addr));
-            }
-            Type::Fn(_, ref mut args, ref mut res) => {
-                /*match *tmpl {
-                    Some(ref tmpl) =>
-                        for t in tmpl.iter() {
-                            rec!(t);
-                        },
-                    _ => ()
-                }*/
-                for t in args.iter_mut() {
-                    rec!(t);
+                match env.fun_env().check_class(pref, name, params, addr)? {
+                	Some(new_pref) => {
+                		let new_params = if new_params.len() == 0 {
+                			None
+                		} else {
+                			Some(new_params)
+                		};
+                		return Ok(type_c!(new_pref, name.clone(), new_params))
+                	},
+                	_ if params_changed => {
+                		let new_params = if new_params.len() == 0 {
+                			None
+                		} else {
+                			Some(new_params)
+                		};
+                		return Ok(type_c!(pref.clone(), name.clone(), new_params))
+                	},
+                	_ => return Ok(t.clone())
                 }
-                rec!(&**res);
             },
-            _ => ()
+            Type::Fn(ref tmpl, ref args, ref res) => {
+            	let mut new_params = Vec::new();
+            	let mut params_changed = false;
+                for t in args.iter() {
+                	let t_new = rec!(t.clone());
+                	params_changed = params_changed || !rc_eq!(&t_new, &t);
+                    new_params.push(t_new);
+                }
+                let new_res = rec!(res.clone());
+                if !rc_eq!(&new_res, &res) || params_changed {
+                    let tmpl = match *tmpl {
+                        Some(ref vec) => vec.clone(),
+                        None => vec![]
+                    };
+                	return Ok(type_fn!(tmpl, new_params, new_res));
+                } else {
+                	return Ok(t.clone());
+                }
+            },
+            _ => return Ok(t.clone())
         }
-        Ok(())
     }
 }
