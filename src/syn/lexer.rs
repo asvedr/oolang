@@ -29,38 +29,10 @@ pub enum LexTP {
     Br,            // ok q
     Dot,        // ok q
     Hash,
-    //Comma,        // ok q
-    //DCM,        // ok
     Opr,        // ok q
     DecType,    // ok q
     NSpace,        // ok q
 }
-
-/*
-impl LexTP {
-    pub fn to_string(&self) -> String {
-        format!("{:?}", self)
-    }
-}
-*/
-
-/*
-// this struct don't used in this module but using in others
-#[derive(Debug,Clone)]
-pub struct Lexem {
-    pub val  : String,
-    pub kind : LexTP
-}
-
-impl LexRes {
-    pub fn compare_with(&self, lexem : &Lexem) -> bool {
-        if self.kind == lexem.kind
-            { return self.val == lexem.val }
-        else
-            { return false }
-    }
-}
-*/
 
 // return lex err
 macro_rules! lexerr {
@@ -503,3 +475,37 @@ fn read_str(s : &str) -> Result<String,String> {
     Ok(acc)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+//    #[test]
+    fn check_seq(src : &str, tps : &[LexTP], vals : &[&str]) {
+        let lexer = Lexer::new(src);
+        let mut curs = Cursor:new();
+        for i in 0 .. tps.len() {
+            match lexer.lex(&curs) {
+                Ok(res) => {
+                    assert_eq!(vals[i], res.val);
+                    assert_eq!(tps[i], res.kind);
+                    curs = res.cursor;
+                },
+                Err(err) => {
+                    assert!(false);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn internal() {
+        let src = "hop 1   hip 1.2, +=321";
+        let tps = [LexTP::Id, LexTP::Int, LexTP::Id, LexTP::Real, LexTP::Dot, LexTP::Opr, LexTP::Int];
+        let vals= ["hop", "1", "hip", "1.2", "+=", "321"];
+        check_seq(src, tps, vals);
+        let src = "   'c' ()[]     ..\n#\t: ::\"a b\\n\""
+        let tps = [LexTP::Char, LexTP::Br, LexTP::Br, LexTP::Br, LexTP::Br, LexTP::Dot, LexTP::Dot, LexTP::Hash, LexTP::DecType, LexTP::NSpace, LexTP::Str];
+        let vals= ["'c'","(",")","[","]",".",".","#",":","::","a b\n"];
+        check_seq(src, tps, vals);
+    }
+}
